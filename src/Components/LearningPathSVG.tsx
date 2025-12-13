@@ -1,130 +1,96 @@
-// LearningPathSVG.tsx
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-
-interface NodePosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import React, { useEffect, useState, useRef } from 'react';
 
 interface LearningPathSVGProps {
-  nodeRefs: React.MutableRefObject<Array<HTMLDivElement | null>>;
+  nodeRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   pathDataLength: number;
 }
 
 const LearningPathSVG: React.FC<LearningPathSVGProps> = ({ nodeRefs, pathDataLength }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
   const [pathD, setPathD] = useState('');
-  
-  // --- ¡NUEVO ESTADO PARA LA ALTURA! ---
-  const [svgHeight, setSvgHeight] = useState(0); 
+  // Ref para acceder al elemento <path> real en el DOM
+  const pathElementRef = useRef<SVGPathElement>(null);
+  const [pathLength, setPathLength] = useState(0);
 
-  const calculatePath = useCallback(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+  // 1. Calcular la forma del camino (igual que antes)
+  const calculatePath = () => {
+    if (pathDataLength === 0 || nodeRefs.current.length === 0) return;
+    const firstNode = nodeRefs.current[0];
+    if (!firstNode || !firstNode.offsetParent) return;
 
-    const positions: NodePosition[] = [];
-    nodeRefs.current.forEach((ref) => {
-      if (ref) {
-        const rect = ref.getBoundingClientRect();
-        const svgRect = svg.getBoundingClientRect();
-        positions.push({
-          x: rect.left + rect.width / 2 - svgRect.left,
-          y: rect.top + rect.height / 2 - svgRect.top,
-          width: rect.width,
-          height: rect.height,
-        });
+    let d = '';
+    for (let i = 0; i < pathDataLength - 1; i++) {
+      const current = nodeRefs.current[i];
+      const next = nodeRefs.current[i + 1];
+      if (current && next) {
+        const x1 = current.offsetLeft + current.offsetWidth / 2;
+        const y1 = current.offsetTop + current.offsetHeight / 2;
+        const x2 = next.offsetLeft + next.offsetWidth / 2;
+        const y2 = next.offsetTop + next.offsetHeight / 2;
+        if (i === 0) d += `M ${x1} ${y1} `;
+        const halfY = (y2 - y1) / 2;
+        d += `C ${x1} ${y1 + halfY}, ${x2} ${y2 - halfY}, ${x2} ${y2} `;
       }
-    });
-
-    if (positions.length < 2) {
-      setPathD('');
-      return;
     }
-
-    let d = `M ${positions[0].x} ${positions[0].y}`;
-    
-    // --- ¡NUEVA LÓGICA! ---
-    // Encontrar la posición 'y' más baja para saber qué tan alto debe ser el SVG
-    let maxY = positions[0].y + positions[0].height / 2;
-
-    for (let i = 0; i < positions.length - 1; i++) {
-      const p0 = positions[i];
-      const p1 = positions[i + 1];
-
-      const midX = (p0.x + p1.x) / 2;
-      const midY = (p0.y + p1.y) / 2;
-
-      const waveOffset = 30; 
-      const cp1x = p0.x + (p1.x - p0.x) / 3;
-      const cp1y = p0.y + (p1.y - p0.y) / 3 + (i % 2 === 0 ? waveOffset : -waveOffset); 
-
-      const cp2x = p1.x - (p1.x - p0.x) / 3;
-      const cp2y = p1.y - (p1.y - p0.y) / 3 + (i % 2 === 0 ? -waveOffset : waveOffset); 
-
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
-      
-      // Actualizar la altura máxima
-      maxY = Math.max(maxY, p1.y + p1.height / 2);
-    }
-
     setPathD(d);
-    
-    // --- ¡AQUÍ ESTÁ LA MAGIA! ---
-    // Establecer la altura del SVG para que sea tan alta como el nodo más bajo
-    // Se añaden 50px de espacio extra
-    setSvgHeight(maxY + 50); 
+  };
 
-  }, [nodeRefs]);
-
+  // 2. Efecto para calcular la ruta y luego preparar la animación
   useEffect(() => {
     calculatePath();
     window.addEventListener('resize', calculatePath);
-    // Usamos un timeout para asegurarnos de que los nodos estén en su posición final
-    const timeout = setTimeout(calculatePath, 100); 
-
+    const timeout = setTimeout(calculatePath, 500);
     return () => {
       window.removeEventListener('resize', calculatePath);
       clearTimeout(timeout);
     };
-  }, [calculatePath, pathDataLength]);
+  }, [pathDataLength, nodeRefs]);
 
-  const draw = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { duration: 1.0, delay: 0.5 } // Simple fade-in
-    }
-  };
+  // 3. Efecto NUEVO para medir la línea y activar la animación cuando 'pathD' cambia
+  useEffect(() => {
+      if (pathElementRef.current && pathD) {
+          // Obtener la longitud total de la línea dibujada
+          const length = pathElementRef.current.getTotalLength();
+          setPathLength(length);
+
+          // Resetear la animación: ocultar la línea
+          pathElementRef.current.style.transition = 'none';
+          pathElementRef.current.style.strokeDasharray = `${length} ${length}`;
+          pathElementRef.current.style.strokeDashoffset = `${length}`;
+
+          // Forzar un reflow del navegador para que aplique los estilos anteriores
+          pathElementRef.current.getBoundingClientRect();
+
+          // Activar la animación hacia strokeDashoffset: 0
+          setTimeout(() => {
+              if(pathElementRef.current) {
+                  // Duración de 1.5s con efecto de desaceleración suave
+                  pathElementRef.current.style.transition = 'stroke-dashoffset 1.5s ease-out';
+                  pathElementRef.current.style.strokeDashoffset = '0';
+              }
+          }, 50);
+      }
+  }, [pathD]);
 
   return (
-    <svg 
-      ref={svgRef} 
-      style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        width: '100%', 
-        // --- ¡AQUÍ ESTÁ EL CAMBIO! ---
-        // La altura ya no es '100%', sino la altura calculada (o '100vh' como fallback)
-        height: svgHeight ? `${svgHeight}px` : '100vh', 
-        pointerEvents: 'none', 
-        zIndex: 0 
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+        pointerEvents: 'none', overflow: 'visible', zIndex: 0
       }}
     >
-      <motion.path
+      {/* Sombra de la línea para profundidad */}
+      <path d={pathD} fill="none" stroke="rgba(0,0,0,0.1)" strokeWidth="14" strokeLinecap="round" />
+      
+      {/* La línea principal que se anima */}
+      <path
+        ref={pathElementRef}
         d={pathD}
-        fill="transparent"
-        stroke="#4a4a5a" // Color de la línea
-        strokeWidth="6"   // Grosor de la línea
+        fill="none"
+        stroke="#e5e5e5"
+        strokeWidth="10"
         strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray="10 10" // Mantiene el efecto punteado
-        variants={draw} 
-        initial="hidden"
-        animate="visible"
+        // NOTA: Quitamos strokeDasharray="12 12" (punteado) porque interfiere 
+        // con la animación de dibujado. La línea sólida se ve mejor animada.
       />
     </svg>
   );

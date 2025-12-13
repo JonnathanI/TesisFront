@@ -1,12 +1,26 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
+// IMPORTANTE: Recuerda tener las imágenes en tu carpeta public
+const BIRD_ICON_URL = "/euro-04.png"; 
+const BIRD_BACKGROUND_URL = "/euro-02.png"; 
+
 export default function HomeIngles() {
   const navigate = useNavigate();
 
   return (
     <>
       <style>{`
+        /* PALETA DE COLORES */
+        :root {
+          --color-bg-light: #E5E6E6; 
+          --color-primary-blue: #278DCE; 
+          --color-secondary-yellow: #FFD700; 
+          --color-card-bg: rgba(255, 255, 255, 0.9); 
+          --color-text-dark: #4A4A4A; 
+          --color-text-light: #FFFFFF; 
+        }
+        
         html, body, #root {
           margin: 0;
           height: 100%;
@@ -15,23 +29,73 @@ export default function HomeIngles() {
         }
 
         body {
-          background: linear-gradient(135deg, #1a1a1a, #0f0f0f, #2a2a2a, #1f1f1f);
-          background-size: 400% 400%;
-          animation: backgroundMove 20s ease infinite;
-          color: white;
+          background-color: var(--color-bg-light);
+          color: var(--color-text-dark); 
+        }
+        
+        .home-container { 
+          display: flex; 
+          flex-direction: column; 
+          min-height: 100vh;
+          position: relative; 
+          z-index: 1; 
+        }
+        
+        /* FONDO GRANDE (SIN CAMBIOS) */
+        .bird-background {
+          position: fixed; 
+          top: 50%; 
+          left: 50%;
+          transform: translate(-50%, -50%); 
+          height: 140vh; 
+          width: auto;
+          max-width: 100%;
+          opacity: 0.5; 
+          z-index: 0; 
+          pointer-events: none; 
+          object-fit: contain; 
         }
 
-        @keyframes backgroundMove {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
+        /* --- NUEVO: ESTILO PARA EL TEXTO "Europeek" --- */
+        .logo-text {
+          position: absolute;
+          left: 40px; /* Separación desde la izquierda */
+          top: 30px;  /* Separación desde arriba */
+          font-size: 32px;
+          font-weight: 900;
+          color: var(--color-primary-blue);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          /* Sombra para que destaque y combine con el tema */
+          text-shadow: 2px 2px 0px var(--color-secondary-yellow);
+          cursor: pointer;
+          z-index: 10;
         }
 
-        .home-container { display: flex; flex-direction: column; min-height: 100vh; }
+        /* --- CAMBIOS AQUÍ: ÍCONO MÁS GRANDE Y CON MOVIMIENTO --- */
+        .bird-icon-title {
+          height: 100px; /* AUMENTADO: Antes era 55px */
+          width: auto;
+          vertical-align: middle;
+          margin-left: 15px;
+          margin-bottom: 10px;
+          display: inline-block;
+          
+          /* ANIMACIÓN AÑADIDA */
+          animation: floatBird 3s ease-in-out infinite;
+        }
 
-        .header { width: 100%; display: flex; justify-content: center; align-items: center; padding: 25px 40px; }
+        /* DEFINICIÓN DE LA ANIMACIÓN DE MOVIMIENTO */
+        @keyframes floatBird {
+          0% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-15px) rotate(5deg); } /* Sube y rota un poquito */
+          100% { transform: translateY(0px) rotate(0deg); }
+        }
 
-        .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 20px; position: relative; }
+        /* --- Estilos de Componentes --- */
+        .header { width: 100%; display: flex; justify-content: center; align-items: center; padding: 25px 40px; position: relative; z-index: 2; }
+
+        .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 20px; position: relative; z-index: 2;}
 
         .hero h1 {
           font-size: 64px;
@@ -40,46 +104,33 @@ export default function HomeIngles() {
           margin-bottom: 20px;
           text-transform: uppercase;
           position: relative;
-          color: #00ffff;
-          text-shadow: 
-            0 0 5px #00ffff,
-            0 0 10px #00aaff,
-            0 0 20px #00ffff,
-            0 0 30px #00aaff;
-          animation: glowText 1.5s infinite alternate;
+          color: var(--color-primary-blue); 
+          text-shadow: 0 0 5px rgba(39, 141, 206, 0.7), 0 0 10px rgba(39, 141, 206, 0.4);
         }
 
         .hero h1 span {
-          color: #ffdd00;
-          text-shadow: 0 0 10px #ffdd00, 0 0 20px #ffaa00, 0 0 30px #ffcc00;
+          color: var(--color-secondary-yellow); 
+          text-shadow: 0 0 5px rgba(255, 215, 0, 0.7);
         }
-
+        
         .hero h1::before, .hero h1::after {
           content: "🇬🇧";
           font-size: 48px;
           position: absolute;
           top: -20px;
-          animation: iconMove 2s infinite alternate;
+          animation: none;
         }
-        .hero h1::after {
-          content: "🇺🇸";
-          right: -60px;
-        }
+        .hero h1::after { content: "🇺🇸"; right: -60px; }
         .hero h1::before { left: -60px; }
 
-        @keyframes glowText {
-          0% { text-shadow: 0 0 5px #00ffff,0 0 10px #00aaff,0 0 20px #00ffff; }
-          50% { text-shadow: 0 0 10px #00ffff,0 0 20px #00aaff,0 0 30px #00ffff; }
-          100% { text-shadow: 0 0 5px #00ffff,0 0 10px #00aaff,0 0 20px #00ffff; }
+        .hero p { 
+          font-size: 20px; 
+          opacity: 1; 
+          margin-bottom: 40px; 
+          max-width: 700px; 
+          animation: fadeUp 1.5s ease forwards; 
+          color: var(--color-text-dark); 
         }
-
-        @keyframes iconMove {
-          0% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(-10px); opacity: 0.8; }
-          100% { transform: translateY(0); opacity: 1; }
-        }
-
-        .hero p { font-size: 20px; opacity: 0.9; margin-bottom: 40px; max-width: 700px; animation: fadeUp 1.5s ease forwards; }
 
         .hero-buttons { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
 
@@ -94,81 +145,86 @@ export default function HomeIngles() {
           overflow: hidden;
           transition: all 0.3s ease;
           text-transform: uppercase;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); 
         }
 
         .btn-login {
-          background: rgba(255,255,255,0.15);
-          color: #00ffff;
-          border: 2px solid #00ffff;
-          box-shadow: 0 0 20px rgba(0,255,255,0.5);
-          animation: glowLogin 2s infinite alternate;
+          background: var(--color-card-bg); 
+          color: var(--color-primary-blue); 
+          border: 2px solid var(--color-primary-blue); 
+          box-shadow: none; 
         }
         .btn-login:hover {
-          transform: scale(1.1) translateY(-3px);
-          box-shadow: 0 0 35px rgba(0,255,255,0.8);
+          transform: scale(1.05);
+          background-color: var(--color-primary-blue); 
+          color: var(--color-text-light); 
+          box-shadow: 0 8px 20px rgba(39, 141, 206, 0.4);
         }
-        @keyframes glowLogin {
-          0% { box-shadow: 0 0 15px rgba(0,255,255,0.5); }
-          50% { box-shadow: 0 0 25px rgba(0,255,255,0.7); }
-          100% { box-shadow: 0 0 15px rgba(0,255,255,0.5); }
-        }
-
+        
         .btn-play {
-          background: linear-gradient(270deg, #00ffff, #00aaff, #00ddff, #00ffcc);
-          background-size: 600% 600%;
-          color: black;
+          background: var(--color-secondary-yellow); 
+          color: var(--color-text-dark); 
           font-weight: 900;
-          box-shadow: 0 0 20px rgba(0,255,255,0.5);
-          animation: gradientBtn 4s ease infinite, bounce 2s infinite;
+          border: 2px solid var(--color-secondary-yellow);
+          box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
         }
         .btn-play:hover {
-          transform: scale(1.15) rotate(-2deg);
-          box-shadow: 0 0 45px rgba(0,255,255,0.9);
+          transform: scale(1.1);
+          background-color: #FFC000; 
+          box-shadow: 0 8px 25px rgba(255, 215, 0, 0.8);
         }
 
-        @keyframes gradientBtn {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-
-        .cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin: 60px 0; }
+        .cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin: 60px 0; position: relative; z-index: 2; }
 
         .card {
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--color-card-bg);
           border-radius: 25px;
           width: 280px;
           padding: 30px 20px;
-          backdrop-filter: blur(15px);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-          transition: transform 0.5s ease, box-shadow 0.5s ease;
+          backdrop-filter: blur(5px); 
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); 
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
           cursor: pointer;
-          animation: fadeIn 2s ease forwards;
+          border: 1px solid rgba(0, 0, 0, 0.1); 
         }
-        .card:hover { transform: translateY(-20px) scale(1.05); box-shadow: 0 20px 50px rgba(255,255,255,0.35); }
-        .card h3 { font-size: 24px; margin-bottom: 10px; color: #00ffff; }
-        .card p { font-size: 15px; opacity: 0.85; }
+        .card:hover { transform: translateY(-10px) scale(1.03); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3); }
+        .card h3 { font-size: 24px; margin-bottom: 10px; color: var(--color-primary-blue); }
+        .card p { font-size: 15px; opacity: 1; color: var(--color-text-dark); }
 
-        .footer { text-align: center; padding: 20px; opacity: 0.8; font-size: 14px; }
+        .footer { text-align: center; padding: 20px; opacity: 0.8; font-size: 14px; position: relative; z-index: 2; }
 
+        @media (max-width: 900px) { 
+          .hero h1 { font-size: 45px; } 
+          .cards { flex-direction: column; align-items: center; } 
+          .logo-text { left: 20px; top: 20px; font-size: 24px; } /* Ajuste de logo en móvil */
+        }
         @keyframes fadeUp { 0% { transform: translateY(30px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
-
-        @media (max-width: 900px) { .hero h1 { font-size: 45px; } .cards { flex-direction: column; align-items: center; } }
       `}</style>
 
       <div className="home-container">
+        
+        <img 
+          src={BIRD_BACKGROUND_URL} 
+          alt="Pájaro Fondo"
+          className="bird-background"
+        />
+
         <header className="header">
-          {/* Logo eliminado */}
+          {/* NUEVO: Logo Europeek en la esquina izquierda */}
+          <div className="logo-text">Europeek</div>
         </header>
 
         <section className="hero">
           <h1>
-            Aprende <span>Inglés</span> jugando <br /> y conquista el mundo 🌍
+            Aprende <span>Inglés</span> jugando 
+            <br /> y conquista el mundo 
+            
+            {/* ÍCONO MÁS GRANDE Y CON ANIMACIÓN */}
+            <img 
+              src={BIRD_ICON_URL} 
+              alt="Pájaro Animado"
+              className="bird-icon-title"
+            />
           </h1>
           <p>
             Únete a millones de estudiantes que aprenden inglés de forma divertida,
