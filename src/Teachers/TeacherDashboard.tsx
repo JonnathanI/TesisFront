@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import StudentTable from "./StudentTable"; // Componente asumido
+import { registerBulk } from "../api/auth.service";
 
 // --- IMPORTS API ---
 import {
@@ -12,7 +13,6 @@ import {
   getStudentList, 
   deleteUnit, deleteLesson, updateUnit, updateLesson, updateQuestion, 
   removeToken, 
-  
   ClassroomData, AssignmentData, QuestionData, UnitData, LessonData, StudentData
 } from '../api/auth.service';
 
@@ -26,8 +26,176 @@ const sidebarNavItems = [
   { label: "UNIDADES", id: "units", icon: "📚" },
   { label: "LECCIONES", id: "lessons", icon: "📖" },
   { label: "PREGUNTAS", id: "questions", icon: "❓" },
+{ label: "CARGA MASIVA", id: "bulk", icon: "👥" }, 
   { label: "MÁS", id: "more", icon: "⋯" },
 ];
+
+const BulkRegistrationTab = () => {
+  const [rows, setRows] = useState<any[]>([
+    { id: Date.now(), fullName: "", email: "", password: "" }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState<any>(null);
+
+  // Añadir una nueva fila vacía
+  const addRow = () => {
+    setRows([...rows, { id: Date.now(), fullName: "", email: "", password: "" }]);
+  };
+
+  // Eliminar una fila específica
+  const removeRow = (id: number) => {
+    if (rows.length > 1) {
+      setRows(rows.filter(row => row.id !== id));
+    }
+  };
+
+  // Actualizar el valor de una celda específica
+  const handleInputChange = (id: number, field: string, value: string) => {
+    setRows(rows.map(row => row.id === id ? { ...row, [field]: value } : row));
+  };
+
+  const handleBulkSubmit = async () => {
+    // Filtrar filas vacías o incompletas
+    const studentsToRegister = rows.filter(r => r.fullName.trim() && r.email.trim());
+    
+    if (studentsToRegister.length === 0) {
+      alert("Por favor, completa al menos una fila con Nombre y Email.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const payload = { 
+        students: studentsToRegister.map(({ fullName, email, password }) => ({ 
+          fullName, 
+          email, 
+          password: password || "temp123" 
+        })) 
+      };
+      
+      const response = await registerBulk(payload);
+      setResults(response);
+      
+      // Limpiar el formulario de registro al cumplir el proceso
+      setRows([{ id: Date.now(), fullName: "", email: "", password: "" }]);
+      
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ color: 'white' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div>
+          <h2 style={{ color: '#1cb0f6', margin: 0 }}>Carga Masiva de Alumnos</h2>
+          <p style={{ opacity: 0.7, margin: '5px 0 0 0' }}>Ingresa los datos en la cuadrícula para registrar múltiples usuarios.</p>
+        </div>
+        <button 
+          onClick={addRow}
+          style={{ background: '#58cc02', color: 'white', border: 'none', padding: '0.8rem 1.5rem', borderRadius: '0.8rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <span>+</span> Añadir Fila
+        </button>
+      </div>
+      
+      <div style={{ background: '#1f2a30', borderRadius: '1rem', border: '2px solid #2c363a', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#131f24', textAlign: 'left', borderBottom: '2px solid #2c363a' }}>
+              <th style={{ padding: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>NOMBRE COMPLETO</th>
+              <th style={{ padding: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>CORREO ELECTRÓNICO</th>
+              <th style={{ padding: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>CONTRASEÑA (OPCIONAL)</th>
+              <th style={{ width: '50px' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} style={{ borderBottom: '1px solid #2c363a' }}>
+                <td style={{ padding: '0.5rem' }}>
+                  <input 
+                    type="text"
+                    value={row.fullName}
+                    onChange={(e) => handleInputChange(row.id, 'fullName', e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    style={{ width: '100%', padding: '0.6rem', background: 'transparent', border: 'none', color: 'white', outline: 'none' }}
+                  />
+                </td>
+                <td style={{ padding: '0.5rem' }}>
+                  <input 
+                    type="email"
+                    value={row.email}
+                    onChange={(e) => handleInputChange(row.id, 'email', e.target.value)}
+                    placeholder="juan@empresa.com"
+                    style={{ width: '100%', padding: '0.6rem', background: 'transparent', border: 'none', color: 'white', outline: 'none' }}
+                  />
+                </td>
+                <td style={{ padding: '0.5rem' }}>
+                  <input 
+                    type="text"
+                    value={row.password}
+                    onChange={(e) => handleInputChange(row.id, 'password', e.target.value)}
+                    placeholder="Por defecto: temp123"
+                    style={{ width: '100%', padding: '0.6rem', background: 'transparent', border: 'none', color: 'white', outline: 'none' }}
+                  />
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <button 
+                    onClick={() => removeRow(row.id)}
+                    style={{ background: 'none', border: 'none', color: '#ff4b4b', cursor: 'pointer', fontSize: '1.2rem', padding: '0.5rem' }}
+                    title="Eliminar fila"
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <button 
+          onClick={handleBulkSubmit} 
+          disabled={isLoading}
+          style={{ width: '250px', padding: '1rem', background: '#1cb0f6', border: 'none', borderRadius: '0.8rem', fontWeight: 'bold', color: 'white', cursor: 'pointer', fontSize: '1rem' }}
+        >
+          {isLoading ? "Procesando..." : "Guardar Todos los Estudiantes"}
+        </button>
+      </div>
+
+      {results && (
+        <div style={{ marginTop: '2rem', padding: '1.5rem', background: results.failureCount > 0 ? 'rgba(255, 75, 75, 0.1)' : 'rgba(88, 204, 2, 0.1)', borderRadius: '1rem', border: `2px solid ${results.failureCount > 0 ? '#ff4b4b' : '#58cc02'}` }}>
+          <h3 style={{ marginTop: 0, color: results.failureCount > 0 ? '#ff4b4b' : '#58cc02' }}>
+            {results.failureCount > 0 ? "⚠️ Proceso completado con advertencias" : "✅ ¡Éxito total!"}
+          </h3>
+          <p>Se procesaron {results.totalProcessed} registros:</p>
+          <ul>
+            <li style={{ color: '#58cc02' }}>Éxitos: {results.successCount}</li>
+            <li style={{ color: '#ff4b4b' }}>Fallos: {results.failureCount}</li>
+          </ul>
+          {results.errors.length > 0 && (
+            <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+              <strong>Detalle de errores:</strong>
+              {results.errors.map((err: any, i: number) => (
+                <div key={i} style={{ opacity: 0.8 }}>• {err.email}: {err.message}</div>
+              ))}
+            </div>
+          )}
+          <button 
+            onClick={() => setResults(null)}
+            style={{ marginTop: '1rem', background: 'transparent', border: '1px solid white', color: 'white', padding: '0.4rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.8rem' }}
+          >
+            Cerrar Reporte
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -651,6 +819,11 @@ export default function TeacherDashboard() {
 
                 {/* --- ESTUDIANTES --- */}
                 {activeTab === "students" && <motion.div key="students" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="section-card"><h2>Estudiantes</h2><StudentTable /></motion.div>}
+              {activeTab === "bulk" && (
+  <motion.div key="bulk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="section-card">
+    <BulkRegistrationTab />
+  </motion.div>
+)}
             </AnimatePresence>
         </main>
       </div>

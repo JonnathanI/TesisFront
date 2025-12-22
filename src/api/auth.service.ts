@@ -163,6 +163,20 @@ export interface LeaderboardEntry {
     position: number;
 }
 
+// --- TIPOS PARA REGISTRO MASIVO ---
+export interface BulkUserItem {
+    fullName: string;
+    email: string;
+    password?: string;
+}
+
+export interface BulkRegisterResponse {
+    totalProcessed: number;
+    successCount: number;
+    failureCount: number;
+    errors: { email: string; message: string }[];
+}
+
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
 // ==========================================
@@ -494,4 +508,13 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
         method: 'POST',
         body: JSON.stringify({ itemType }),
     });
+};
+
+// --- FUNCIÓN DE EXPORTACIÓN ---
+export const registerBulk = async (data: { students: BulkUserItem[] }): Promise<BulkRegisterResponse> => {
+    const response = await apiFetch('/auth/register-bulk', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+    return response.json();
 };
