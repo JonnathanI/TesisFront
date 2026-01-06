@@ -13,16 +13,19 @@ import {
   getStudentList, 
   deleteUnit, deleteLesson, updateUnit, updateLesson, updateQuestion, 
   removeToken, 
-  ClassroomData, AssignmentData, QuestionData, UnitData, LessonData, StudentData
+  ClassroomData, AssignmentData, QuestionData, UnitData, LessonData, StudentData,
+getCourses,createCourse, generateTeacherRegistrationCode
 } from '../api/auth.service';
+import { get } from "http";
 
-const DEFAULT_COURSE_ID = "fb7390f6-40d6-4b8e-b770-36e6e2b3d8f9";
+//const DEFAULT_COURSE_ID = "fb7390f6-40d6-4b8e-b770-36e6e2b3d8f9";
 
 // --- DATOS ESTÁTICOS ---
 const sidebarNavItems = [
   { label: "DASHBOARD", id: "dashboard", icon: "📊" },
   { label: "GRUPOS", id: "groups", icon: "🏫" },
   { label: "ESTUDIANTES", id: "students", icon: "👨‍🎓" },
+  { label: "CURSOS", id: "courses", icon: "🎓" },
   { label: "UNIDADES", id: "units", icon: "📚" },
   { label: "LECCIONES", id: "lessons", icon: "📖" },
   { label: "PREGUNTAS", id: "questions", icon: "❓" },
@@ -195,6 +198,13 @@ const BulkRegistrationTab = () => {
     </div>
   );
 };
+interface Student {
+  id: string;
+  fullName: string;
+  xpTotal: number;
+  currentStreak: number;
+  isActive: boolean;
+}
 
 
 export default function TeacherDashboard() {
@@ -207,6 +217,12 @@ export default function TeacherDashboard() {
   
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+const [currentCourseId, setCurrentCourseId] = useState<string>("");
+  const [courses, setCourses] = useState<any[]>([]);
+const [newCourseTitle, setNewCourseTitle] = useState("");
+const [newCourseDesc, setNewCourseDesc] = useState("");
+const [selectedCourseId, setSelectedCourseId] = useState<string>("");
 
   // --- TEMA ---
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -233,6 +249,7 @@ export default function TeacherDashboard() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [groupAssignments, setGroupAssignments] = useState<AssignmentData[]>([]);
+const [coursesList, setCoursesList] = useState<any[]>([]);
   
   // Formularios
   const [newUnitTitle, setNewUnitTitle] = useState("");
@@ -252,9 +269,16 @@ export default function TeacherDashboard() {
   const [newOptions, setNewOptions] = useState(["", "", "", ""]);
   const [correctAnswer, setCorrectAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("GRAMMAR");
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [registrationCode, setRegistrationCode] = useState<string | null>(null);
+  const [loadingCode, setLoadingCode] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
   // --- EFECTOS ---
   useEffect(() => {
+    fetchCourses();
     fetchUnits();
     fetchClassrooms();
     fetchAllStudents(); 
@@ -265,7 +289,7 @@ export default function TeacherDashboard() {
   useEffect(() => { if (selectedLessonId) fetchQuestions(selectedLessonId); else setQuestions([]); }, [selectedLessonId]);
 
   // --- FETCHERS ---
-  const fetchUnits = async () => { try { const data = await getCourseUnits(DEFAULT_COURSE_ID); setUnits(data); if (data.length > 0 && !selectedUnitId) setSelectedUnitId(data[0].id); } catch (err) { console.error("Error fetching units:", err); } };
+  const fetchUnits = async () => { try { const data = await getCourseUnits(currentCourseId); setUnits(data); if (data.length > 0 && !selectedUnitId) setSelectedUnitId(data[0].id); } catch (err) { console.error("Error fetching units:", err); } };
   const fetchLessons = async (unitId: string) => { try { const data = await getLessonsByUnit(unitId); setLessons(data); if (data.length > 0) setSelectedLessonId(data[0].id); else setSelectedLessonId(""); } catch (err) { console.error("Error fetching lessons:", err); } };
   const fetchQuestions = async (lessonId: string) => { setIsLoading(true); try { const data = await getQuestionsByLesson(lessonId); setQuestions(data); } catch (err) { console.error("Error fetching questions:", err); } finally { setIsLoading(false); } };
   const fetchClassrooms = async () => { try { const data = await getTeacherClassrooms(); setClassrooms(data); } catch(e) { console.error("Error fetching classrooms:", e); } }
@@ -291,19 +315,41 @@ export default function TeacherDashboard() {
       setNewQuestionText(""); setNewOptions(["", "", "", ""]); setCorrectAnswer("");
   };
 
+    const fetchCourses = async () => {
+        try {
+            const data = await getCourses();
+            setCoursesList(data);
+        } catch (e) {
+            console.error("Error cargando cursos:", e);
+        }
+    };
+
+    const handleCreateCourse = async () => {
+    if (!newCourseTitle) return alert("El título es obligatorio");
+    try {
+        await createCourse({ title: newCourseTitle, description: newCourseDesc });
+        alert("Curso creado");
+        setNewCourseTitle(""); setNewCourseDesc("");
+        fetchCourses(); // Recargar lista
+        setSubTab('list');
+    } catch (e) { alert("Error al crear curso"); }
+};
+
   // --- HANDLERS UNIDADES ---
   const handleSaveUnit = async () => {
       if (!newUnitTitle) return alert("Falta título");
+      if (!currentCourseId) return alert("Error: ID del curso no disponible");
       try {
           if (editingId) {
               await updateUnit(editingId, { title: newUnitTitle, unitOrder: Number(newUnitOrder) });
-              alert("Unidad actualizada");
           } else {
-              await createUnit({ courseId: DEFAULT_COURSE_ID, title: newUnitTitle, unitOrder: Number(newUnitOrder) });
-              alert("Unidad creada");
+              await createUnit({ courseId: currentCourseId, title: newUnitTitle, unitOrder: Number(newUnitOrder) });
           }
-          resetForm(); fetchUnits(); setSubTab('list');
-      } catch (err: any) { alert("Error al guardar unidad"); }
+          resetForm(); 
+          const updateUnits = await getCourseUnits(currentCourseId);
+          setUnits(updateUnits);
+          setSubTab('list');
+      } catch (err: any) { alert("Error al guardar unidad" + err.message); }
   };
 
   const handleEditUnit = (u: UnitData) => {
@@ -351,7 +397,7 @@ export default function TeacherDashboard() {
       const validOptions = newOptions.filter(o => o.trim());
       if (validOptions.length < 2) return alert("Mínimo 2 opciones");
       
-      const payload = { lessonId: selectedLessonId, questionTypeId: "TRANSLATION_TO_TARGET", textSource: newQuestionText, textTarget: correctAnswer, options: validOptions };
+      const payload = { lessonId: selectedLessonId, questionTypeId: "TRANSLATION_TO_TARGET", textSource: newQuestionText, textTarget: correctAnswer, options: validOptions , category: selectedCategory, audioUrl: audioUrl || undefined };
       try {
           if (editingId) {
               await updateQuestion(editingId, payload);
@@ -426,6 +472,29 @@ export default function TeacherDashboard() {
           alert("Error al añadir estudiante manualmente. Verifique que el email exista."); 
       } 
   }
+useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const loadStudents = async () => {
+    try {
+      const data = await getStudentList();
+      setStudents(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+  const handleGenerateCode = async () => {
+    try {
+      setLoadingCode(true);
+      const code = await generateTeacherRegistrationCode();
+      setRegistrationCode(code);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoadingCode(false);
+    }
+  };
 
   const handleLogoutClick = () => { setShowMoreMenu(false); setShowLogoutModal(true); };
   
@@ -525,8 +594,87 @@ export default function TeacherDashboard() {
             <AnimatePresence mode="wait">
                 
                 {/* DASHBOARD */}
-                {activeTab === "dashboard" && <motion.div key="dashboard" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="section-card"><h2>👋 Bienvenido</h2><p>Selecciona una opción del menú para comenzar.</p></motion.div>}
+                {activeTab === "dashboard" && <motion.div key="dashboard" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="section-card"><h2>👋 Bienvenido</h2><p>Selecciona una opción del menú para comenzar.</p>
+  {/* GENERAR CÓDIGO DE REGISTRO */}
+<div
+  style={{
+    marginTop: "2rem",
+    maxWidth: "420px",
+    padding: "1.5rem",
+    borderRadius: "1rem",
+    background: currentTheme.cardBg,
+    border: `2px solid ${currentTheme.border}`
+  }}
+>
+  <h3 style={{ marginBottom: "1rem" }}>🔑 Código de registro</h3>
 
+  <button
+    onClick={handleGenerateCode}
+    disabled={loadingCode}
+    className="btn-success"
+    style={{ width: "100%" }}
+  >
+    {loadingCode ? "Generando..." : "Generar código"}
+  </button>
+
+  {registrationCode && (
+    <div
+      style={{
+        marginTop: "1rem",
+        padding: "0.8rem",
+        border: "2px dashed #58cc02",
+        borderRadius: "0.6rem",
+        textAlign: "center",
+        fontWeight: "bold",
+        fontSize: "1.2rem",
+        letterSpacing: "2px",
+        color: "#58cc02"
+      }}
+    >
+      {registrationCode}
+    </div>
+  )}
+
+  {error && (
+    <p style={{ color: "red", marginTop: "0.5rem" }}>
+      {error}
+    </p>
+  )}
+</div>
+
+</motion.div>}
+{/* --- SECCIÓN DE CURSOS --- */}
+{activeTab === "courses" && (
+    <motion.div key="courses" initial={{opacity:0}} animate={{opacity:1}} className="section-card">
+        {subTab === 'menu' && (
+            <div className="grid-menu">
+                <ActionCard title="Nuevo Curso" icon="➕" color="#58cc02" onClick={()=>setSubTab('form')} />
+                <ActionCard title="Ver Cursos" icon="🎓" color="#1cb0f6" onClick={()=>setSubTab('list')} />
+            </div>
+        )}
+        {subTab === 'form' && (
+            <div>
+                <button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button>
+                <h2>Crear Nuevo Curso</h2>
+                <input className="form-input" placeholder="Título (ej. Inglés Básico)" value={newCourseTitle} onChange={e=>setNewCourseTitle(e.target.value)} />
+                <input className="form-input" placeholder="Descripción" value={newCourseDesc} onChange={e=>setNewCourseDesc(e.target.value)} />
+                <button className="btn-primary" onClick={handleCreateCourse}>Guardar Curso</button>
+            </div>
+        )}
+        {subTab === 'list' && (
+            <div>
+                <button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button>
+                <h2>Cursos en la Base de Datos</h2>
+                {coursesList.map(c => (
+                    <div key={c.id} className="list-item">
+                        <span><strong>ID:</strong> {c.id}</span>
+                        <span>{c.title}</span>
+                    </div>
+                ))}
+            </div>
+        )}
+    </motion.div>
+)}
                 {/* GRUPOS */}
 {activeTab === "groups" && (
   <motion.div
@@ -777,13 +925,19 @@ export default function TeacherDashboard() {
 
 
                 {/* --- UNIDADES --- */}
-                {activeTab === "units" && (
-                    <motion.div key="units" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="section-card">
-                        {subTab === 'menu' && <div className="grid-menu"><ActionCard title="Nueva Unidad" icon="📘" color="#ff9600" onClick={()=>{resetForm(); setSubTab('form')}} /><ActionCard title="Ver Unidades" icon="👀" color="#ce82ff" onClick={()=>setSubTab('list')} /></div>}
-                        {subTab === 'form' && (<div><button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button><h2>{editingId?'Editar':'Crear'} Unidad</h2><div className="form-group"><label className="form-label">Título</label><input className="form-input" value={newUnitTitle} onChange={e=>setNewUnitTitle(e.target.value)} /></div><div className="form-group"><label className="form-label">Orden</label><input type="number" className="form-input" value={newUnitOrder} onChange={e=>setNewUnitOrder(Number(e.target.value))} /></div><button className="btn-primary" onClick={handleSaveUnit}>{editingId?'Actualizar':'Guardar'}</button></div>)}
-                        {subTab === 'list' && (<div><button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button><h2>Lista de Unidades</h2><ul>{units.map(u=>(<li key={u.id} className="list-item"><span><strong>{u.unitOrder}.</strong> {u.title}</span><div><button className="btn-warning" style={{marginRight:'10px'}} onClick={()=>handleEditUnit(u)}>✏️</button><button className="btn-danger" onClick={()=>handleDeleteUnit(u.id)}>🗑️</button></div></li>))}</ul></div>)}
-                    </motion.div>
-                )}
+               {subTab === 'form' && (
+    <div>
+        <button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button>
+        <h2>Nueva Unidad</h2>
+        <label style={{opacity: 0.6}}>Asignar al Curso:</label>
+        <select className="form-select" value={selectedCourseId} onChange={e=>setSelectedCourseId(e.target.value)}>
+            <option value="">-- Seleccionar curso --</option>
+            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+        </select>
+        {/* Aquí siguen tus inputs de título y orden de unidad... */}
+    </div>
+)}
+
                 
                 {/* --- LECCIONES --- */}
                 {activeTab === "lessons" && (

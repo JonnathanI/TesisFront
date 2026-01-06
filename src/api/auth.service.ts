@@ -8,6 +8,7 @@ const BASE_URL = 'http://localhost:8081/api';
 // ==========================================
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
+export type QuestionCategory  = 'GRAMMAR' | 'VOCABULARY' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'ORDERING';
 
 export interface AuthResponse {
     token: string;
@@ -25,6 +26,8 @@ export interface RegisterCredentials {
     username: string;
     password: string;
     fullName: string;
+cedula: string;              // ✅ NUEVO
+  registrationCode?: string;
     adminCode?: string; 
 }
 
@@ -67,10 +70,14 @@ export interface LessonProgressDTO {
 }
 
 export interface QuestionDTO {
-    id: string;
-    questionText: string;
-    questionType: { typeName: string }; 
-    options: string[]; 
+    id: string;
+    questionText: string; // textSource en el backend
+    textSource: string;   // para compatibilidad
+    textTarget: string;   // respuesta correcta
+    questionType: { typeName: string }; 
+    options: string[]; 
+    audioUrl?: string;    // URL del audio para Listening
+    category: QuestionCategory; // Para saber qué juego mostrar
 }
 
 export interface AnswerSubmissionDTO {
@@ -105,13 +112,16 @@ export interface StudentData {
     username?: string;
     xpTotal: number;
     currentStreak: number;
+isActive: boolean; 
 }
 
 export interface QuestionData {
-    id: string;
-    textSource: string;
-    textTarget: string | null;
-    options: string[];
+    id: string;
+    textSource: string;
+    textTarget: string | null;
+    options: string[];
+    audioUrl?: string;      // Nuevo campo
+    category: QuestionCategory; // Nuevo campo
 }
 
 export interface ClassroomData {
@@ -149,11 +159,13 @@ export interface NewLessonPayload {
 }
 
 export interface NewQuestionPayload {
-    lessonId: string;
-    questionTypeId: string;
-    textSource: string;
-    textTarget: string;
-    options: string[];
+    lessonId: string;
+    questionTypeId: string;
+    textSource: string;
+    textTarget: string;
+    options: string[];
+    audioUrl?: string;     // Nuevo campo
+    category: string;      // Nuevo campo
 }
 
 export interface LeaderboardEntry {
@@ -262,20 +274,24 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
 };
 
 export const register = async (credentials: RegisterCredentials): Promise<AuthResponse> => {
-    const response = await apiFetch('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-            email: credentials.username,
-            password: credentials.password,
-            fullName: credentials.fullName,
-            adminCode: credentials.adminCode
-        }),
-    }, false);
-    const data: AuthResponse = await response.json();
-    saveToken(data.token);
-    localStorage.setItem(ROLE_KEY, data.role); 
-    return data;
+  const response = await apiFetch('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: credentials.username,
+      password: credentials.password,
+      fullName: credentials.fullName,
+      cedula: credentials.cedula,                 // ✅
+      registrationCode: credentials.registrationCode, // ✅
+      adminCode: credentials.adminCode
+    }),
+  }, false);
+
+  const data: AuthResponse = await response.json();
+  saveToken(data.token);
+  localStorage.setItem(ROLE_KEY, data.role);
+  return data;
 };
+
 
 export const getCourses = async (): Promise<Course[]> => {
     const response = await apiFetch('/courses', { method: 'GET' }, false);
@@ -517,4 +533,33 @@ export const registerBulk = async (data: { students: BulkUserItem[] }): Promise<
         body: JSON.stringify(data),
     });
     return response.json();
+};
+
+// Añade esta función al final de tu auth.service.ts
+export const createCourse = async (payload: { title: string, description: string }): Promise<any> => {
+    const response = await apiFetch('/teacher/content/courses', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    return response.json();
+};
+
+const TeacherAPI = {
+  getCourses: () => apiFetch('/courses'), 
+  // Este es el que te daba error 404:
+  createCourse: (data: any) => apiFetch('/teacher/content/courses', { method: 'POST', body: JSON.stringify(data) }),
+  // Este es el que daba error //units si el ID está vacío:
+  getUnits: (courseId: string) => {
+    if (!courseId) return Promise.resolve([]); // Guard para evitar URL malformada
+    return apiFetch(`/courses/${courseId}/units`);
+  }
+};
+
+export const generateTeacherRegistrationCode = async (): Promise<string> => {
+  const response = await apiFetch('/teacher/generate-code', {
+    method: 'POST',
+  });
+
+  const data = await response.json();
+  return data.code;
 };
