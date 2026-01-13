@@ -21,14 +21,17 @@ import {
   getUserProfile,
   getGlobalLeaderboard,
   buyShopItem,
-  UnitStatus,
+  UnitWithLessons,
   QuestionDTO,
   LeaderboardEntry,
-  UserProfileData
+  UserProfileData,
 } from '../api/auth.service'; 
+import type { Lesson } from '../api/auth.service';
 
 // --- TIPOS LOCALES ---
 type PathNodeStatus = 'LOCKED' | 'ACTIVE' | 'COMPLETED';
+const COURSE_ID = "f23e5216-dec7-4c6f-9ce9-95064bf3e4ac";
+
 
 interface PathNode {
   type: 'lesson' | 'checkpoint';
@@ -117,7 +120,7 @@ export default function StudentDashboard() {
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
   // --- ESTADOS DE DATOS ---
-  const [units, setUnits] = useState<UnitStatus[]>([]);
+  const [units, setUnits] = useState<UnitWithLessons[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null); 
   const [selectedUnitTitle, setSelectedUnitTitle] = useState("");
   const [pathData, setPathData] = useState<PathNode[]>([]);
@@ -137,16 +140,43 @@ export default function StudentDashboard() {
   const [globalLeague, setGlobalLeague] = useState<LeaderboardEntry[]>([]);
 
   const nodeRefs = useRef<Array<HTMLDivElement | null>>([]); 
+useEffect(() => {
+  const loadCourse = async () => {
+    try {
+      const data = await getCourseStatus(COURSE_ID);
+      setUnits(data);
+    } catch (e) {
+      console.error('Error cargando unidades', e);
+    }
+  };
+
+  loadCourse();
+}, []);
+
 
   // --- CARGA INICIAL ---
-  useEffect(() => {
-    fetchUserData();
-    if (activeSection === "APRENDER") fetchUnits();
-    if (activeSection === "GRUPOS" && !viewingGroupId) fetchMyGroups();
-  }, [activeSection, viewingGroupId]);
+ useEffect(() => {
+  fetchUserData();
+  if (activeSection === "GRUPOS" && !viewingGroupId) {
+    fetchMyGroups();
+  }
+}, [activeSection, viewingGroupId]);
 
-  useEffect(() => { if (selectedUnitId) fetchPathData(selectedUnitId); }, [selectedUnitId]);
+
+  useEffect(() => { if (selectedUnitId) fetchPathData(selectedUnitId); }, [selectedUnitId]
+
+);
   useEffect(() => { if (viewingGroupId) { fetchGroupDetails(viewingGroupId); fetchLeaderboard(viewingGroupId); } }, [viewingGroupId]);
+useEffect(() => {
+  if (units.length > 0 && !selectedUnitId) {
+    const firstUnlocked = units.find(u => !u.isLocked);
+    if (firstUnlocked) {
+      setSelectedUnitId(firstUnlocked.id); // 👈 FALTABA ESTO
+      setSelectedUnitTitle(firstUnlocked.title);
+    }
+  }
+}, [units, selectedUnitId]);
+
 
   // --- FETCHERS ---
   const fetchUserData = async () => {
@@ -160,47 +190,95 @@ export default function StudentDashboard() {
       } catch(e) { console.error(e); }
   }
 
-  const fetchUnits = async () => {
-      setIsLoading(true);
-      try {
-        const COURSE_ID = "fb7390f6-40d6-4b8e-b770-36e6e2b3d8f9"; 
-        const data = await getCourseStatus(COURSE_ID);
-        setUnits(data);
-      } catch (error) { console.error("Error cargando unidades:", error); } 
-      finally { setIsLoading(false); }
-  }
-
   const fetchMyGroups = async () => { try { const g = await getStudentClassrooms(); setMyGroups(g); } catch (e) {} }
   const fetchGroupDetails = async (id: string) => { setIsLoading(true); try { const d = await getStudentClassroomDetails(id); setGroupDetails(d); } catch (e) {} finally { setIsLoading(false); } }
   const fetchLeaderboard = async (id: string) => { try { const d = await getClassroomLeaderboard(id); setLeaderboard(d); } catch (e) {} }
   
-  const fetchPathData = async (unitId: string) => {
-    setIsLoading(true);
-    try {
-      const progressDTOs = await getUnitProgress(unitId);
-      nodeRefs.current = nodeRefs.current.slice(0, progressDTOs.length);
-      let foundActive = false;
-      const newPathData = progressDTOs.map((dto): PathNode => {
-        let status: PathNodeStatus = dto.isCompleted ? 'COMPLETED' : 'LOCKED';
-        if (!dto.isCompleted && !foundActive) { status = 'ACTIVE'; foundActive = true; }
-        return { type: 'lesson', icon: getIconForTitle(dto.title), title: dto.title, lessonId: dto.id, status: status, color: '#e5e5e5' };
-      });
-      setPathData(newPathData);
-    } catch (error) { console.error(error); } finally { setIsLoading(false); }
-  };
+const fetchPathData = async (unitId: string) => {
+  setIsLoading(true);
+  try {
+    // Buscamos la unidad directamente del estado más reciente o del parámetro
+    const unit = units.find(u => u.id === unitId);
+    if (!unit || !unit.lessons) return;
+
+    let foundActive = false;
+
+    const newPathData: PathNode[] = unit.lessons.map((lesson) => {
+      let status: PathNodeStatus = 'LOCKED';
+
+      if (lesson.isCompleted) {
+        status = 'COMPLETED';
+      } else if (!foundActive) {
+        // La primera que NO esté completada se vuelve la ACTIVA
+        status = 'ACTIVE';
+        foundActive = true;
+      }
+
+      return {
+        type: 'lesson',
+        lessonId: lesson.id,
+        title: lesson.title,
+        icon: '📘',
+        color: '#58cc02',
+        status,
+      };
+    });
+
+    setPathData(newPathData);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // --- HANDLERS ---
-  const startLesson = async (lessonId: string) => { setActiveLessonId(lessonId); setShowQuizModal(true); try { const q = await getLessonQuestions(lessonId); setQuizQuestions(q); } catch (e) { setShowQuizModal(false); } };
-  
-  const handleQuizComplete = async (lessonId: string, count: number) => {
-    try { await completeLesson(lessonId, count); } catch (error) {} 
-    finally {
-      setShowQuizModal(false); setQuizQuestions(null);
-      if (selectedUnitId) fetchPathData(selectedUnitId); 
-      fetchUserData(); 
-      fetchUnits();
+const startLesson = async (lessonId: string) => {
+  if (isLoading) return;
+  setIsLoading(true);
+
+  try {
+    const q = await getLessonQuestions(lessonId); // 1. Primero pedimos las preguntas
+    if (q && q.length > 0) {
+      setQuizQuestions(q);       // 2. Guardamos las preguntas
+      setActiveLessonId(lessonId); // 3. Guardamos el ID
+      setShowQuizModal(true);    // 4. ¡Recién ahora abrimos el modal!
+    } else {
+      alert("Esta lección no tiene preguntas aún.");
     }
-  };
+  } catch (e) {
+    console.error("Error al cargar lección", e);
+  } finally {
+    setIsLoading(false);
+  }
+};
+  
+const handleQuizComplete = async (lessonId: string, count: number) => {
+  try { 
+    // 1. Enviar progreso al servidor
+    await completeLesson(lessonId, count); 
+    
+    // 2. Cerrar el modal
+    setShowQuizModal(false); 
+    setQuizQuestions(null);
+
+    // 3. ¡ESTO ES LO NUEVO!: Actualizar la lista maestra de unidades
+    // Necesitamos los nuevos 'isCompleted' del servidor
+    const updatedUnits = await getCourseStatus(COURSE_ID);
+    setUnits(updatedUnits); 
+
+    // 4. Refrescar el mapa visual
+    if (selectedUnitId) {
+      // Pasamos las unidades actualizadas si fetchPathData depende de 'units' externo
+      await fetchPathData(selectedUnitId); 
+    }
+    
+    // 5. Actualizar estadísticas (XP, gemas)
+    await fetchUserData(); 
+    
+  } catch (error) {
+    console.error("Error al completar lección:", error);
+    setShowQuizModal(false); 
+  }
+};
 
   const openLevelModal = (idx: number) => {
     const node = pathData[idx];
@@ -262,6 +340,10 @@ export default function StudentDashboard() {
   // ============================================================
   // RENDER
   // ============================================================
+  console.log('selectedUnitId:', selectedUnitId);
+console.log('units:', units);
+console.log('pathData:', pathData);
+
   return (
     <div style={{ height: "100vh", background: currentTheme.background, color: currentTheme.text, fontFamily: "'DIN Round', sans-serif", display: "flex", overflow: "hidden" }}>
       <style>{` .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
@@ -316,8 +398,12 @@ export default function StudentDashboard() {
                         <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             {!isLoading && <LearningPathSVG nodeRefs={nodeRefs} pathDataLength={pathData.length} />}
                             <motion.div variants={containerVariants} initial="hidden" animate="show" style={{ width: '100%', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '20px' }}>
+                                <p style={{ color: 'white' }}>
+  Nodos cargados: {pathData.length}
+</p>
+
                                 {pathData.map((lvl, idx) => (
-                                    <motion.div key={lvl.lessonId} ref={(el) => { nodeRefs.current[idx] = el; }} variants={nodeVariants} whileHover={!lvl.status.includes('LOCKED') ? { scale: 1.1 } : {}} onClick={() => openLevelModal(idx)} style={{ marginBottom: '60px', transform: `translateX(${Math.sin(idx * 0.8) * 75}px)`, cursor: lvl.status==='LOCKED' ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                                    <motion.div key={`${lvl.lessonId}-${idx}`} ref={(el) => { nodeRefs.current[idx] = el; }} variants={nodeVariants} whileHover={lvl.status !== 'LOCKED' ? { scale: 1.1 } : {}} onClick={() => openLevelModal(idx)} style={{ marginBottom: '60px', transform: `translateX(${Math.sin(idx * 0.8) * 75}px)`, cursor: lvl.status==='LOCKED' ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
                                         <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: lvl.status==='COMPLETED'?'#ffc800':(lvl.status==='ACTIVE'?'#58cc02':'#e5e5e5'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', boxShadow: '0 6px 0 rgba(0,0,0,0.2)', border: `4px solid ${currentTheme.background}` }}>{lvl.status==='COMPLETED' ? '✓' : lvl.icon}</div>
                                         {lvl.status === 'ACTIVE' && <motion.div initial={{ y: 0 }} animate={{ y: -10 }} transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }} style={{ position: 'absolute', top: '-45px', background:'white', color:'#58cc02', padding:'5px 10px', borderRadius:'10px', fontWeight:'bold', fontSize:'0.8rem', boxShadow:'0 2px 5px rgba(0,0,0,0.2)' }}>EMPEZAR<div style={{position:'absolute', bottom:'-5px', left:'50%', transform:'translateX(-50%)', borderLeft:'5px solid transparent', borderRight:'5px solid transparent', borderTop:'5px solid white'}}></div></motion.div>}
                                         <span style={{ display: 'block', marginTop: '10px', textAlign: 'center', fontWeight: 'bold', color: currentTheme.text, textShadow: '0 1px 4px rgba(0,0,0,0.5)', background: 'rgba(0,0,0,0.3)', padding:'0.2rem 0.5rem', borderRadius:'0.5rem', backdropFilter:'blur(4px)' }}>{lvl.title}</span>
@@ -522,9 +608,17 @@ export default function StudentDashboard() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showQuizModal && activeLessonId && <QuizModal questions={quizQuestions} lessonId={activeLessonId} onClose={() => setShowQuizModal(false)} onComplete={handleQuizComplete} />}
-      </AnimatePresence>
+    {/* Al final de tu return en StudentDashboard */}
+<AnimatePresence>
+  {showQuizModal && (
+    <QuizModal
+      questions={quizQuestions}
+      lessonId={activeLessonId || ""}
+      onClose={() => setShowQuizModal(false)}
+      onComplete={(count) => handleQuizComplete(activeLessonId!, count)}
+    />
+  )}
+</AnimatePresence>
     </div>
   );
 }

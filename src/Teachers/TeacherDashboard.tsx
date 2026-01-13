@@ -275,6 +275,9 @@ const [coursesList, setCoursesList] = useState<any[]>([]);
   const [registrationCode, setRegistrationCode] = useState<string | null>(null);
   const [loadingCode, setLoadingCode] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [newCourseTargetLang, setNewCourseTargetLang] = useState("EN");
+const [newCourseBaseLang, setNewCourseBaseLang] = useState("ES");
+
 
   // --- EFECTOS ---
   useEffect(() => {
@@ -323,17 +326,30 @@ const [coursesList, setCoursesList] = useState<any[]>([]);
             console.error("Error cargando cursos:", e);
         }
     };
+const handleCreateCourse = async () => {
+  if (!newCourseTitle) return alert("El título es obligatorio");
 
-    const handleCreateCourse = async () => {
-    if (!newCourseTitle) return alert("El título es obligatorio");
-    try {
-        await createCourse({ title: newCourseTitle, description: newCourseDesc });
-        alert("Curso creado");
-        setNewCourseTitle(""); setNewCourseDesc("");
-        fetchCourses(); // Recargar lista
-        setSubTab('list');
-    } catch (e) { alert("Error al crear curso"); }
+  try {
+    await createCourse({
+      title: newCourseTitle,
+      targetLanguage: newCourseTargetLang,
+      baseLanguage: newCourseBaseLang
+    });
+
+    alert("Curso creado correctamente");
+
+    setNewCourseTitle("");
+    setNewCourseTargetLang("EN");
+    setNewCourseBaseLang("ES");
+
+    fetchCourses();
+    setSubTab("list");
+  } catch (e: any) {
+    alert("Error al crear curso");
+    console.error(e);
+  }
 };
+
 
   // --- HANDLERS UNIDADES ---
   const handleSaveUnit = async () => {
@@ -657,7 +673,32 @@ useEffect(() => {
                 <button className="back-btn" onClick={()=>setSubTab('menu')}>⬅ Volver</button>
                 <h2>Crear Nuevo Curso</h2>
                 <input className="form-input" placeholder="Título (ej. Inglés Básico)" value={newCourseTitle} onChange={e=>setNewCourseTitle(e.target.value)} />
-                <input className="form-input" placeholder="Descripción" value={newCourseDesc} onChange={e=>setNewCourseDesc(e.target.value)} />
+               <input
+  className="form-input"
+  placeholder="Título (ej. Inglés Básico)"
+  value={newCourseTitle}
+  onChange={e => setNewCourseTitle(e.target.value)}
+/>
+
+<select
+  className="form-select"
+  value={newCourseTargetLang}
+  onChange={e => setNewCourseTargetLang(e.target.value)}
+>
+  <option value="EN">Inglés</option>
+  <option value="ES">Español</option>
+  <option value="FR">Francés</option>
+</select>
+
+<select
+  className="form-select"
+  value={newCourseBaseLang}
+  onChange={e => setNewCourseBaseLang(e.target.value)}
+>
+  <option value="ES">Español</option>
+  <option value="EN">Inglés</option>
+</select>
+
                 <button className="btn-primary" onClick={handleCreateCourse}>Guardar Curso</button>
             </div>
         )}
@@ -675,6 +716,127 @@ useEffect(() => {
         )}
     </motion.div>
 )}
+
+{/*Unidades*/}
+{activeTab === "units" && (
+  <motion.div
+    key="units"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="section-card"
+  >
+    {/* MENÚ */}
+    {subTab === "menu" && (
+      <div className="grid-menu">
+        <ActionCard
+          title="Nueva Unidad"
+          icon="➕"
+          color="#58cc02"
+          onClick={() => {
+            resetForm();
+            setSubTab("form");
+          }}
+        />
+        <ActionCard
+          title="Ver Unidades"
+          icon="📚"
+          color="#1cb0f6"
+          onClick={() => setSubTab("list")}
+        />
+      </div>
+    )}
+
+    {/* FORMULARIO */}
+    {subTab === "form" && (
+      <div>
+        <button className="back-btn" onClick={() => setSubTab("menu")}>
+          ⬅ Volver
+        </button>
+
+        <h2>{editingId ? "Editar Unidad" : "Nueva Unidad"}</h2>
+
+        <label className="form-label">Curso</label>
+        <select
+          className="form-select"
+          value={currentCourseId}
+          onChange={(e) => {
+            setCurrentCourseId(e.target.value);
+            setSelectedUnitId("");
+          }}
+        >
+          <option value="">-- Seleccionar curso --</option>
+          {coursesList.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+            </option>
+          ))}
+        </select>
+
+        <label className="form-label">Título de la Unidad</label>
+        <input
+          className="form-input"
+          value={newUnitTitle}
+          onChange={(e) => setNewUnitTitle(e.target.value)}
+        />
+
+        <label className="form-label">Orden</label>
+        <input
+          type="number"
+          className="form-input"
+          value={newUnitOrder}
+          onChange={(e) => setNewUnitOrder(Number(e.target.value))}
+        />
+
+        <button className="btn-primary" onClick={handleSaveUnit}>
+          {editingId ? "Actualizar" : "Guardar"}
+        </button>
+      </div>
+    )}
+
+    {/* LISTA */}
+    {subTab === "list" && (
+      <div>
+        <button className="back-btn" onClick={() => setSubTab("menu")}>
+          ⬅ Volver
+        </button>
+
+        <h2>Unidades</h2>
+
+        {!currentCourseId && (
+          <p style={{ opacity: 0.7 }}>
+            Selecciona un curso para ver sus unidades
+          </p>
+        )}
+
+        {units.map((u) => (
+          <div key={u.id} className="list-item">
+            <span>
+              {u.unitOrder}. {u.title}
+            </span>
+            <div>
+              <button
+                className="btn-warning"
+                onClick={() => handleEditUnit(u)}
+              >
+                ✏️
+              </button>
+              <button
+                className="btn-danger"
+                onClick={() => handleDeleteUnit(u.id)}
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </motion.div>
+)}
+
+
+
                 {/* GRUPOS */}
 {activeTab === "groups" && (
   <motion.div

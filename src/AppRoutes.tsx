@@ -15,6 +15,7 @@ import Lesson from "./Students/Lesson";
 import TeacherDashboard from "./Teachers/TeacherDashboard";
 import StatsChart from "./Teachers/StatsChart";
 import StudentTable from "./Teachers/StudentTable";
+import ResetPassword from "./Pages/ResetPassword";
 
 // Layout opcional (header/footer compartido)
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -42,7 +43,7 @@ export default function AppRoutes() {
       <Route path="/teacher/dashboard" element={<Layout><TeacherDashboard /></Layout>} />
       <Route path="/teacher/stats" element={<Layout><StatsChart /></Layout>} />
       <Route path="/teacher/students" element={<Layout><StudentTable /></Layout>} />
-
+      <Route path="/reset-password" element={<ResetPassword />} />
       {/* Redirige cualquier ruta desconocida al Home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

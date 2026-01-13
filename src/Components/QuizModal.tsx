@@ -1,14 +1,14 @@
-// QuizModal.tsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-// Ajusta la ruta a tu archivo apiClient.ts
+// Asegúrate de que esta ruta sea correcta según tu estructura
 import { QuestionDTO, AnswerSubmissionDTO, submitAnswer } from '../api/auth.service'; 
 
 interface QuizModalProps {
   questions: QuestionDTO[] | null;
   lessonId: string;
   onClose: () => void;
-  onComplete: (lessonId: string, correctCount: number) => void;
+  // Ajustado para recibir el conteo de correctas como número
+  onComplete: (correctCount: number) => void;
 }
 
 export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClose, onComplete }) => {
@@ -18,11 +18,17 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
   const [correctCount, setCorrectCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  if (!questions) {
+  // 1. Caso: No hay preguntas
+  if (!questions || questions.length === 0) {
     return (
       <div style={modalOverlayStyle}>
-        <motion.div style={modalContentStyle}>
-          <p style={{color: 'white', fontSize: '1.2rem'}}>Cargando preguntas...</p>
+        <motion.div style={modalContentStyle} initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
+          <p style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1.5rem' }}>
+            Esta lección no tiene preguntas disponibles.
+          </p>
+          <button onClick={onClose} style={nextButtonStyle}>
+            Cerrar
+          </button>
         </motion.div>
       </div>
     );
@@ -30,15 +36,27 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
 
   const currentQuestion = questions[qIndex];
 
+  // 2. Caso: Error de carga de pregunta específica
+  if (!currentQuestion) {
+    return (
+      <div style={modalOverlayStyle}>
+        <motion.div style={modalContentStyle}>
+          <p style={{ color: 'white' }}>Finalizando lección...</p>
+          <button onClick={() => onComplete(correctCount)} style={nextButtonStyle}>Continuar</button>
+        </motion.div>
+      </div>
+    );
+  }
+
   const handleOptionClick = async (option: string) => {
-    if (isLoading || selectedOption) return; // Evitar clics múltiples
+    if (isLoading || selectedOption) return; 
 
     setIsLoading(true);
     setSelectedOption(option);
 
     const submission: AnswerSubmissionDTO = {
       questionId: currentQuestion.id,
-      userAnswer: option, // Tu backend espera 'userAnswer'
+      userAnswer: option, 
     };
 
     try {
@@ -49,22 +67,23 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
       }
     } catch (error) {
       console.error("Error al enviar respuesta:", error);
-      setIsCorrect(false);
+      setIsCorrect(false); // Por defecto falso si falla la red
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNext = () => {
-    // Limpiar estados
+    // Es vital limpiar los estados antes de pasar a la siguiente
     setSelectedOption(null);
     setIsCorrect(null);
 
-    // ¿Es la última pregunta?
     if (qIndex + 1 >= questions.length) {
-      onComplete(lessonId, correctCount); // ¡Lección completada!
+      // Si es la última pregunta, enviamos el resultado al Dashboard
+      onComplete(correctCount); 
     } else {
-      setQIndex(qIndex + 1); // Siguiente pregunta
+      // Si no, avanzamos el índice
+      setQIndex(prev => prev + 1); 
     }
   };
 
@@ -73,35 +92,47 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
     
     const isThisOptionSelected = selectedOption === option;
     
-    if (isThisOptionSelected && isCorrect === true) {
-      return { ...optionStyle, ...correctOptionStyle };
+    if (isThisOptionSelected) {
+      if (isCorrect === true) return { ...optionStyle, ...correctOptionStyle };
+      if (isCorrect === false) return { ...optionStyle, ...incorrectOptionStyle };
     }
-    if (isThisOptionSelected && isCorrect === false) {
-      return { ...optionStyle, ...incorrectOptionStyle };
+    
+    if (isCorrect !== null) {
+      return { ...optionStyle, opacity: 0.5, cursor: 'not-allowed' };
     }
-    // Si no está seleccionada pero se mostró un resultado, atenuarla
-    if (!isThisOptionSelected && isCorrect !== null) {
-      return { ...optionStyle, opacity: 0.6, cursor: 'not-allowed' };
-    }
+    
     return optionStyle;
   };
 
   return (
-    <div style={modalOverlayStyle} onClick={onClose}>
+    <div style={modalOverlayStyle}>
       <motion.div 
         style={modalContentStyle} 
         onClick={(e) => e.stopPropagation()}
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 50, opacity: 0 }}
       >
-        <h2 style={{ color: '#00FFC2', marginBottom: '2rem' }}>{currentQuestion.questionText}</h2>
+        {/* Barra de Progreso Visual */}
+        <div style={progressContainer}>
+            <div style={{...progressFill, width: `${((qIndex + 1) / questions.length) * 100}%`}} />
+        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+        <p style={{ color: '#aaa', fontSize: '0.8rem', marginBottom: '1rem' }}>
+            PREGUNTA {qIndex + 1} DE {questions.length}
+        </p>
+
+        <h2 style={{ color: '#00FFC2', marginBottom: '2rem', minHeight: '60px' }}>
+            {currentQuestion.questionText}
+        </h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%' }}>
           {currentQuestion.options.map((option, idx) => (
             <motion.button
-              key={idx}
+              key={`${qIndex}-${idx}`} // Clave única por pregunta e índice
               style={getOptionStyle(option)}
-              whileHover={{ scale: selectedOption ? 1 : 1.05 }}
+              whileHover={!selectedOption ? { scale: 1.02, backgroundColor: 'rgba(255,255,255,0.2)' } : {}}
+              whileTap={!selectedOption ? { scale: 0.98 } : {}}
               onClick={() => handleOptionClick(option)}
               disabled={selectedOption !== null}
             >
@@ -114,10 +145,10 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
           <motion.button
             style={nextButtonStyle}
             onClick={handleNext}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
           >
-            {qIndex + 1 >= questions.length ? 'Finalizar' : 'Siguiente'}
+            {qIndex + 1 >= questions.length ? 'FINALIZAR LECCIÓN' : 'SIGUIENTE PREGUNTA'}
           </motion.button>
         )}
       </motion.div>
@@ -125,29 +156,44 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
   );
 };
 
-// Estilos
+// --- ESTILOS ---
 const modalOverlayStyle: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+  position: 'fixed', inset: 0, background: 'rgba(10, 10, 25, 0.9)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
 };
+
 const modalContentStyle: React.CSSProperties = {
-  background: '#1A1A2E', padding: '2rem', borderRadius: '1rem',
-  width: '90%', maxWidth: '500px', textAlign: 'center',
-  border: '1px solid #00FFC2'
+  background: '#1A1A2E', padding: '2.5rem', borderRadius: '1.5rem',
+  width: '90%', maxWidth: '450px', textAlign: 'center',
+  border: '2px solid #00FFC2', boxShadow: '0 0 20px rgba(0, 255, 194, 0.2)'
 };
+
+const progressContainer: React.CSSProperties = {
+    width: '100%', height: '8px', background: '#333', 
+    borderRadius: '10px', marginBottom: '1.5rem', overflow: 'hidden'
+};
+
+const progressFill: React.CSSProperties = {
+    height: '100%', background: '#00FFC2', transition: 'width 0.3s ease'
+};
+
 const optionStyle: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.1)', border: '2px solid #555',
-  color: 'white', padding: '1rem', borderRadius: '0.75rem',
-  fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%'
+  background: 'rgba(255, 255, 255, 0.05)', border: '2px solid #444',
+  color: 'white', padding: '1.2rem', borderRadius: '1rem',
+  fontSize: '1.1rem', fontWeight: 600, cursor: 'pointer', 
+  width: '100%', transition: 'all 0.2s ease'
 };
+
 const correctOptionStyle: React.CSSProperties = {
-  background: '#2a9d8f', borderColor: '#00FFC2', color: 'white'
+  background: 'rgba(42, 157, 143, 0.3)', borderColor: '#00FFC2', color: '#00FFC2'
 };
+
 const incorrectOptionStyle: React.CSSProperties = {
-  background: '#e76f51', borderColor: '#FF6B6B', color: 'white'
+  background: 'rgba(231, 111, 81, 0.3)', borderColor: '#FF6B6B', color: '#FF6B6B'
 };
+
 const nextButtonStyle: React.CSSProperties = {
-  marginTop: '2rem', background: '#00FFC2', border: 'none',
-  borderRadius: '0.75rem', padding: '0.75rem 1.5rem',
-  fontWeight: 'bold', cursor: 'pointer', color: '#111'
+  marginTop: '2.5rem', background: '#00FFC2', border: 'none',
+  borderRadius: '1rem', padding: '1rem 2rem', width: '100%',
+  fontWeight: 'bold', cursor: 'pointer', color: '#1A1A2E', fontSize: '1rem'
 };

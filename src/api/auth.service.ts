@@ -44,14 +44,24 @@ export interface UnitData {
   unitOrder: number;
   description?: string;
 }
-
+/*
 export interface UnitStatus {
   id: string;
   title: string;
   unitOrder: number;
   isLocked: boolean;
   isCompleted: boolean;
+}*/
+
+export interface UnitWithLessons {
+  id: string;
+  title: string;
+  unitOrder: number;
+  isLocked: boolean;
+  isCompleted: boolean;
+  lessons: Lesson[];
 }
+
 
 // --- PROGRESO ---
 export interface UserProgress {
@@ -123,6 +133,15 @@ export interface QuestionData {
     audioUrl?: string;      // Nuevo campo
     category: QuestionCategory; // Nuevo campo
 }
+export interface Lesson {
+  id: string;
+  title: string;
+  lessonOrder: number;
+  requiredXp: number;
+  isCompleted: boolean;
+  unitId?: string; // 👈 opcional
+}
+
 
 export interface ClassroomData {
     id: string;
@@ -308,10 +327,11 @@ export const purchaseItem = async (itemId: number): Promise<void> => {
 };
 
 // --- UNIDADES Y CAMINO ---
-export const getCourseStatus = async (courseId: string): Promise<UnitStatus[]> => {
+export const getCourseStatus = async (courseId: string): Promise<UnitWithLessons[]> => {
   const response = await apiFetch(`/progress/course/${courseId}`, { method: 'GET' });
   return response.json();
 };
+
 
 export const getCourseUnits = async (courseId: string): Promise<UnitData[]> => {
     const response = await apiFetch(`/courses/${courseId}/units`, { method: 'GET' });
@@ -428,6 +448,7 @@ export const createQuestion = async (payload: NewQuestionPayload): Promise<Quest
         method: 'POST',
         body: JSON.stringify(payload),
     });
+console.log(payload);
     return response.json();
 };
 
@@ -535,26 +556,27 @@ export const registerBulk = async (data: { students: BulkUserItem[] }): Promise<
     return response.json();
 };
 
-// Añade esta función al final de tu auth.service.ts
-export const createCourse = async (payload: { title: string, description: string }): Promise<any> => {
-    const response = await apiFetch('/teacher/content/courses', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+export interface CreateCoursePayload {
+  title: string;
+  targetLanguage: string;
+  baseLanguage: string;
+}
+
+export const createCourse = async (
+  payload: CreateCoursePayload
+): Promise<any> => {
+  const response = await apiFetch('/teacher/content/courses', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.json();
 };
+
+
 
 const TeacherAPI = {
-  getCourses: () => apiFetch('/courses'), 
-  // Este es el que te daba error 404:
-  createCourse: (data: any) => apiFetch('/teacher/content/courses', { method: 'POST', body: JSON.stringify(data) }),
-  // Este es el que daba error //units si el ID está vacío:
-  getUnits: (courseId: string) => {
-    if (!courseId) return Promise.resolve([]); // Guard para evitar URL malformada
-    return apiFetch(`/courses/${courseId}/units`);
-  }
+  getCourses: () => apiFetch('/courses'),
 };
-
 export const generateTeacherRegistrationCode = async (): Promise<string> => {
   const response = await apiFetch('/teacher/generate-code', {
     method: 'POST',
