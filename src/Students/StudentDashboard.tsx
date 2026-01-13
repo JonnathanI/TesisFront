@@ -56,7 +56,7 @@ const sidebarNavItems = [
   { label: "GRUPOS", icon: "🏫" }, 
   { label: "TIENDA", icon: "🛍️" },
   { label: "PERFIL", icon: "👤" },
-  { label: "MÁS", icon: "⋯" }, 
+  { label: "CERRAR SESIÓN", icon: "🚪" }
 ];
 
 const cards = [
@@ -140,6 +140,7 @@ export default function StudentDashboard() {
   const [globalLeague, setGlobalLeague] = useState<LeaderboardEntry[]>([]);
 
   const nodeRefs = useRef<Array<HTMLDivElement | null>>([]); 
+  const [hasInitialized, setHasInitialized] = useState(false);
 useEffect(() => {
   const loadCourse = async () => {
     try {
@@ -168,14 +169,16 @@ useEffect(() => {
 );
   useEffect(() => { if (viewingGroupId) { fetchGroupDetails(viewingGroupId); fetchLeaderboard(viewingGroupId); } }, [viewingGroupId]);
 useEffect(() => {
-  if (units.length > 0 && !selectedUnitId) {
+  // Solo auto-selecciona si hay unidades, no hay seleccionada Y es la primera carga
+  if (units.length > 0 && !selectedUnitId && !hasInitialized) {
     const firstUnlocked = units.find(u => !u.isLocked);
     if (firstUnlocked) {
-      setSelectedUnitId(firstUnlocked.id); // 👈 FALTABA ESTO
+      setSelectedUnitId(firstUnlocked.id); 
       setSelectedUnitTitle(firstUnlocked.title);
+      setHasInitialized(true); // Bloqueamos para que no vuelva a entrar aquí solo
     }
   }
-}, [units, selectedUnitId]);
+}, [units, selectedUnitId, hasInitialized]);
 
 
   // --- FETCHERS ---
@@ -195,21 +198,23 @@ useEffect(() => {
   const fetchLeaderboard = async (id: string) => { try { const d = await getClassroomLeaderboard(id); setLeaderboard(d); } catch (e) {} }
   
 const fetchPathData = async (unitId: string) => {
+  if (!unitId) return;
   setIsLoading(true);
   try {
-    // Buscamos la unidad directamente del estado más reciente o del parámetro
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.lessons) return;
 
     let foundActive = false;
-
     const newPathData: PathNode[] = unit.lessons.map((lesson) => {
       let status: PathNodeStatus = 'LOCKED';
+      
+      // Calculamos el porcentaje (suponiendo que tienes campos como totalQuestions y correctAnswers)
+      // Si no los tienes, puedes usar 100 si está completada y 0 si no.
+      const progressPercent = lesson.isCompleted ? 100 : 0; 
 
       if (lesson.isCompleted) {
         status = 'COMPLETED';
       } else if (!foundActive) {
-        // La primera que NO esté completada se vuelve la ACTIVA
         status = 'ACTIVE';
         foundActive = true;
       }
@@ -221,10 +226,13 @@ const fetchPathData = async (unitId: string) => {
         icon: '📘',
         color: '#58cc02',
         status,
+        progress: progressPercent, // <--- Agregamos esto
       };
     });
 
     setPathData(newPathData);
+  } catch (e) {
+    console.error(e);
   } finally {
     setIsLoading(false);
   }
@@ -349,23 +357,41 @@ console.log('pathData:', pathData);
       <style>{` .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
       
       {/* SIDEBAR IZQUIERDA */}
-      <aside style={{ width: "260px", borderRight: `2px solid ${currentTheme.border}`, padding: "1.5rem", background: currentTheme.sidebarBg, zIndex: 10 }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 800, color: "#58cc02", marginBottom: "1.5rem", paddingLeft: "1rem" }}>Peek</h1>
-        {sidebarNavItems.map((item) => (
-          <div key={item.label} style={{ position: 'relative' }}>
-             <div onClick={() => { if (item.label === "MÁS") setShowMoreMenu(!showMoreMenu); else { setActiveSection(item.label); setSelectedUnitId(null); setViewingGroupId(null); setShowMoreMenu(false); } }} style={{ display: "flex", alignItems: "center", gap: "1.2rem", padding: "0.8rem 1rem", borderRadius: "0.8rem", cursor: "pointer", backgroundColor: activeSection === item.label ? "rgba(28, 176, 246, 0.15)" : "transparent", color: activeSection === item.label ? "#1cb0f6" : currentTheme.text }}>
-                <span style={{ fontSize: "1.5rem" }}>{item.icon}</span><span style={{ fontWeight: 700 }}>{item.label}</span>
-             </div>
-             {item.label === "MÁS" && showMoreMenu && (
-                  <div style={{ position: 'absolute', top: 0, left: '100%', width: '220px', background: currentTheme.cardBg, border: `1px solid ${currentTheme.border}`, borderRadius: '0.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 20 }}>
-                      <div onClick={() => handleMoreMenuClick('GRUPOS')} style={{ padding: '1rem', cursor: 'pointer' }}>👥 Grupos</div>
-                      <div onClick={() => handleMoreMenuClick('CONFIGURACION')} style={{ padding: '1rem', cursor: 'pointer' }}>⚙️ Configuración</div>
-                      <div onClick={() => handleMoreMenuClick('CERRAR_SESION')} style={{ padding: '1rem', cursor: 'pointer', color: 'red' }}>❌ Salir</div>
-                  </div>
-             )}
-          </div>
-        ))}
-      </aside>
+      {/* Busca esta sección dentro del return de tu componente */}
+<aside style={{ width: "260px", borderRight: `2px solid ${currentTheme.border}`, padding: "1.5rem", background: currentTheme.sidebarBg, zIndex: 10 }}>
+  <h1 style={{ fontSize: "2rem", fontWeight: 800, color: "#58cc02", marginBottom: "1.5rem", paddingLeft: "1rem" }}>Peek</h1>
+  
+  {sidebarNavItems.map((item) => (
+    <div key={item.label}>
+      <div 
+        onClick={() => { 
+          if (item.label === "CERRAR SESIÓN") {
+            // Esta es la función que activa el modal que ya tienes al final del código
+            setShowLogoutModal(true); 
+          } else {
+            setActiveSection(item.label); 
+            setSelectedUnitId(null); 
+            setViewingGroupId(null); 
+          }
+        }} 
+        style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: "1.2rem", 
+          padding: "0.8rem 1rem", 
+          borderRadius: "0.8rem", 
+          cursor: "pointer", 
+          marginBottom: "0.5rem",
+          backgroundColor: activeSection === item.label ? "rgba(28, 176, 246, 0.15)" : "transparent", 
+          color: item.label === "CERRAR SESIÓN" ? "#ff4b4b" : (activeSection === item.label ? "#1cb0f6" : currentTheme.text) 
+        }}
+      >
+        <span style={{ fontSize: "1.5rem" }}>{item.icon}</span>
+        <span style={{ fontWeight: 700 }}>{item.label}</span>
+      </div>
+    </div>
+  ))}
+</aside>
 
       {/* CONTENIDO CENTRAL */}
       <div style={{ flex: 1, display: "flex", justifyContent: "center", overflowY: "auto" }}>
@@ -379,43 +405,258 @@ console.log('pathData:', pathData);
           <div style={{ flex: 1, padding: "2rem 1rem" }}>
 
             {/* SECCIÓN: APRENDER */}
-            {activeSection === "APRENDER" && (
-                <div style={{ width: "100%" }}>
-                {!selectedUnitId ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth:'600px', margin:'0 auto' }}>
-                        <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: currentTheme.text, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Ruta de Aprendizaje</h2>
-                        {units.map((unit, idx) => (
-                            <motion.div key={unit.id} whileHover={{ scale: 1.02 }} onClick={() => !unit.isLocked && (setSelectedUnitId(unit.id), setSelectedUnitTitle(unit.title))} style={{ background: unit.isLocked ? (theme==='dark'?'rgba(0,0,0,0.6)':'rgba(255,255,255,0.8)') : `linear-gradient(135deg, ${idx%2===0?'#58cc02':'#ce82ff'}, ${idx%2===0?'#46a302':'#a562ff'})`, padding: '2rem', borderRadius: '1rem', cursor: unit.isLocked?'not-allowed':'pointer', opacity: unit.isLocked?0.8:1, display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', border: unit.isLocked ? `2px solid ${currentTheme.border}` : 'none', backdropFilter: 'blur(5px)' }}>
-                                <div style={{ color: unit.isLocked ? currentTheme.text : 'white' }}><h3 style={{ margin: 0 }}>Unidad {unit.unitOrder}</h3><p style={{ margin: 0 }}>{unit.title}</p></div>
-                                <div style={{fontSize:'2rem', color: unit.isLocked ? currentTheme.text : 'white'}}>{unit.isLocked ? '🔒' : '▶'}</div>
-                            </motion.div>
-                        ))}
-                    </div>
-                ) : (
-                    <div style={{ position: 'relative', width: '100%', maxWidth:'600px', margin:'0 auto' }}>
-                        <button onClick={() => setSelectedUnitId(null)} style={{ background: 'rgba(0,0,0,0.3)', color: 'white', border: 'none', cursor: 'pointer', marginBottom: '1rem', padding:'0.5rem 1rem', borderRadius:'2rem', fontWeight:'bold', backdropFilter:'blur(5px)' }}>⬅ Volver a Unidades</button>
-                        <div style={{ background: "#58cc02", padding: "1.5rem", borderRadius: "1rem", marginBottom: "3rem", display: "flex", justifyContent: "space-between", alignItems: "center", position:'relative', zIndex:10, boxShadow:'0 5px 0 #46a302' }}><div><h2 style={{margin:0, color:'white'}}>{selectedUnitTitle}</h2></div><span style={{ fontSize: "2rem" }}>📖</span></div>
-                        <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            {!isLoading && <LearningPathSVG nodeRefs={nodeRefs} pathDataLength={pathData.length} />}
-                            <motion.div variants={containerVariants} initial="hidden" animate="show" style={{ width: '100%', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '20px' }}>
-                                <p style={{ color: 'white' }}>
-  Nodos cargados: {pathData.length}
-</p>
+           {/* SECCIÓN: APRENDER */}
+{activeSection === "APRENDER" && (
+  <div style={{ width: "100%" }}>
+    {!selectedUnitId ? (
+      /* --- VISTA 1: LISTADO DE TODAS LAS UNIDADES --- */
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: currentTheme.text, textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+          Ruta de Aprendizaje
+        </h2>
+        
+        {units.map((unit, idx) => {
+  // Calculamos el progreso. 
+  // Si la unidad está bloqueada es 0, si no, calculamos lecciones completadas / totales
+  const totalLessons = unit.lessons?.length || 0;
+  const completedLessons = unit.lessons?.filter(l => l.isCompleted).length || 0;
+  const progressPercent = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
 
-                                {pathData.map((lvl, idx) => (
-                                    <motion.div key={`${lvl.lessonId}-${idx}`} ref={(el) => { nodeRefs.current[idx] = el; }} variants={nodeVariants} whileHover={lvl.status !== 'LOCKED' ? { scale: 1.1 } : {}} onClick={() => openLevelModal(idx)} style={{ marginBottom: '60px', transform: `translateX(${Math.sin(idx * 0.8) * 75}px)`, cursor: lvl.status==='LOCKED' ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-                                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: lvl.status==='COMPLETED'?'#ffc800':(lvl.status==='ACTIVE'?'#58cc02':'#e5e5e5'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', boxShadow: '0 6px 0 rgba(0,0,0,0.2)', border: `4px solid ${currentTheme.background}` }}>{lvl.status==='COMPLETED' ? '✓' : lvl.icon}</div>
-                                        {lvl.status === 'ACTIVE' && <motion.div initial={{ y: 0 }} animate={{ y: -10 }} transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }} style={{ position: 'absolute', top: '-45px', background:'white', color:'#58cc02', padding:'5px 10px', borderRadius:'10px', fontWeight:'bold', fontSize:'0.8rem', boxShadow:'0 2px 5px rgba(0,0,0,0.2)' }}>EMPEZAR<div style={{position:'absolute', bottom:'-5px', left:'50%', transform:'translateX(-50%)', borderLeft:'5px solid transparent', borderRight:'5px solid transparent', borderTop:'5px solid white'}}></div></motion.div>}
-                                        <span style={{ display: 'block', marginTop: '10px', textAlign: 'center', fontWeight: 'bold', color: currentTheme.text, textShadow: '0 1px 4px rgba(0,0,0,0.5)', background: 'rgba(0,0,0,0.3)', padding:'0.2rem 0.5rem', borderRadius:'0.5rem', backdropFilter:'blur(4px)' }}>{lvl.title}</span>
-                                    </motion.div>
-                                ))}
-                            </motion.div>
-                        </div>
-                    </div>
-                )}
-                </div>
-            )}
+  return (
+    <motion.div
+      key={unit.id}
+      whileHover={!unit.isLocked ? { scale: 1.02 } : {}}
+      onClick={() => {
+        if (!unit.isLocked) {
+          setSelectedUnitId(unit.id);
+          setSelectedUnitTitle(unit.title);
+          fetchPathData(unit.id);
+        }
+      }}
+      style={{
+        background: unit.isLocked 
+          ? (theme === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)') 
+          : `linear-gradient(135deg, ${idx % 2 === 0 ? '#58cc02' : '#ce82ff'}, ${idx % 2 === 0 ? '#46a302' : '#a562ff'})`,
+        padding: '1.5rem 2rem',
+        borderRadius: '1rem',
+        cursor: unit.isLocked ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        flexDirection: 'column', // Cambiado a columna para que la barra vaya abajo
+        gap: '1rem',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+        border: unit.isLocked ? `2px solid ${currentTheme.border}` : 'none',
+        position: 'relative'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ color: unit.isLocked ? currentTheme.text : 'white' }}>
+          <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Unidad {unit.unitOrder}</h3>
+          <p style={{ margin: 0, opacity: 0.9 }}>{unit.title}</p>
+        </div>
+        <div style={{ fontSize: '1.5rem', color: unit.isLocked ? currentTheme.text : 'white' }}>
+          {unit.isLocked ? '🔒' : '▶'}
+        </div>
+      </div>
 
+      {/* --- BARRA DE PROGRESO NUEVA --- */}
+      {!unit.isLocked && (
+        <div style={{ width: '100%' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            fontSize: '0.75rem', 
+            color: 'white', 
+            marginBottom: '4px',
+            fontWeight: 'bold' 
+          }}>
+            <span>Progreso</span>
+            <span>{Math.round(progressPercent)}%</span>
+          </div>
+          <div style={{ 
+            width: '100%', 
+            height: '10px', 
+            backgroundColor: 'rgba(255,255,255,0.3)', 
+            borderRadius: '10px',
+            overflow: 'hidden'
+          }}>
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              style={{ 
+                height: '100%', 
+                backgroundColor: 'white', 
+                borderRadius: '10px' 
+              }} 
+            />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+})}
+      </div>
+    ) : (
+      /* --- VISTA 2: MAPA DE LECCIONES DE LA UNIDAD SELECCIONADA --- */
+      <div style={{ position: 'relative', width: '100%', maxWidth: '600px', margin: '0 auto' }}>
+        
+        {/* BOTÓN VOLVER: Limpia los estados para regresar al listado */}
+        <button 
+          onClick={() => {
+            setSelectedUnitId(null);
+            setSelectedUnitTitle("");
+            setPathData([]); // Limpiamos las lecciones actuales
+            setHasInitialized(true); // Evita que el useEffect te meta a la fuerza a una unidad
+          }} 
+          style={{ 
+            background: 'rgba(0,0,0,0.3)', 
+            color: 'white', 
+            border: 'none', 
+            cursor: 'pointer', 
+            marginBottom: '1rem', 
+            padding: '0.5rem 1rem', 
+            borderRadius: '2rem', 
+            fontWeight: 'bold', 
+            backdropFilter: 'blur(5px)' 
+          }}
+        >
+          ⬅ Volver a Unidades
+        </button>
+
+        {/* CABECERA DE LA UNIDAD SELECCIONADA */}
+        <div style={{ 
+          background: "#58cc02", 
+          padding: "1.5rem", 
+          borderRadius: "1rem", 
+          marginBottom: "3rem", 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          position: 'relative', 
+          zIndex: 10, 
+          boxShadow: '0 5px 0 #46a302' 
+        }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white' }}>{selectedUnitTitle}</h2>
+          </div>
+          <span style={{ fontSize: "2rem" }}>📖</span>
+        </div>
+
+        {/* CAMINO DE LECCIONES (MAPA) */}
+        <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          
+          {/* SVG que dibuja las líneas conectoras */}
+          {!isLoading && <LearningPathSVG nodeRefs={nodeRefs} pathDataLength={pathData.length} />}
+          
+          <motion.div 
+            variants={containerVariants} 
+            initial="hidden" 
+            animate="show" 
+            style={{ width: '100%', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '20px' }}
+          >
+            {/* Indicador de carga de nodos */}
+            <p style={{ color: 'white', opacity: 0.6, fontSize: '0.8rem' }}>
+              Nodos cargados: {pathData.length}
+            </p>
+
+           {pathData.map((lvl, idx) => {
+  // AJUSTE DE CURVATURA:
+  // Multiplicar idx por 0.5 hace que la curva sea más lenta (serpiente larga).
+  // Multiplicar el resultado por 120 da más anchura al camino.
+  const xOffset = Math.sin(idx * 0.5) * 120; 
+
+  return (
+    <motion.div 
+      key={`${lvl.lessonId}-${idx}`} 
+      ref={(el) => { nodeRefs.current[idx] = el; }} 
+      variants={nodeVariants} 
+      whileHover={lvl.status !== 'LOCKED' ? { scale: 1.1 } : {}} 
+      onClick={() => openLevelModal(idx)} 
+      style={{ 
+        marginBottom: '90px', // Un poco más de espacio vertical para que se aprecie la curva
+        transform: `translateX(${xOffset}px)`, 
+        cursor: lvl.status === 'LOCKED' ? 'not-allowed' : 'pointer', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        position: 'relative',
+        zIndex: 2 // Asegura que los nodos estén sobre la línea del SVG
+      }}
+    >
+      {/* Círculo de la Lección */}
+      <div style={{ 
+        width: '85px', 
+        height: '85px', 
+        borderRadius: '50%', 
+        background: lvl.status === 'COMPLETED' ? '#ffc800' : (lvl.status === 'ACTIVE' ? '#58cc02' : '#e5e5e5'), 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        fontSize: '2.5rem', 
+        boxShadow: '0 8px 0 rgba(0,0,0,0.15)', // Sombra más profunda para estilo 3D
+        border: `5px solid ${currentTheme.background}`,
+        position: 'relative'
+      }}>
+        {lvl.status === 'COMPLETED' ? '✓' : lvl.icon}
+      </div>
+
+      {/* Etiqueta EMPEZAR */}
+      {lvl.status === 'ACTIVE' && (
+        <motion.div 
+          initial={{ y: 0 }} 
+          animate={{ y: -10 }} 
+          transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }} 
+          style={{ 
+            position: 'absolute', 
+            top: '-50px', 
+            background: 'white', 
+            color: '#58cc02', 
+            padding: '6px 12px', 
+            borderRadius: '12px', 
+            fontWeight: 'bold', 
+            fontSize: '0.85rem', 
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            zIndex: 10
+          }}
+        >
+          EMPEZAR
+          <div style={{ 
+            position: 'absolute', 
+            bottom: '-6px', 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            width: 0, height: 0,
+            borderLeft: '6px solid transparent', 
+            borderRight: '6px solid transparent', 
+            borderTop: '6px solid white' 
+          }}></div>
+        </motion.div>
+      )}
+
+      {/* Título de la Lección */}
+      <span style={{ 
+        display: 'block', 
+        marginTop: '12px', 
+        textAlign: 'center', 
+        fontWeight: 'bold', 
+        color: currentTheme.text, 
+        fontSize: '0.9rem',
+        textShadow: '0 2px 4px rgba(0,0,0,0.3)', 
+        background: 'rgba(0,0,0,0.4)', 
+        padding: '3px 10px', 
+        borderRadius: '8px', 
+        whiteSpace: 'nowrap'
+      }}>
+        {lvl.title}
+      </span>
+    </motion.div>
+  );
+})}
+          </motion.div>
+        </div>
+      </div>
+    )}
+  </div>
+)}
             {activeSection === "SONIDOS" && soundItems.map((c, i) => <div key={i} style={{marginBottom:'2rem', background: currentTheme.cardBg, padding:'1.5rem', borderRadius:'1rem', backdropFilter:'blur(10px)', border:`1px solid ${currentTheme.border}`}}><h3>{c.category}</h3><div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:'1rem'}}>{c.items.map((it, j)=><button key={j} onClick={()=>speak(it.name)} style={{padding:'1rem', borderRadius:'0.5rem', border:`1px solid ${currentTheme.border}`, background:currentTheme.background, color:currentTheme.text, cursor:'pointer'}}><div style={{fontSize:'1.5rem'}}>{it.icon}</div><div>{it.name}</div></button>)}</div></div>)}
 
             {activeSection === "GRUPOS" && (
@@ -536,6 +777,8 @@ console.log('pathData:', pathData);
                   <div style={{display:'flex', alignItems:'center', gap:'0.2rem'}}><span style={{fontSize:'1.2rem'}}>⚡</span><span style={{color:'#ffd900', fontWeight:'bold'}}>{userProfile.totalXp}</span></div>
               </div>
           )}
+          
+          {/* TARJETAS INFORMATIVAS */}
 
           <div style={{ background: currentTheme.cardBg, border: `2px solid ${currentTheme.border}`, borderRadius: "1rem", padding: "1.5rem", marginBottom:'1rem' }}>
               <h3 style={{ fontWeight: "bold", margin: "0 0 0.5rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}><span>🛡️</span> Compite en Ligas</h3>

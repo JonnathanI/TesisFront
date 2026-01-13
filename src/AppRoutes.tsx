@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 // Páginas principales
 import Home from "./Pages/Home";
-import Login from "./Pages/Login";
+import { Login } from "./Pages/Login";
 import Register from "./Pages/Register";
 
 // Páginas de estudiantes

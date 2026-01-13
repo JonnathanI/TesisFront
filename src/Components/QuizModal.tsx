@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-// Asegúrate de que esta ruta sea correcta según tu estructura
-import { QuestionDTO, AnswerSubmissionDTO, submitAnswer } from '../api/auth.service'; 
+import { QuestionDTO, AnswerSubmissionDTO, submitAnswer } from '../api/auth.service';
 
 interface QuizModalProps {
   questions: QuestionDTO[] | null;
   lessonId: string;
   onClose: () => void;
-  // Ajustado para recibir el conteo de correctas como número
   onComplete: (correctCount: number) => void;
 }
+
+// Configuración de reconocimiento de voz
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
 
 export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClose, onComplete }) => {
   const [qIndex, setQIndex] = useState(0);
@@ -17,138 +19,161 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false); // Para el micrófono
 
-  // 1. Caso: No hay preguntas
-  if (!questions || questions.length === 0) {
-    return (
-      <div style={modalOverlayStyle}>
-        <motion.div style={modalContentStyle} initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
-          <p style={{ color: 'white', fontSize: '1.2rem', marginBottom: '1.5rem' }}>
-            Esta lección no tiene preguntas disponibles.
-          </p>
-          <button onClick={onClose} style={nextButtonStyle}>
-            Cerrar
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
+  if (!questions || questions.length === 0) return null; // ... (mantener lógica de carga anterior)
 
   const currentQuestion = questions[qIndex];
 
-  // 2. Caso: Error de carga de pregunta específica
-  if (!currentQuestion) {
-    return (
-      <div style={modalOverlayStyle}>
-        <motion.div style={modalContentStyle}>
-          <p style={{ color: 'white' }}>Finalizando lección...</p>
-          <button onClick={() => onComplete(correctCount)} style={nextButtonStyle}>Continuar</button>
-        </motion.div>
-      </div>
-    );
-  }
+  // --- FUNCIONES MULTIMEDIA ---
+  const playAudio = (text: string) => {
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'en-US';
+    window.speechSynthesis.speak(msg);
+  };
 
-  const handleOptionClick = async (option: string) => {
-    if (isLoading || selectedOption) return; 
+  const startListening = () => {
+    if (!recognition) return alert("Navegador no compatible con voz");
+    setIsRecording(true);
+    recognition.start();
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      handleOptionClick(transcript); // Enviamos lo que dijo como respuesta
+      setIsRecording(false);
+    };
+    recognition.onerror = () => setIsRecording(false);
+  };
 
+  // --- LÓGICA DE ENVÍO ---
+  const handleOptionClick = async (answer: string) => {
+    if (isLoading || selectedOption) return;
     setIsLoading(true);
-    setSelectedOption(option);
+    setSelectedOption(answer);
 
     const submission: AnswerSubmissionDTO = {
       questionId: currentQuestion.id,
-      userAnswer: option, 
+      userAnswer: answer,
     };
 
     try {
       const result = await submitAnswer(submission);
       setIsCorrect(result.isCorrect);
-      if (result.isCorrect) {
-        setCorrectCount(prev => prev + 1);
-      }
+      if (result.isCorrect) setCorrectCount(prev => prev + 1);
     } catch (error) {
-      console.error("Error al enviar respuesta:", error);
-      setIsCorrect(false); // Por defecto falso si falla la red
+      console.error(error);
+      setIsCorrect(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNext = () => {
-    // Es vital limpiar los estados antes de pasar a la siguiente
     setSelectedOption(null);
     setIsCorrect(null);
+    if (qIndex + 1 >= questions.length) onComplete(correctCount);
+    else setQIndex(prev => prev + 1);
+  };
 
-    if (qIndex + 1 >= questions.length) {
-      // Si es la última pregunta, enviamos el resultado al Dashboard
-      onComplete(correctCount); 
-    } else {
-      // Si no, avanzamos el índice
-      setQIndex(prev => prev + 1); 
+  // --- RENDERIZADO DINÁMICO SEGÚN CATEGORÍA ---
+  const renderContent = () => {
+    switch (currentQuestion.category) {
+      case 'IMAGE_SELECT':
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {currentQuestion.options.map((opt, idx) => (
+              <motion.div
+                key={idx}
+                onClick={() => handleOptionClick(opt)}
+                style={getOptionStyle(opt)}
+                whileHover={{ scale: 1.05 }}
+              >
+                <img src={opt} alt="opcion" style={{ width: '100%', height: '100px', objectFit: 'contain' }} />
+              </motion.div>
+            ))}
+          </div>
+        );
+
+      case 'LISTENING':
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => playAudio(currentQuestion.textSource)}
+              style={audioButtonStyle}
+            >
+              🔊 Escuchar
+            </motion.button>
+            <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {currentQuestion.options.map((opt, idx) => (
+                <button key={idx} onClick={() => handleOptionClick(opt)} style={getOptionStyle(opt)}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'SPEAKING':
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ color: '#00FFC2', fontSize: '1.5rem', fontWeight: 'bold' }}>"{currentQuestion.textSource}"</p>
+            <motion.button
+              animate={isRecording ? { scale: [1, 1.1, 1], boxShadow: '0 0 20px #ff4b4b' } : {}}
+              transition={{ repeat: Infinity }}
+              onClick={startListening}
+              style={{ ...audioButtonStyle, background: isRecording ? '#ff4b4b' : '#00FFC2', color: '#1A1A2E' }}
+            >
+              {isRecording ? '🛑 Escuchando...' : '🎤 Toca para hablar'}
+            </motion.button>
+            {selectedOption && <p style={{color: 'white', marginTop: '10px'}}>Dijiste: {selectedOption}</p>}
+          </div>
+        );
+
+      default: // GRAMMAR, VOCABULARY o Texto normal
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {currentQuestion.options.map((option, idx) => (
+              <motion.button
+                key={idx}
+                style={getOptionStyle(option)}
+                onClick={() => handleOptionClick(option)}
+                disabled={selectedOption !== null}
+              >
+                {option}
+              </motion.button>
+            ))}
+          </div>
+        );
     }
   };
 
+  // --- ESTILOS DINÁMICOS ---
   const getOptionStyle = (option: string): React.CSSProperties => {
-    if (!selectedOption) return optionStyle;
-    
-    const isThisOptionSelected = selectedOption === option;
-    
-    if (isThisOptionSelected) {
-      if (isCorrect === true) return { ...optionStyle, ...correctOptionStyle };
-      if (isCorrect === false) return { ...optionStyle, ...incorrectOptionStyle };
+    const base = { ...optionStyle };
+    if (selectedOption === option) {
+      if (isCorrect === true) return { ...base, ...correctOptionStyle };
+      if (isCorrect === false) return { ...base, ...incorrectOptionStyle };
     }
-    
-    if (isCorrect !== null) {
-      return { ...optionStyle, opacity: 0.5, cursor: 'not-allowed' };
-    }
-    
-    return optionStyle;
+    if (selectedOption && selectedOption !== option) return { ...base, opacity: 0.5 };
+    return base;
   };
 
   return (
     <div style={modalOverlayStyle}>
-      <motion.div 
-        style={modalContentStyle} 
-        onClick={(e) => e.stopPropagation()}
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-      >
-        {/* Barra de Progreso Visual */}
+      <motion.div style={modalContentStyle} initial={{ y: 50 }} animate={{ y: 0 }}>
         <div style={progressContainer}>
-            <div style={{...progressFill, width: `${((qIndex + 1) / questions.length) * 100}%`}} />
-        </div>
-
-        <p style={{ color: '#aaa', fontSize: '0.8rem', marginBottom: '1rem' }}>
-            PREGUNTA {qIndex + 1} DE {questions.length}
-        </p>
-
-        <h2 style={{ color: '#00FFC2', marginBottom: '2rem', minHeight: '60px' }}>
-            {currentQuestion.questionText}
-        </h2>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%' }}>
-          {currentQuestion.options.map((option, idx) => (
-            <motion.button
-              key={`${qIndex}-${idx}`} // Clave única por pregunta e índice
-              style={getOptionStyle(option)}
-              whileHover={!selectedOption ? { scale: 1.02, backgroundColor: 'rgba(255,255,255,0.2)' } : {}}
-              whileTap={!selectedOption ? { scale: 0.98 } : {}}
-              onClick={() => handleOptionClick(option)}
-              disabled={selectedOption !== null}
-            >
-              {option}
-            </motion.button>
-          ))}
+          <div style={{ ...progressFill, width: `${((qIndex + 1) / questions.length) * 100}%` }} />
         </div>
         
+        <h2 style={{ color: '#00FFC2', marginBottom: '2rem' }}>
+          {currentQuestion.questionText}
+        </h2>
+
+        {renderContent()}
+
         {isCorrect !== null && (
-          <motion.button
-            style={nextButtonStyle}
-            onClick={handleNext}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            {qIndex + 1 >= questions.length ? 'FINALIZAR LECCIÓN' : 'SIGUIENTE PREGUNTA'}
+          <motion.button style={nextButtonStyle} onClick={handleNext} initial={{ y: 20 }} animate={{ y: 0 }}>
+            {qIndex + 1 >= questions.length ? 'TERMINAR' : 'CONTINUAR'}
           </motion.button>
         )}
       </motion.div>
@@ -156,7 +181,14 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
   );
 };
 
-// --- ESTILOS ---
+// --- ESTILOS EXTRA ---
+const audioButtonStyle: React.CSSProperties = {
+  background: '#1cb0f6', color: 'white', border: 'none', borderRadius: '15px',
+  padding: '15px 30px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+  boxShadow: '0 4px 0 #1899d6'
+};
+
+// ... (Copia aquí tus otros estilos: modalOverlayStyle, modalContentStyle, etc.)
 const modalOverlayStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, background: 'rgba(10, 10, 25, 0.9)',
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000

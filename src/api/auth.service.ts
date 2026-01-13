@@ -8,7 +8,15 @@ const BASE_URL = 'http://localhost:8081/api';
 // ==========================================
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-export type QuestionCategory  = 'GRAMMAR' | 'VOCABULARY' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'ORDERING';
+export type QuestionCategory = 
+  | 'GRAMMAR' 
+  | 'VOCABULARY' 
+  | 'LISTENING'  // Estudiante escucha y escribe/selecciona
+  | 'SPEAKING'   // Estudiante habla
+  | 'WRITING' 
+  | 'ORDERING' 
+  | 'IMAGE_SELECT' // ✅ Nuevo: Seleccionar imagen correcta
+  | 'MATCHING';    // ✅ Nuevo: Unir palabras
 
 export interface AuthResponse {
     token: string;
@@ -584,4 +592,22 @@ export const generateTeacherRegistrationCode = async (): Promise<string> => {
 
   const data = await response.json();
   return data.code;
+};
+// --- RECUPERACIÓN DE CONTRASEÑA ---
+
+export const forgotPassword = async (email: string): Promise<any> => {
+    // Nota: Tu controlador mapea a /api/auth/password/forgot
+    const response = await apiFetch('/auth/password/forgot', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+    }, false); // false porque no requiere estar logueado
+    return response.json();
+};
+
+export const resetPasswordConfirm = async (token: string, newPassword: string): Promise<any> => {
+    const response = await apiFetch('/auth/password/reset', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
+    }, false);
+    return response.json();
 };

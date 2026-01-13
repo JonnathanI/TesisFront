@@ -1,304 +1,247 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState, CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-// Importamos la función login y los tipos necesarios
-import { login, AuthResponse, UserRole } from "../api/auth.service"; 
+// Importamos las funciones necesarias de tu service
+import { login, forgotPassword, AuthResponse } from "../api/auth.service";
 
-// Paleta de colores importada de HomeIngles
 const COLOR_PRIMARY_BLUE = "#278DCE";
 const COLOR_SECONDARY_YELLOW = "#FFD700";
 const COLOR_BG_LIGHT = "#E5E6E6";
 const COLOR_CARD_BG = "rgba(255, 255, 255, 0.95)";
 const COLOR_TEXT_DARK = "#4A4A4A";
+const COLOR_SUCCESS = "#52c41a";
 
-export default function Login() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const navigate = useNavigate();
+export const Login: React.FC = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Estados para recuperación
+  const [showRecover, setShowRecover] = useState(false);
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverMessage, setRecoverMessage] = useState<string | null>(null);
 
-    /**
-     * Maneja el proceso de inicio de sesión llamando al backend.
-     */
-    const handleLogin = async () => {
-        if (!email || !password) {
-            setError("Por favor, ingresa correo y contraseña.");
-            return;
-        }
+  const navigate = useNavigate();
 
-        setError(null);
-        setIsLoading(true);
+  // --- FUENTE Y ESTILOS GLOBALES ---
+  useEffect(() => {
+    const id = "poppins-font";
+    if (!document.getElementById(id)) {
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap";
+      document.head.appendChild(link);
+    }
+    document.body.style.margin = "0";
+    document.body.style.backgroundColor = COLOR_BG_LIGHT;
+    document.body.style.color = COLOR_TEXT_DARK;
+    document.body.style.fontFamily = "'Poppins', system-ui, sans-serif";
+  }, []);
 
-        try {
-            const data: AuthResponse = await login({ 
-                username: email,
-                password: password 
-            });
+  const styles = useMemo<Record<string, CSSProperties>>(() => ({
+    page: {
+      minHeight: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      position: "relative",
+      padding: 24,
+    },
+    logoText: {
+      position: "absolute",
+      left: 40,
+      top: 30,
+      fontSize: 32,
+      fontWeight: 900,
+      color: COLOR_PRIMARY_BLUE,
+      textTransform: "uppercase",
+      textShadow: `2px 2px 0 ${COLOR_SECONDARY_YELLOW}`,
+      cursor: "pointer",
+    },
+    card: {
+      background: COLOR_CARD_BG,
+      borderRadius: 25,
+      padding: "64px 48px",
+      width: 520,
+      maxWidth: "95%",
+      textAlign: "center",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+    },
+    title: { fontSize: "2.8rem", fontWeight: 900, color: COLOR_PRIMARY_BLUE, margin: 0 },
+    subtitle: { marginBottom: 40, fontSize: "1.2rem", color: "#666" },
+    input: {
+      width: "100%",
+      padding: "18px 20px",
+      borderRadius: 20,
+      border: `2px solid ${COLOR_SECONDARY_YELLOW}`,
+      fontSize: "1.1rem",
+      marginBottom: 20,
+      textAlign: "center",
+      boxSizing: "border-box"
+    },
+    message: { minHeight: 24, marginBottom: 12, fontWeight: 800 },
+    error: { color: "#ff4d4f" },
+    success: { color: COLOR_SUCCESS },
+    button: {
+      width: "100%",
+      padding: 18,
+      fontSize: "1.2rem",
+      fontWeight: 900,
+      borderRadius: 50,
+      background: COLOR_SECONDARY_YELLOW,
+      cursor: "pointer",
+      border: "none",
+      marginTop: 10,
+    },
+    register: { marginTop: 20 },
+    registerLink: { color: COLOR_PRIMARY_BLUE, cursor: "pointer", fontWeight: 800 },
+    recoverLink: { color: COLOR_PRIMARY_BLUE, cursor: "pointer", marginTop: 12, display: "inline-block", fontWeight: 700 },
+    recoverInput: {
+      width: "100%",
+      padding: 16,
+      borderRadius: 20,
+      border: `2px solid ${COLOR_PRIMARY_BLUE}`,
+      fontSize: "1rem",
+      marginBottom: 12,
+      textAlign: "center",
+      boxSizing: "border-box"
+    },
+  }), []);
 
-            // CORRECCIÓN CLAVE: El rol ya se guarda en auth.service.ts
-            // Usaremos la data que nos da la respuesta, que es lo más directo.
-            
-            switch (data.role.toUpperCase() as UserRole) {
-                case 'ADMIN':
-                case 'TEACHER':
-                    navigate("/teacher/dashboard"); 
-                    break;
-                case 'STUDENT':
-                default:
-                    navigate("/student/dashboard");
-                    break;
-            }
+  // --- LÓGICA DE LOGIN ---
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Por favor, ingresa correo y contraseña.");
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
 
-        } catch (err) {
-            let errorMessage = "Error al intentar iniciar sesión.";
-            if (err instanceof Error) {
-                errorMessage = err.message.includes('401')
-                    ? "Credenciales inválidas. Por favor, verifica tu correo y contraseña."
-                    : `Error: ${err.message}`;
-            }
-            setError(errorMessage);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    try {
+      const data: AuthResponse = await login({ username: email, password });
+      setSuccess("¡Inicio de sesión exitoso! Redirigiendo...");
+      
+      setTimeout(() => {
+        if (data.role === "ADMIN" || data.role === "TEACHER") {
+          navigate("/teacher/dashboard");
+        } else {
+          navigate("/student/dashboard");
+        }
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || "Credenciales inválidas.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <>
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&display=swap');
-                
-                /* PALETA DE COLORES */
-                :root {
-                  --color-bg-light: ${COLOR_BG_LIGHT}; 
-                  --color-primary-blue: ${COLOR_PRIMARY_BLUE}; 
-                  --color-secondary-yellow: ${COLOR_SECONDARY_YELLOW}; 
-                  --color-card-bg: ${COLOR_CARD_BG};
-                  --color-text-dark: ${COLOR_TEXT_DARK}; 
-                  --color-text-light: #FFFFFF; 
-                }
+  // --- LÓGICA DE RECUPERACIÓN REAL ---
+  const handleRecoverPassword = async () => {
+    if (!recoverEmail) {
+      setRecoverMessage("Ingresa tu correo.");
+      return;
+    }
 
-                html, body, #root {
-                    margin: 0;
-                    height: 100%;
-                    font-family: 'Poppins', sans-serif;
-                }
-                body {
-                    background-color: var(--color-bg-light);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                    color: var(--color-text-dark);
-                }
-                
-                /* --- AHORA ES UN BOTÓN DE REGRESO AL HOME --- */
-                .logo-text {
-                    position: absolute;
-                    left: 40px; 
-                    top: 30px;  
-                    font-size: 32px;
-                    font-weight: 900;
-                    color: var(--color-primary-blue);
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    text-shadow: 2px 2px 0px var(--color-secondary-yellow);
-                    cursor: pointer;
-                    z-index: 10;
-                    transition: transform 0.2s;
-                }
-                .logo-text:hover {
-                    transform: scale(1.05); /* Agregamos un pequeño efecto al pasar el ratón */
-                }
-                
-                .login-card {
-                    background: var(--color-card-bg);
-                    border-radius: 25px;
-                    padding: 4rem 3rem;
-                    width: 520px;
-                    max-width: 95%;
-                    text-align: center;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); 
-                    border: 1px solid rgba(0, 0, 0, 0.1);
-                    position: relative;
-                }
-                
-                /* ELIMINADO EN JSX, PERO MANTENGO EL ESTILO SI DECIDES REAÑADIR EL EMOJI 
-                .home-icon {
-                    position: absolute;
-                    top: 20px;
-                    left: 20px; 
-                    font-size: 1.8rem;
-                    cursor: pointer;
-                    color: var(--color-text-dark); 
-                    transition: transform 0.2s, color 0.2s;
-                    opacity: 0; 
-                }
-                .home-icon:hover {
-                    transform: scale(1.2);
-                    color: var(--color-primary-blue);
-                }*/
-                
-                .login-title {
-                    font-size: 2.8rem;
-                    font-weight: 900;
-                    margin-bottom: 1rem;
-                    color: var(--color-primary-blue); 
-                    text-shadow: none;
-                }
-                
-                .login-subtitle {
-                    margin-bottom: 2.5rem;
-                    font-size: 1.2rem;
-                    opacity: 0.85;
-                    color: var(--color-text-dark);
-                }
-                
-                .login-input {
-                    width: 90%;
-                    padding: 1.1rem 1.3rem;
-                    border-radius: 20px;
-                    border: 2px solid var(--color-secondary-yellow); 
-                    background: rgba(255, 215, 0, 0.05);
-                    color: var(--color-text-dark);
-                    font-size: 1.15rem;
-                    outline: none;
-                    margin-bottom: 1.8rem;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
-                    text-align: center;
-                }
-                .login-input::placeholder {
-                    color: var(--color-text-dark);
-                    opacity: 0.5;
-                    text-align: center;
-                }
-                .login-input:focus {
-                    border: 2px solid var(--color-primary-blue);
-                    box-shadow: 0 0 25px rgba(39, 141, 206, 0.5);
-                    transform: scale(1.03);
-                    background: rgba(39, 141, 206, 0.05);
-                }
-                
-                .btn {
-                    width: 90%;
-                    padding: 1.2rem;
-                    font-size: 1.25rem;
-                    font-weight: 900;
-                    border-radius: 50px;
-                    cursor: pointer;
-                    border: none;
-                    margin-top: 1.2rem;
-                    text-transform: uppercase;
-                    transition: all 0.3s ease;
-                }
-                
-                .btn-login {
-                    background: var(--color-secondary-yellow);
-                    color: var(--color-text-dark);
-                    border: 2px solid var(--color-secondary-yellow);
-                    box-shadow: 0 5px 20px rgba(255, 215, 0, 0.5);
-                }
-                .btn-login:hover:not(:disabled) {
-                    transform: scale(1.05) translateY(-3px);
-                    background-color: #FFC000;
-                    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
-                }
-                .btn-login:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                    background-color: var(--color-secondary-yellow);
-                }
-                
-                .register-link {
-                    margin-top: 1.5rem;
-                    font-size: 1rem;
-                    opacity: 0.85;
-                }
-                .register-link span {
-                    color: var(--color-primary-blue);
-                    cursor: pointer;
-                    text-decoration: underline;
-                }
-                .error-message {
-                    color: #ff4d4f;
-                    margin-top: 10px;
-                    margin-bottom: 10px;
-                    font-size: 1rem;
-                    font-weight: bold;
-                    min-height: 20px; 
-                }
+    setIsLoading(true);
+    setRecoverMessage(null);
 
-                @media (max-width: 600px) {
-                    .logo-text { left: 20px; top: 20px; font-size: 24px; }
-                }
-            `}</style>
+    try {
+      // Llamada a tu backend: /api/auth/password/forgot
+      await forgotPassword(recoverEmail);
+      setRecoverMessage("Si el correo existe, recibirás un enlace en breve.");
+      setRecoverEmail("");
+      
+      // Cerrar panel después de unos segundos
+      setTimeout(() => {
+        setShowRecover(false);
+        setRecoverMessage(null);
+      }, 4000);
+    } catch (err: any) {
+      setRecoverMessage("Error al procesar la solicitud.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            {/* Logo de Europeek que ahora actúa como botón de regreso al Home */}
-            <div className="logo-text" onClick={() => navigate("/")}>
-                Europeek
-            </div>
+  return (
+    <div style={styles.page}>
+      <div style={styles.logoText} onClick={() => navigate("/")}>Europeek</div>
 
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1 }}
-                style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", width: "100%" }}
-            >
-                <motion.div
-                    className="login-card"
-                    initial={{ scale: 0.8, opacity: 0, y: -20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, type: "spring", stiffness: 120 }}
-                >
-                    {/* El icono de casa (🏠) ha sido eliminado del JSX ya que Europeek hace su función */}
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+        <div style={styles.card}>
+          {!showRecover ? (
+            <>
+              <h1 style={styles.title}>¡Bienvenido!</h1>
+              <p style={styles.subtitle}>Aprende inglés de forma divertida</p>
 
-                    <h1 className="login-title">¡Bienvenido!</h1>
-                    <p className="login-subtitle">
-                        Inicia sesión para aprender inglés de forma divertida
-                    </p>
+              <input
+                style={styles.input}
+                type="email"
+                placeholder="Correo electrónico"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-                    <input
-                        type="email"
-                        placeholder="Correo electrónico"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="login-input"
-                        disabled={isLoading}
-                    />
-                    <input
-                        type="password"
-                        placeholder="Contraseña"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="login-input"
-                        disabled={isLoading}
-                        onKeyDown={(e) => { 
-                            if (e.key === 'Enter') {
-                                handleLogin();
-                            }
-                        }}
-                    />
+              <input
+                style={styles.input}
+                type="password"
+                placeholder="Contraseña"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
 
-                    {/* Mensaje de error */}
-                    <div className="error-message">
-                         {error}
-                    </div>
+              <div style={{ ...styles.message, ...styles.error }}>{error}</div>
+              {success && <div style={{ ...styles.message, ...styles.success }}>{success}</div>}
 
-                    <button 
-                        className="btn btn-login" 
-                        onClick={handleLogin}
-                        disabled={isLoading || !email || !password}
-                    >
-                        {isLoading ? "Cargando..." : "Iniciar sesión"}
-                    </button>
+              <button style={styles.button} onClick={handleLogin} disabled={isLoading}>
+                {isLoading ? "Cargando..." : "Iniciar sesión"}
+              </button>
 
-                    <div className="register-link">
-                        ¿No tienes cuenta?{" "}
-                        <span onClick={() => navigate("/register")}>Regístrate</span>
-                    </div>
-                </motion.div>
-            </motion.div>
-        </>
-    );
-}
+              <div style={styles.register}>
+                ¿No tienes cuenta?{" "}
+                <span style={styles.registerLink} onClick={() => navigate("/register")}>Regístrate</span>
+              </div>
+
+              <div style={styles.recoverLink} onClick={() => setShowRecover(true)}>
+                ¿Olvidaste tu contraseña?
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 style={styles.title}>Recuperar</h2>
+              <p style={styles.subtitle}>Te enviaremos un correo para restablecer tu cuenta</p>
+
+              <input
+                style={styles.recoverInput}
+                type="email"
+                placeholder="Ingresa tu correo"
+                value={recoverEmail}
+                onChange={(e) => setRecoverEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRecoverPassword()}
+              />
+
+              <div style={{ ...styles.message, ...styles.success }}>{recoverMessage}</div>
+
+              <button 
+                style={{...styles.button, background: COLOR_PRIMARY_BLUE, color: 'white'}} 
+                onClick={handleRecoverPassword}
+                disabled={isLoading}
+              >
+                {isLoading ? "Enviando..." : "Enviar enlace"}
+              </button>
+
+              <div style={styles.recoverLink} onClick={() => { setShowRecover(false); setRecoverMessage(null); }}>
+                Volver al inicio de sesión
+              </div>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
