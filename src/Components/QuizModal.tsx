@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { QuestionDTO, AnswerSubmissionDTO, submitAnswer } from '../api/auth.service';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  QuestionDTO, 
+  AnswerSubmissionDTO, 
+  submitAnswer, 
+  completeLesson 
+} from '../api/auth.service';
 
 interface QuizModalProps {
   questions: QuestionDTO[] | null;
@@ -9,223 +14,172 @@ interface QuizModalProps {
   onComplete: (correctCount: number) => void;
 }
 
-// Configuración de reconocimiento de voz
-const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-const recognition = SpeechRecognition ? new SpeechRecognition() : null;
-
 export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClose, onComplete }) => {
+  // --- ESTADOS DE PROGRESO ---
   const [qIndex, setQIndex] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
+  
+  // --- ESTADOS DE PREGUNTA ACTUAL ---
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [correctCount, setCorrectCount] = useState(0);
+  const [isAnswered, setIsAnswered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false); // Para el micrófono
 
-  if (!questions || questions.length === 0) return null; // ... (mantener lógica de carga anterior)
+  // 1. EFECTO: CARGAR PROGRESO AL INICIAR
+  useEffect(() => {
+    const savedProgress = localStorage.getItem(`lesson_progress_${lessonId}`);
+    if (savedProgress && questions) {
+      const { lastIndex, savedScore } = JSON.parse(savedProgress);
+      // Solo cargamos si no habíamos terminado la lección
+      if (lastIndex < questions.length) {
+        setQIndex(lastIndex);
+        setCorrectCount(savedScore);
+      }
+    }
+  }, [lessonId, questions]);
 
+  if (!questions || questions.length === 0) return null;
   const currentQuestion = questions[qIndex];
 
-  // --- FUNCIONES MULTIMEDIA ---
-  const playAudio = (text: string) => {
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'en-US';
-    window.speechSynthesis.speak(msg);
+  // 2. FUNCIÓN: GUARDAR PROGRESO EN LOCALSTORAGE
+  const saveProgressToLocal = (nextIndex: number, currentScore: number) => {
+    const data = { lastIndex: nextIndex, savedScore: currentScore };
+    localStorage.setItem(`lesson_progress_${lessonId}`, JSON.stringify(data));
   };
 
-  const startListening = () => {
-    if (!recognition) return alert("Navegador no compatible con voz");
-    setIsRecording(true);
-    recognition.start();
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      handleOptionClick(transcript); // Enviamos lo que dijo como respuesta
-      setIsRecording(false);
-    };
-    recognition.onerror = () => setIsRecording(false);
-  };
-
-  // --- LÓGICA DE ENVÍO ---
-  const handleOptionClick = async (answer: string) => {
-    if (isLoading || selectedOption) return;
+  const handleCheck = async () => {
+    if (isLoading || !selectedOption || isAnswered) return;
     setIsLoading(true);
-    setSelectedOption(answer);
-
-    const submission: AnswerSubmissionDTO = {
-      questionId: currentQuestion.id,
-      userAnswer: answer,
-    };
 
     try {
+      const submission: AnswerSubmissionDTO = {
+        questionId: currentQuestion.id,
+        userAnswer: selectedOption,
+      };
       const result = await submitAnswer(submission);
-      setIsCorrect(result.isCorrect);
-      if (result.isCorrect) setCorrectCount(prev => prev + 1);
+      const correct = result.isCorrect;
+
+      setIsCorrect(correct);
+      setIsAnswered(true);
+
+      if (correct) {
+        const newScore = correctCount + 1;
+        setCorrectCount(newScore);
+        // Guardamos el progreso inmediatamente después de contestar
+        saveProgressToLocal(qIndex, newScore); 
+      }
     } catch (error) {
-      console.error(error);
-      setIsCorrect(false);
+        // Fallback local...
+        setIsAnswered(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleNext = () => {
-    setSelectedOption(null);
-    setIsCorrect(null);
-    if (qIndex + 1 >= questions.length) onComplete(correctCount);
-    else setQIndex(prev => prev + 1);
-  };
+  const handleNext = async () => {
+    const nextIndex = qIndex + 1;
 
-  // --- RENDERIZADO DINÁMICO SEGÚN CATEGORÍA ---
-  const renderContent = () => {
-    switch (currentQuestion.category) {
-      case 'IMAGE_SELECT':
-        return (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            {currentQuestion.options.map((opt, idx) => (
-              <motion.div
-                key={idx}
-                onClick={() => handleOptionClick(opt)}
-                style={getOptionStyle(opt)}
-                whileHover={{ scale: 1.05 }}
-              >
-                <img src={opt} alt="opcion" style={{ width: '100%', height: '100px', objectFit: 'contain' }} />
-              </motion.div>
-            ))}
-          </div>
-        );
-
-      case 'LISTENING':
-        return (
-          <div style={{ textAlign: 'center' }}>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={() => playAudio(currentQuestion.textSource)}
-              style={audioButtonStyle}
-            >
-              🔊 Escuchar
-            </motion.button>
-            <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {currentQuestion.options.map((opt, idx) => (
-                <button key={idx} onClick={() => handleOptionClick(opt)} style={getOptionStyle(opt)}>
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'SPEAKING':
-        return (
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#00FFC2', fontSize: '1.5rem', fontWeight: 'bold' }}>"{currentQuestion.textSource}"</p>
-            <motion.button
-              animate={isRecording ? { scale: [1, 1.1, 1], boxShadow: '0 0 20px #ff4b4b' } : {}}
-              transition={{ repeat: Infinity }}
-              onClick={startListening}
-              style={{ ...audioButtonStyle, background: isRecording ? '#ff4b4b' : '#00FFC2', color: '#1A1A2E' }}
-            >
-              {isRecording ? '🛑 Escuchando...' : '🎤 Toca para hablar'}
-            </motion.button>
-            {selectedOption && <p style={{color: 'white', marginTop: '10px'}}>Dijiste: {selectedOption}</p>}
-          </div>
-        );
-
-      default: // GRAMMAR, VOCABULARY o Texto normal
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            {currentQuestion.options.map((option, idx) => (
-              <motion.button
-                key={idx}
-                style={getOptionStyle(option)}
-                onClick={() => handleOptionClick(option)}
-                disabled={selectedOption !== null}
-              >
-                {option}
-              </motion.button>
-            ))}
-          </div>
-        );
+    if (nextIndex >= questions.length) {
+      setIsLoading(true);
+      try {
+        await completeLesson(lessonId, correctCount);
+        localStorage.removeItem(`lesson_progress_${lessonId}`); // Limpiar al terminar
+        setIsFinished(true);
+      } catch (error) {
+        setIsFinished(true);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Avanzar y actualizar el guardado
+      setQIndex(nextIndex);
+      saveProgressToLocal(nextIndex, correctCount); 
+      setSelectedOption(null);
+      setIsCorrect(null);
+      setIsAnswered(false);
     }
   };
 
-  // --- ESTILOS DINÁMICOS ---
-  const getOptionStyle = (option: string): React.CSSProperties => {
-    const base = { ...optionStyle };
-    if (selectedOption === option) {
-      if (isCorrect === true) return { ...base, ...correctOptionStyle };
-      if (isCorrect === false) return { ...base, ...incorrectOptionStyle };
-    }
-    if (selectedOption && selectedOption !== option) return { ...base, opacity: 0.5 };
-    return base;
-  };
+  // --- VISTA DE RESUMEN ---
+  if (isFinished) {
+    return (
+      <div style={modalOverlayStyle}>
+        <div style={modalContentStyle}>
+          <h2 style={{ color: '#ffc800' }}>¡LECCIÓN COMPLETADA!</h2>
+          <p style={{ color: 'white' }}>Puntaje final: {correctCount}</p>
+          <button onClick={() => onComplete(correctCount)} style={nextButtonStyle}>VOLVER AL INICIO</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={modalOverlayStyle}>
       <motion.div style={modalContentStyle} initial={{ y: 50 }} animate={{ y: 0 }}>
-        <div style={progressContainer}>
-          <div style={{ ...progressFill, width: `${((qIndex + 1) / questions.length) * 100}%` }} />
-        </div>
         
-        <h2 style={{ color: '#00FFC2', marginBottom: '2rem' }}>
-          {currentQuestion.questionText}
-        </h2>
+        {/* CABECERA: La X ahora solo cierra el modal (onClose) */}
+        <div style={headerLayout}>
+           <button onClick={onClose} style={exitButtonStyle}>✕</button>
+           <div style={progressContainer}>
+             <div style={{ ...progressFill, width: `${((qIndex + 1) / questions.length) * 100}%` }} />
+           </div>
+        </div>
 
-        {renderContent()}
+        <h2 style={{ color: '#00FFC2' }}>{currentQuestion.questionText}</h2>
 
-        {isCorrect !== null && (
-          <motion.button style={nextButtonStyle} onClick={handleNext} initial={{ y: 20 }} animate={{ y: 0 }}>
-            {qIndex + 1 >= questions.length ? 'TERMINAR' : 'CONTINUAR'}
-          </motion.button>
-        )}
+        {/* CONTENIDO DE PREGUNTA (Opciones) */}
+        <div style={{ padding: '1rem' }}>
+          {currentQuestion.options.map((opt, i) => (
+            <button 
+              key={i} 
+              onClick={() => !isAnswered && setSelectedOption(opt)}
+              style={{
+                ...optionStyle,
+                background: selectedOption === opt ? '#1cb0f6' : 'transparent',
+                color: selectedOption === opt ? 'white' : 'white',
+                opacity: isAnswered && selectedOption !== opt ? 0.5 : 1
+              }}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+
+        {/* FOOTER: PERSISTENTE */}
+        <div style={footerContainer}>
+          <AnimatePresence mode="wait">
+            {!isAnswered ? (
+              <button 
+                disabled={!selectedOption || isLoading} 
+                onClick={handleCheck}
+                style={{...nextButtonStyle, background: selectedOption ? '#58cc02' : '#333'}}
+              >
+                {isLoading ? 'VERIFICANDO...' : 'COMPROBAR'}
+              </button>
+            ) : (
+              <motion.div initial={{ y: 50 }} animate={{ y: 0 }} style={{...feedbackPanel, background: isCorrect ? '#d7ffb8' : '#ffdfe0'}}>
+                <h3 style={{color: isCorrect ? '#58a700' : '#ea2b2b', margin: 0}}>
+                    {isCorrect ? '¡Muy bien!' : 'Incorrecto'}
+                </h3>
+                <button onClick={handleNext} style={nextButtonStyle}>CONTINUAR</button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
     </div>
   );
 };
 
-// --- ESTILOS EXTRA ---
-const audioButtonStyle: React.CSSProperties = {
-  background: '#1cb0f6', color: 'white', border: 'none', borderRadius: '15px',
-  padding: '15px 30px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
-  boxShadow: '0 4px 0 #1899d6'
-};
-
-// ... (Copia aquí tus otros estilos: modalOverlayStyle, modalContentStyle, etc.)
-const modalOverlayStyle: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(10, 10, 25, 0.9)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-};
-
-const modalContentStyle: React.CSSProperties = {
-  background: '#1A1A2E', padding: '2.5rem', borderRadius: '1.5rem',
-  width: '90%', maxWidth: '450px', textAlign: 'center',
-  border: '2px solid #00FFC2', boxShadow: '0 0 20px rgba(0, 255, 194, 0.2)'
-};
-
-const progressContainer: React.CSSProperties = {
-    width: '100%', height: '8px', background: '#333', 
-    borderRadius: '10px', marginBottom: '1.5rem', overflow: 'hidden'
-};
-
-const progressFill: React.CSSProperties = {
-    height: '100%', background: '#00FFC2', transition: 'width 0.3s ease'
-};
-
-const optionStyle: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.05)', border: '2px solid #444',
-  color: 'white', padding: '1.2rem', borderRadius: '1rem',
-  fontSize: '1.1rem', fontWeight: 600, cursor: 'pointer', 
-  width: '100%', transition: 'all 0.2s ease'
-};
-
-const correctOptionStyle: React.CSSProperties = {
-  background: 'rgba(42, 157, 143, 0.3)', borderColor: '#00FFC2', color: '#00FFC2'
-};
-
-const incorrectOptionStyle: React.CSSProperties = {
-  background: 'rgba(231, 111, 81, 0.3)', borderColor: '#FF6B6B', color: '#FF6B6B'
-};
-
-const nextButtonStyle: React.CSSProperties = {
-  marginTop: '2.5rem', background: '#00FFC2', border: 'none',
-  borderRadius: '1rem', padding: '1rem 2rem', width: '100%',
-  fontWeight: 'bold', cursor: 'pointer', color: '#1A1A2E', fontSize: '1rem'
-};
+// --- ESTILOS (Resumidos) ---
+const modalOverlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(10,10,25,0.98)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+const modalContentStyle: React.CSSProperties = { background: '#1A1A2E', padding: '2rem', borderRadius: '2rem', width: '95%', maxWidth: '500px', height: '85vh', position: 'relative', overflow: 'hidden' };
+const headerLayout: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '2rem' };
+const exitButtonStyle: React.CSSProperties = { background: 'none', border: 'none', color: '#666', fontSize: '1.8rem', cursor: 'pointer' };
+const progressContainer: React.CSSProperties = { flex: 1, height: '12px', background: '#333', borderRadius: '10px', overflow: 'hidden' };
+const progressFill: React.CSSProperties = { height: '100%', background: '#00FFC2', transition: 'width 0.3s ease' };
+const footerContainer: React.CSSProperties = { position: 'absolute', bottom: 0, left: 0, width: '100%' };
+const feedbackPanel: React.CSSProperties = { padding: '1.5rem', textAlign: 'center' };
+const optionStyle: React.CSSProperties = { border: '2px solid #444', padding: '1rem', borderRadius: '1rem', width: '100%', marginBottom: '0.5rem', cursor: 'pointer' };
+const nextButtonStyle: React.CSSProperties = { border: 'none', borderRadius: '1rem', padding: '1.2rem', width: '90%', margin: '1rem auto', fontWeight: 'bold', cursor: 'pointer', display: 'block' };

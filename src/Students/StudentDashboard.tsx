@@ -34,12 +34,14 @@ const COURSE_ID = "f23e5216-dec7-4c6f-9ce9-95064bf3e4ac";
 
 
 interface PathNode {
+  lessonId: string;
   type: 'lesson' | 'checkpoint';
   icon: string;
   title: string;
   color: string;
-  lessonId: string;
   status: PathNodeStatus;
+  totalQuestions?: number; 
+  currentProgress?: number;
 }
 
 interface SoundItemBase {
@@ -138,9 +140,19 @@ export default function StudentDashboard() {
 
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [globalLeague, setGlobalLeague] = useState<LeaderboardEntry[]>([]);
-
+const [isPathLoading, setIsPathLoading] = useState(false);
   const nodeRefs = useRef<Array<HTMLDivElement | null>>([]); 
   const [hasInitialized, setHasInitialized] = useState(false);
+  // AÑADE ESTO AQUÍ:
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 useEffect(() => {
   const loadCourse = async () => {
     try {
@@ -169,16 +181,14 @@ useEffect(() => {
 );
   useEffect(() => { if (viewingGroupId) { fetchGroupDetails(viewingGroupId); fetchLeaderboard(viewingGroupId); } }, [viewingGroupId]);
 useEffect(() => {
-  // Solo auto-selecciona si hay unidades, no hay seleccionada Y es la primera carga
-  if (units.length > 0 && !selectedUnitId && !hasInitialized) {
-    const firstUnlocked = units.find(u => !u.isLocked);
-    if (firstUnlocked) {
-      setSelectedUnitId(firstUnlocked.id); 
-      setSelectedUnitTitle(firstUnlocked.title);
-      setHasInitialized(true); // Bloqueamos para que no vuelva a entrar aquí solo
-    }
+  // Solo marcamos que ya se cargaron las unidades para evitar bucles,
+  // pero NO llamamos a setSelectedUnitId.
+  if (units.length > 0 && !hasInitialized) {
+    setHasInitialized(true); 
+    // Al no poner nada aquí, selectedUnitId se queda en null
+    // y React mostrará el listado de unidades por defecto.
   }
-}, [units, selectedUnitId, hasInitialized]);
+}, [units, hasInitialized]);
 
 
   // --- FETCHERS ---
@@ -199,17 +209,20 @@ useEffect(() => {
   
 const fetchPathData = async (unitId: string) => {
   if (!unitId) return;
+  
+  // Limpiamos los nodos actuales para que no haya rastro de la unidad anterior
+  setPathData([]); 
   setIsLoading(true);
+  nodeRefs.current = [];
+
   try {
+    // Buscamos en el estado local (que ya actualizamos en handleQuizComplete)
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.lessons) return;
 
     let foundActive = false;
     const newPathData: PathNode[] = unit.lessons.map((lesson) => {
       let status: PathNodeStatus = 'LOCKED';
-      
-      // Calculamos el porcentaje (suponiendo que tienes campos como totalQuestions y correctAnswers)
-      // Si no los tienes, puedes usar 100 si está completada y 0 si no.
       const progressPercent = lesson.isCompleted ? 100 : 0; 
 
       if (lesson.isCompleted) {
@@ -226,7 +239,7 @@ const fetchPathData = async (unitId: string) => {
         icon: '📘',
         color: '#58cc02',
         status,
-        progress: progressPercent, // <--- Agregamos esto
+        progress: progressPercent,
       };
     });
 
@@ -234,10 +247,13 @@ const fetchPathData = async (unitId: string) => {
   } catch (e) {
     console.error(e);
   } finally {
-    setIsLoading(false);
+    // IMPORTANTE: Un pequeño delay de 100ms evita el parpadeo 
+    // y da tiempo a que el SVG calcule las posiciones de las líneas.
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 150);
   }
 };
-
   // --- HANDLERS ---
 const startLesson = async (lessonId: string) => {
   if (isLoading) return;
@@ -260,31 +276,48 @@ const startLesson = async (lessonId: string) => {
 };
   
 const handleQuizComplete = async (lessonId: string, count: number) => {
-  try { 
-    // 1. Enviar progreso al servidor
-    await completeLesson(lessonId, count); 
-    
-    // 2. Cerrar el modal
-    setShowQuizModal(false); 
-    setQuizQuestions(null);
+  try {
+    // 1. Guardamos en la base de datos
+    await completeLesson(lessonId, count);
 
-    // 3. ¡ESTO ES LO NUEVO!: Actualizar la lista maestra de unidades
-    // Necesitamos los nuevos 'isCompleted' del servidor
-    const updatedUnits = await getCourseStatus(COURSE_ID);
-    setUnits(updatedUnits); 
+    // 2. Actualizamos el estado de las UNIDADES
+    setUnits(prevUnits => {
+      return prevUnits.map(unit => ({
+        ...unit,
+        lessons: unit.lessons?.map(lesson => 
+          lesson.id === lessonId ? { ...lesson, isCompleted: true } : lesson
+        )
+      }));
+    });
 
-    // 4. Refrescar el mapa visual
-    if (selectedUnitId) {
-      // Pasamos las unidades actualizadas si fetchPathData depende de 'units' externo
-      await fetchPathData(selectedUnitId); 
-    }
-    
-    // 5. Actualizar estadísticas (XP, gemas)
-    await fetchUserData(); 
-    
+    // 3. ACTUALIZACIÓN INMEDIATA DEL MAPA (pathData)
+    // Esto hace que el nodo cambie a amarillo y el siguiente se active sin esperar al fetch
+    setPathData(prevPath => {
+      let foundActive = false;
+      return prevPath.map((node) => {
+        // Si es la lección terminada -> COMPLETADA (Amarillo)
+        if (node.lessonId === lessonId) {
+          return { ...node, status: 'COMPLETED' };
+        }
+        
+        // Lógica para desbloquear la siguiente lección si estaba bloqueada
+        if (node.status === 'COMPLETED') return node;
+        
+        if (!foundActive && node.status === 'LOCKED') {
+          foundActive = true;
+          return { ...node, status: 'ACTIVE' };
+        }
+        return node;
+      });
+    });
+
+    // 4. Actualizamos el perfil del usuario (para ver las gemas/XP ganadas)
+    fetchUserData();
+
+    setShowQuizModal(false);
   } catch (error) {
-    console.error("Error al completar lección:", error);
-    setShowQuizModal(false); 
+    console.error("Error al completar la lección:", error);
+    alert("Hubo un error al guardar tu progreso.");
   }
 };
 
@@ -404,7 +437,6 @@ console.log('pathData:', pathData);
           
           <div style={{ flex: 1, padding: "2rem 1rem" }}>
 
-            {/* SECCIÓN: APRENDER */}
            {/* SECCIÓN: APRENDER */}
 {activeSection === "APRENDER" && (
   <div style={{ width: "100%" }}>
@@ -421,7 +453,6 @@ console.log('pathData:', pathData);
   const totalLessons = unit.lessons?.length || 0;
   const completedLessons = unit.lessons?.filter(l => l.isCompleted).length || 0;
   const progressPercent = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-
   return (
     <motion.div
       key={unit.id}
@@ -559,92 +590,151 @@ console.log('pathData:', pathData);
             </p>
 
            {pathData.map((lvl, idx) => {
-  // AJUSTE DE CURVATURA:
-  // Multiplicar idx por 0.5 hace que la curva sea más lenta (serpiente larga).
-  // Multiplicar el resultado por 120 da más anchura al camino.
-  const xOffset = Math.sin(idx * 0.5) * 120; 
+  // --- AJUSTES RESPONSIVOS DINÁMICOS ---
+  // Reducimos la amplitud de 120 a 50 en móviles para que no se corte
+  const amplitude = isMobile ? 40 : 80; 
+  const xOffset = Math.sin(idx * 0.8) * amplitude; 
+  
+  // Tamaño del círculo más pequeño en móvil
+  const circleSize = isMobile ? 68 : 85; 
 
-  return (
+ return (
     <motion.div 
       key={`${lvl.lessonId}-${idx}`} 
       ref={(el) => { nodeRefs.current[idx] = el; }} 
       variants={nodeVariants} 
-      whileHover={lvl.status !== 'LOCKED' ? { scale: 1.1 } : {}} 
-      onClick={() => openLevelModal(idx)} 
+      whileHover={lvl.status !== 'LOCKED' ? { scale: 1.05 } : {}} 
+      onClick={() => lvl.status !== 'LOCKED' && openLevelModal(idx)} 
       style={{ 
-        marginBottom: '90px', // Un poco más de espacio vertical para que se aprecie la curva
+        marginBottom: isMobile ? '40px' : '60px', 
         transform: `translateX(${xOffset}px)`, 
         cursor: lvl.status === 'LOCKED' ? 'not-allowed' : 'pointer', 
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center', 
         position: 'relative',
-        zIndex: 2 // Asegura que los nodos estén sobre la línea del SVG
+        zIndex: 2,
       }}
     >
-      {/* Círculo de la Lección */}
-      <div style={{ 
-        width: '85px', 
-        height: '85px', 
-        borderRadius: '50%', 
-        background: lvl.status === 'COMPLETED' ? '#ffc800' : (lvl.status === 'ACTIVE' ? '#58cc02' : '#e5e5e5'), 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        fontSize: '2.5rem', 
-        boxShadow: '0 8px 0 rgba(0,0,0,0.15)', // Sombra más profunda para estilo 3D
-        border: `5px solid ${currentTheme.background}`,
-        position: 'relative'
-      }}>
-        {lvl.status === 'COMPLETED' ? '✓' : lvl.icon}
-      </div>
-
-      {/* Etiqueta EMPEZAR */}
+      {/* Etiqueta EMPEZAR con estilo mejorado */}
       {lvl.status === 'ACTIVE' && (
         <motion.div 
           initial={{ y: 0 }} 
-          animate={{ y: -10 }} 
-          transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }} 
+          animate={{ y: -8 }} 
+          transition={{ repeat: Infinity, repeatType: "reverse", duration: 1 }} 
           style={{ 
             position: 'absolute', 
-            top: '-50px', 
+            top: isMobile ? '-35px' : '-45px', 
             background: 'white', 
             color: '#58cc02', 
-            padding: '6px 12px', 
+            padding: '5px 12px', 
             borderRadius: '12px', 
-            fontWeight: 'bold', 
-            fontSize: '0.85rem', 
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-            zIndex: 10
+            fontWeight: '900', 
+            fontSize: isMobile ? '0.65rem' : '0.8rem', 
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            zIndex: 10,
+            border: '2px solid #e5e5e5'
           }}
         >
           EMPEZAR
           <div style={{ 
-            position: 'absolute', 
-            bottom: '-6px', 
-            left: '50%', 
-            transform: 'translateX(-50%)', 
-            width: 0, height: 0,
-            borderLeft: '6px solid transparent', 
-            borderRight: '6px solid transparent', 
-            borderTop: '6px solid white' 
-          }}></div>
+            position: 'absolute', bottom: '-6px', left: '50%', transform: 'translateX(-50%)', 
+            width: 0, height: 0, borderLeft: '6px solid transparent', 
+            borderRight: '6px solid transparent', borderTop: '6px solid white' 
+          }} />
         </motion.div>
       )}
 
-      {/* Título de la Lección */}
+{/* CONTENEDOR DEL NODO */}
+<div style={{ position: 'relative', width: `${circleSize + 25}px`, height: `${circleSize + 25}px`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  
+  {/* ANILLO DE PROGRESO SEGMENTADO (REQ-004) */}
+  {lvl.status !== 'LOCKED' && (
+    <svg 
+      width={circleSize + 25} 
+      height={circleSize + 25} 
+      style={{ position: 'absolute', transform: 'rotate(-90deg)', zIndex: 1 }}
+    >
+      {(() => {
+        const radius = (circleSize / 2) + 8;
+        const circumference = 2 * Math.PI * radius;
+        
+        // 1. Usamos lessonId (que es lo que tiene tu objeto) para buscar el progreso
+        const saved = localStorage.getItem(`lesson_progress_${(lvl as any).lessonId}`);
+        const progressData = saved ? JSON.parse(saved) : { lastIndex: 0 };
+        
+        // 2. Configuración de segmentos
+        const totalSegments = (lvl as any).totalQuestions || 6; 
+        const gap = 8; 
+        const segmentLength = (circumference / totalSegments) - gap;
+        
+        // 3. Lógica de color: cuántos trozos verdes dibujamos
+        const activeSegments = lvl.status === 'COMPLETED' ? totalSegments : progressData.lastIndex;
+
+        return (
+          <>
+            {/* Círculo Base: GRIS (Representa lo que falta o la lección vacía) */}
+            <circle
+              cx={(circleSize + 25) / 2}
+              cy={(circleSize + 25) / 2}
+              r={radius}
+              fill="transparent"
+              stroke="#e5e5e5" 
+              strokeWidth="12" 
+              strokeDasharray={`${segmentLength} ${gap}`}
+            />
+            
+            {/* Círculo de Avance: VERDE (Se dibuja encima segmento por segmento) */}
+            {activeSegments > 0 && (
+              <circle
+                cx={(circleSize + 25) / 2}
+                cy={(circleSize + 25) / 2}
+                r={radius}
+                fill="transparent"
+                stroke="#6691ee" 
+                strokeWidth="12"
+                strokeDasharray={`${segmentLength} ${gap}`}
+                // El offset oculta los segmentos de la línea verde que aún no se completan
+                strokeDashoffset={circumference - (activeSegments * (segmentLength + gap))}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 0.6s ease-out' }}
+              />
+            )}
+          </>
+        );
+      })()}
+    </svg>
+  )}
+
+  {/* BOTÓN CENTRAL (El icono de la lección) */}
+  <div style={{ 
+    width: `${circleSize}px`, 
+    height: `${circleSize}px`, 
+    borderRadius: '50%', 
+    background: lvl.status === 'COMPLETED' ? '#ffc800' : (lvl.status === 'ACTIVE' ? '#58cc02' : '#e5e5e5'), 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    boxShadow: lvl.status === 'COMPLETED' ? '0 8px 0 #d9a500' : 
+               lvl.status === 'ACTIVE' ? '0 8px 0 #46a302' : '0 8px 0 #afafaf', 
+    border: `4px solid white`,
+    zIndex: 2,
+    position: 'relative'
+  }}>
+    <span style={{ fontSize: '2rem' }}>
+       {lvl.status === 'COMPLETED' ? '✓' : lvl.icon || '⭐'}
+    </span>
+  </div>
+</div>
+
+      {/* Título de la Lección - Más limpio */}
       <span style={{ 
-        display: 'block', 
-        marginTop: '12px', 
-        textAlign: 'center', 
-        fontWeight: 'bold', 
-        color: currentTheme.text, 
-        fontSize: '0.9rem',
-        textShadow: '0 2px 4px rgba(0,0,0,0.3)', 
-        background: 'rgba(0,0,0,0.4)', 
-        padding: '3px 10px', 
-        borderRadius: '8px', 
-        whiteSpace: 'nowrap'
+        marginTop: '10px', 
+        fontWeight: '800', 
+        color: lvl.status === 'LOCKED' ? '#afafaf' : currentTheme.text, 
+        fontSize: isMobile ? '0.75rem' : '0.9rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px'
       }}>
         {lvl.title}
       </span>
@@ -852,12 +942,18 @@ console.log('pathData:', pathData);
       </AnimatePresence>
 
     {/* Al final de tu return en StudentDashboard */}
+{/* Busca este bloque al final de tu StudentDashboard */}
 <AnimatePresence>
   {showQuizModal && (
     <QuizModal
       questions={quizQuestions}
       lessonId={activeLessonId || ""}
-      onClose={() => setShowQuizModal(false)}
+      // MODIFICADO: Añadimos confirmación para no perder progreso accidentalmente
+      onClose={() => {
+        if (window.confirm("¿Estás seguro de que quieres salir? Perderás el progreso de esta lección.")) {
+          setShowQuizModal(false);
+        }
+      }}
       onComplete={(count) => handleQuizComplete(activeLessonId!, count)}
     />
   )}

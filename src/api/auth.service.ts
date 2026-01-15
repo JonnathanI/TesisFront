@@ -1,7 +1,9 @@
 // src/api/auth.service.ts
 
 // --- CONFIGURACIÓN BASE ---
-const BASE_URL = 'http://localhost:8081/api';
+//const BASE_URL = 'http://localhost:8081/api';
+// Cambia esto por tu IP real
+const BASE_URL = "http://192.168.20.195:8081/api";
 
 // ==========================================
 // 1. INTERFACES DE DATOS (DTOs)
@@ -86,16 +88,16 @@ export interface LessonProgressDTO {
     masteryLevel: number;
     lastPracticed: string | null; 
 }
-
 export interface QuestionDTO {
     id: string;
-    questionText: string; // textSource en el backend
-    textSource: string;   // para compatibilidad
-    textTarget: string;   // respuesta correcta
+    questionText: string; 
+    textSource: string;   
+    textTarget: string;   // <--- Esta es tu respuesta correcta
     questionType: { typeName: string }; 
     options: string[]; 
-    audioUrl?: string;    // URL del audio para Listening
-    category: QuestionCategory; // Para saber qué juego mostrar
+    audioUrl?: string;    
+    category: QuestionCategory; 
+    feedback?: string;    // <--- Añade esta línea
 }
 
 export interface AnswerSubmissionDTO {
