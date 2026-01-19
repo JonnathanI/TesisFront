@@ -1,9 +1,9 @@
 // src/api/auth.service.ts
 
 // --- CONFIGURACIÓN BASE ---
-//const BASE_URL = 'http://localhost:8081/api';
+const BASE_URL = 'http://localhost:8081/api';
 // Cambia esto por tu IP real
-const BASE_URL = "http://192.168.20.195:8081/api";
+//const BASE_URL = "http://192.168.20.207:8081/api";
 
 // ==========================================
 // 1. INTERFACES DE DATOS (DTOs)
@@ -62,7 +62,6 @@ export interface UnitStatus {
   isLocked: boolean;
   isCompleted: boolean;
 }*/
-
 export interface UnitWithLessons {
   id: string;
   title: string;
@@ -71,8 +70,6 @@ export interface UnitWithLessons {
   isCompleted: boolean;
   lessons: Lesson[];
 }
-
-
 // --- PROGRESO ---
 export interface UserProgress {
     totalPoints: number;
@@ -122,9 +119,7 @@ export interface UserProfileData {
     league: string;
     avatarData?: string; 
 }
-
 // --- TEACHER / ADMIN ---
-
 export interface StudentData {
     id: string;
     fullName: string;
@@ -152,7 +147,6 @@ export interface Lesson {
   unitId?: string; // 👈 opcional
 }
 
-
 export interface ClassroomData {
     id: string;
     name: string;
@@ -172,7 +166,6 @@ export interface LessonData {
     title: string;
     lessonOrder: number;
 }
-
 // Payloads
 export interface NewUnitPayload {
     courseId: string;
@@ -406,30 +399,43 @@ export const getLessonsByUnit = async (unitId: string): Promise<LessonData[]> =>
       lessonOrder: item.lessonOrder
     }));
 };
+export const createUnit = async (
+  payload: NewUnitPayload
+): Promise<any> => {
+  const response = await apiFetch("/teacher/content/units", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
-export const createUnit = async (payload: NewUnitPayload): Promise<any> => {
-    const response = await apiFetch('/teacher/content/units', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+  return response.json();
 };
+
 
 // --- CRUD DE UNIDADES, LECCIONES Y PREGUNTAS ---
 
-export const updateUnit = async (id: string, payload: any): Promise<any> => {
-    const response = await apiFetch(`/teacher/content/units/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+export const updateUnit = async (
+  id: string,
+  payload: { title: string; unitOrder: number }
+) => {
+  const res = await apiFetch(`/teacher/content/units/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return res.json();
 };
 
-export const deleteUnit = async (id: string): Promise<void> => {
-    await apiFetch(`/teacher/content/units/${id}`, {
-        method: 'DELETE',
-    });
+export const deleteUnit = async (id: string) => {
+  await apiFetch(`/teacher/content/units/${id}`, {
+    method: "DELETE",
+  });
 };
+export const getAllUnits = async (): Promise<any[]> => {
+  const response = await apiFetch("/teacher/content/units", {
+    method: "GET",
+  });
+  return response.json();
+};
+
 
 export const createLesson = async (payload: NewLessonPayload): Promise<any> => {
     const response = await apiFetch('/teacher/content/lessons', {
@@ -613,3 +619,23 @@ export const resetPasswordConfirm = async (token: string, newPassword: string): 
     }, false);
     return response.json();
 };
+
+export const updateCourse = async (
+  id: string,
+  payload: any
+): Promise<any> => {
+  const response = await apiFetch(`/courses/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return response.json();
+};
+
+
+export const deleteCourse = async (id: string): Promise<void> => {
+  await apiFetch(`/courses/${id}`, {
+    method: "DELETE",
+  });
+};
+
+
