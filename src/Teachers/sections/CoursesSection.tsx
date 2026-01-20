@@ -54,69 +54,154 @@ export const CoursesSection = ({
   };
 
   return (
-    <div>
-      <h2>📘 Cursos</h2>
+    <div style={{ maxWidth: "900px" }}>
+      <h2 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "1rem" }}>
+        📘 Gestión de Cursos
+      </h2>
 
       {/* FORMULARIO */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <input
-          placeholder="Nombre del curso"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
+      <div
+        style={{
+          background: "#ffffff",
+          padding: "20px",
+          borderRadius: "16px",
+          boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+          marginBottom: "2rem",
+        }}
+      >
+        <h3 style={{ marginBottom: "1rem" }}>
+          {editingId ? "✏️ Editar curso" : "➕ Nuevo curso"}
+        </h3>
 
-        <button onClick={handleSubmit} style={{ marginLeft: "1rem" }}>
-          {editingId ? "Actualizar" : "Crear"}
-        </button>
-
-        {editingId && (
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setForm({ title: "", baseLanguage: "ES", targetLanguage: "EN" });
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <input
+            placeholder="Nombre del curso"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            style={{
+              flex: 1,
+              padding: "12px",
+              borderRadius: "10px",
+              border: "1px solid #ccc",
+              fontSize: "15px",
             }}
-            style={{ marginLeft: "0.5rem" }}
+          />
+
+          <button
+            onClick={handleSubmit}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "10px",
+              border: "none",
+              background: "#1cb0f6",
+              color: "white",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
           >
-            Cancelar
+            {editingId ? "Actualizar" : "Crear"}
           </button>
-        )}
+
+          {editingId && (
+            <button
+              onClick={() => {
+                setEditingId(null);
+                setForm({
+                  title: "",
+                  baseLanguage: "ES",
+                  targetLanguage: "EN",
+                });
+              }}
+              style={{
+                padding: "12px 20px",
+                borderRadius: "10px",
+                border: "none",
+                background: "#e0e0e0",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* LISTA */}
-      {courses.length === 0 && <p>No hay cursos</p>}
+      {courses.length === 0 && (
+        <p style={{ color: "#777" }}>No hay cursos registrados</p>
+      )}
 
-      {courses.map((course) => (
-        <div
-          key={course.id}
-          style={{
-            border: "1px solid #ddd",
-            padding: "1rem",
-            marginBottom: "0.5rem",
-          }}
-        >
-          <strong>{course.title}</strong>
+      <div style={{ display: "grid", gap: "16px" }}>
+        {courses.map((course) => (
+          <div
+            key={course.id}
+            style={{
+              background: "#fff",
+              padding: "18px",
+              borderRadius: "16px",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <strong style={{ fontSize: "16px" }}>{course.title}</strong>
+              <div style={{ fontSize: "13px", color: "#666" }}>
+                Idioma base: {course.baseLanguage} → {course.targetLanguage}
+              </div>
+            </div>
 
-          <div style={{ marginTop: "0.5rem" }}>
-            <button onClick={() => onSelectCourse(course.id)}>
-              Ver unidades
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => onSelectCourse(course.id)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#e8f5fe",
+                  color: "#1cb0f6",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Unidades
+              </button>
 
-            <button
-              onClick={() => handleEdit(course)}
-              style={{ marginLeft: "0.5rem" }}
-            >
-              Editar
-            </button>
+              <button
+                onClick={() => handleEdit(course)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#fff3cd",
+                  color: "#856404",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Editar
+              </button>
 
-            <button
-              onClick={() => handleDelete(course.id)}
-              style={{ marginLeft: "0.5rem", color: "red" }}
-            >
-              Eliminar
-            </button>
+              <button
+                onClick={() => handleDelete(course.id)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#fdecea",
+                  color: "#d93025",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };

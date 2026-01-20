@@ -25,21 +25,34 @@ export const Sidebar = ({
 }: SidebarProps) => (
   <aside
     style={{
-      width: "260px",
+      width: "280px",
       borderRight: `2px solid ${currentTheme.border}`,
-      padding: "1.5rem 0",
+      padding: "1.5rem 1rem",
       background: currentTheme.sidebarBg,
       display: "flex",
       flexDirection: "column",
     }}
   >
-    <h1 style={{ paddingLeft: "1.5rem", color: "#1cb0f6" }}>
+    {/* TÍTULO */}
+    <h1
+      style={{
+        paddingLeft: "0.8rem",
+        marginBottom: "1.5rem",
+        color: "#1cb0f6",
+        fontSize: "20px",
+        fontWeight: 800,
+      }}
+    >
       Panel Docente
     </h1>
 
-    {sidebarNavItems.map((item) => (
-      <div key={item.id}>
+    {/* ITEMS */}
+    {sidebarNavItems.map((item) => {
+      const isActive = activeTab === item.id;
+
+      return (
         <div
+          key={item.id}
           onClick={() => {
             if (item.id === "more") setShowMoreMenu(!showMoreMenu);
             else {
@@ -48,10 +61,37 @@ export const Sidebar = ({
               resetForm();
             }
           }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+            padding: "14px 16px",
+            marginBottom: "10px",
+            borderRadius: "16px",
+            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: isActive ? 700 : 500,
+            background: isActive ? "#E8F5FE" : "transparent",
+            color: isActive ? "#1cb0f6" : "#333",
+            boxShadow: isActive
+              ? "0 6px 14px rgba(28,176,246,0.25)"
+              : "none",
+            transition: "all 0.25s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (!isActive)
+              e.currentTarget.style.background = "#F3FAFF";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = isActive
+              ? "#E8F5FE"
+              : "transparent";
+          }}
         >
-          {item.icon} {item.label}
+          <span style={{ fontSize: "20px" }}>{item.icon}</span>
+          <span>{item.label}</span>
         </div>
-      </div>
-    ))}
+      );
+    })}
   </aside>
 );

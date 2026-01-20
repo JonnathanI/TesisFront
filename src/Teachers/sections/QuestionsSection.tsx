@@ -11,10 +11,6 @@ import {
   QuestionType,
 } from "../../api/auth.service";
 
-/* =========================
-   TIPOS
-========================= */
-
 interface Unit {
   id: string;
   title: string;
@@ -26,10 +22,6 @@ interface Lesson {
 }
 
 const confirmDelete = (msg: string) => window.confirm(msg);
-
-/* =========================
-   COMPONENTE
-========================= */
 
 export function QuestionsSection() {
   const [units, setUnits] = useState<Unit[]>([]);
@@ -44,11 +36,7 @@ export function QuestionsSection() {
   const [textSource, setTextSource] = useState("");
   const [textTarget, setTextTarget] = useState("");
   const [options, setOptions] = useState<string[]>(["", ""]);
-  const [questionTypeId, setQuestionTypeId] = useState(""); // typeName
-
-  /* =========================
-     LOADERS
-  ========================= */
+  const [questionTypeId, setQuestionTypeId] = useState("");
 
   useEffect(() => {
     getAllUnits().then(setUnits);
@@ -70,10 +58,6 @@ export function QuestionsSection() {
     setQuestions(data);
   };
 
-  /* =========================
-     HELPERS
-  ========================= */
-
   const resetForm = () => {
     setEditingId(null);
     setTextSource("");
@@ -89,13 +73,7 @@ export function QuestionsSection() {
     "MATCHING",
     "TRANSLATION_TO_TARGET",
     "TRANSLATION_TO_SOURCE",
-    "SPEAKING",
-    "WRITING",
   ].includes(questionTypeId);
-
-  /* =========================
-     CRUD
-  ========================= */
 
   const handleSave = async () => {
     if (!selectedLessonId || !questionTypeId) {
@@ -103,24 +81,17 @@ export function QuestionsSection() {
       return;
     }
 
-    if (usesOptions && options.filter(o => o.trim()).length < 2) {
-      alert("Debes ingresar al menos 2 opciones");
-      return;
-    }
-
     const payload = {
       lessonId: selectedLessonId,
-      questionTypeId, // STRING (typeName)
+      questionTypeId,
       textSource,
       textTarget,
       options: usesOptions ? options.filter(o => o.trim()) : [],
     };
 
-    if (editingId) {
-      await updateQuestion(editingId, payload);
-    } else {
-      await createQuestion(payload);
-    }
+    editingId
+      ? await updateQuestion(editingId, payload)
+      : await createQuestion(payload);
 
     resetForm();
     loadQuestions();
@@ -134,31 +105,23 @@ export function QuestionsSection() {
     setQuestionTypeId(q.questionType.typeName);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirmDelete("¿Eliminar esta pregunta?")) return;
-    await deleteQuestion(id);
-    loadQuestions();
-  };
-
-  /* =========================
-     UI
-  ========================= */
-
   return (
-    <div>
-      <h2>❓ Gestión de Preguntas</h2>
+    <div style={{ maxWidth: "1000px" }}>
+      <h2 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "1rem" }}>
+        ❓ Gestión de Preguntas
+      </h2>
 
       {/* SELECTORES */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <select
           value={selectedUnitId}
           onChange={e => {
             setSelectedUnitId(e.target.value);
             setSelectedLessonId("");
-            setQuestions([]);
           }}
+          style={{ padding: 12, borderRadius: 10, border: "1px solid #ccc" }}
         >
-          <option value="">Selecciona unidad</option>
+          <option value="">Unidad</option>
           {units.map(u => (
             <option key={u.id} value={u.id}>{u.title}</option>
           ))}
@@ -168,38 +131,51 @@ export function QuestionsSection() {
           value={selectedLessonId}
           onChange={e => setSelectedLessonId(e.target.value)}
           disabled={!selectedUnitId}
+          style={{ padding: 12, borderRadius: 10, border: "1px solid #ccc" }}
         >
-          <option value="">Selecciona lección</option>
+          <option value="">Lección</option>
           {lessons.map(l => (
             <option key={l.id} value={l.id}>{l.title}</option>
           ))}
         </select>
       </div>
 
-      {/* FORMULARIO */}
       {selectedLessonId && (
-        <div style={{ border: "1px solid #ccc", padding: 10, marginBottom: 15 }}>
+        <div
+          style={{
+            background: "#fff",
+            padding: 20,
+            borderRadius: 16,
+            boxShadow: "0 8px 20px rgba(0,0,0,.08)",
+            marginBottom: 30,
+          }}
+        >
+          <h3 style={{ marginBottom: 12 }}>
+            {editingId ? "✏️ Editar pregunta" : "➕ Nueva pregunta"}
+          </h3>
+
           <input
             placeholder="Texto origen"
             value={textSource}
             onChange={e => setTextSource(e.target.value)}
+            style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10 }}
           />
 
           <input
             placeholder="Respuesta correcta"
             value={textTarget}
             onChange={e => setTextTarget(e.target.value)}
+            style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 10 }}
           />
 
           <select
             value={questionTypeId}
             onChange={e => setQuestionTypeId(e.target.value)}
+            style={{ width: "100%", padding: 12, borderRadius: 10, marginBottom: 12 }}
           >
             <option value="">Tipo de pregunta</option>
             {questionTypes.map(t => (
-              <option key={t.id} value={t.typeName}>
-                {t.typeName}
-              </option>
+              <option key={t.id} value={t.typeName}>{t.typeName}</option>
             ))}
           </select>
 
@@ -216,31 +192,58 @@ export function QuestionsSection() {
                     setOptions(copy);
                   }}
                   placeholder={`Opción ${i + 1}`}
+                  style={{ width: "100%", padding: 10, marginTop: 6 }}
                 />
               ))}
-              <button onClick={() => setOptions([...options, ""])}>➕ Opción</button>
+              <button
+                onClick={() => setOptions([...options, ""])}
+                style={{ marginTop: 10 }}
+              >
+                ➕ Opción
+              </button>
             </>
           )}
 
-          <div>
-            <button onClick={handleSave}>
+          <div style={{ marginTop: 16 }}>
+            <button
+              onClick={handleSave}
+              style={{
+                background: "#1cb0f6",
+                color: "#fff",
+                padding: "10px 18px",
+                borderRadius: 10,
+                border: "none",
+                fontWeight: 700,
+              }}
+            >
               {editingId ? "Actualizar" : "Crear"}
             </button>
-            {editingId && <button onClick={resetForm}>Cancelar</button>}
           </div>
         </div>
       )}
 
       {/* LISTADO */}
-      <ul>
+      <div style={{ display: "grid", gap: 12 }}>
         {questions.map(q => (
-          <li key={q.id}>
-            {q.textSource} ({q.questionType.typeName})
-            <button onClick={() => handleEdit(q)}>✏️</button>
-            <button onClick={() => handleDelete(q.id)}>🗑</button>
-          </li>
+          <div
+            key={q.id}
+            style={{
+              background: "#fff",
+              padding: 14,
+              borderRadius: 14,
+              boxShadow: "0 4px 14px rgba(0,0,0,.06)",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+          >
+            <span>{q.textSource} ({q.questionType.typeName})</span>
+            <div>
+              <button onClick={() => handleEdit(q)}>✏️</button>
+              <button onClick={() => deleteQuestion(q.id).then(loadQuestions)}>🗑</button>
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

@@ -145,7 +145,40 @@ const [isPathLoading, setIsPathLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   // AÑADE ESTO AQUÍ:
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
+  const [showNoHeartsModal, setShowNoHeartsModal] = useState(false);
+ const [heartTimer, setHeartTimer] = useState<string>("");
+
+
+useEffect(() => {
+  // Si tiene vidas llenas o no hay tiempo de recarga, no mostramos nada
+  if (!userProfile || userProfile.heartsCount >= 5 || !userProfile.nextHeartRegenTime) {
+    setHeartTimer("");
+    return;
+  }
+
+  const updateTimer = () => {
+    // Convertimos el Instant del backend a milisegundos
+    const targetTime = new Date(userProfile.nextHeartRegenTime!).getTime();
+    const now = new Date().getTime();
+    const difference = targetTime - now;
+
+    if (difference <= 0) {
+      setHeartTimer("00:00");
+      fetchUserData(); // Refrescar perfil automáticamente para recuperar el corazón
+      return;
+    }
+
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+    setHeartTimer(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
+  };
+
+  updateTimer(); // Ejecución inmediata
+  const interval = setInterval(updateTimer, 1000);
+
+  return () => clearInterval(interval);
+}, [userProfile]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -209,37 +242,38 @@ useEffect(() => {
   
 const fetchPathData = async (unitId: string) => {
   if (!unitId) return;
-  
-  // Limpiamos los nodos actuales para que no haya rastro de la unidad anterior
   setPathData([]); 
   setIsLoading(true);
   nodeRefs.current = [];
 
   try {
-    // Buscamos en el estado local (que ya actualizamos en handleQuizComplete)
     const unit = units.find(u => u.id === unitId);
     if (!unit || !unit.lessons) return;
 
-    let foundActive = false;
-    const newPathData: PathNode[] = unit.lessons.map((lesson) => {
+    // Buscamos cuál es la primera lección no completada de la unidad
+    const firstIncompleteIndex = unit.lessons.findIndex(l => !l.isCompleted);
+
+    const newPathData: PathNode[] = unit.lessons.map((lesson, idx) => {
       let status: PathNodeStatus = 'LOCKED';
-      const progressPercent = lesson.isCompleted ? 100 : 0; 
 
       if (lesson.isCompleted) {
         status = 'COMPLETED';
-      } else if (!foundActive) {
+      } else if (idx === firstIncompleteIndex) {
+        // Solo es ACTIVE si es la primera que le falta por terminar
         status = 'ACTIVE';
-        foundActive = true;
+      } else if (firstIncompleteIndex === -1 && idx === 0 && unit.lessons.every(l => l.isCompleted)) {
+        // Si todas están completadas, podrías dejar la última como active o todas completed
+        status = 'COMPLETED';
       }
 
       return {
         type: 'lesson',
         lessonId: lesson.id,
         title: lesson.title,
-        icon: '📘',
+        icon: getIconForTitle(lesson.title),
         color: '#58cc02',
         status,
-        progress: progressPercent,
+        totalQuestions: 6, // O el dato real de tu API
       };
     });
 
@@ -247,24 +281,26 @@ const fetchPathData = async (unitId: string) => {
   } catch (e) {
     console.error(e);
   } finally {
-    // IMPORTANTE: Un pequeño delay de 100ms evita el parpadeo 
-    // y da tiempo a que el SVG calcule las posiciones de las líneas.
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 150);
+    setTimeout(() => setIsLoading(false), 150);
   }
 };
   // --- HANDLERS ---
 const startLesson = async (lessonId: string) => {
   if (isLoading) return;
-  setIsLoading(true);
 
+  // VALIDACIÓN DE CORAZONES CON MODAL NUEVO
+  if (userProfile && userProfile.heartsCount <= 0) {
+    setShowNoHeartsModal(true); // En lugar de alert, abrimos el modal
+    return;
+  }
+
+  setIsLoading(true);
   try {
-    const q = await getLessonQuestions(lessonId); // 1. Primero pedimos las preguntas
+    const q = await getLessonQuestions(lessonId); 
     if (q && q.length > 0) {
-      setQuizQuestions(q);       // 2. Guardamos las preguntas
-      setActiveLessonId(lessonId); // 3. Guardamos el ID
-      setShowQuizModal(true);    // 4. ¡Recién ahora abrimos el modal!
+      setQuizQuestions(q);       
+      setActiveLessonId(lessonId); 
+      setShowQuizModal(true);    
     } else {
       alert("Esta lección no tiene preguntas aún.");
     }
@@ -277,10 +313,10 @@ const startLesson = async (lessonId: string) => {
   
 const handleQuizComplete = async (lessonId: string, count: number) => {
   try {
-    // 1. Guardamos en la base de datos
+    // 1. Llamada al backend
     await completeLesson(lessonId, count);
 
-    // 2. Actualizamos el estado de las UNIDADES
+    // 2. Actualizamos el estado global de unidades
     setUnits(prevUnits => {
       return prevUnits.map(unit => ({
         ...unit,
@@ -290,34 +326,30 @@ const handleQuizComplete = async (lessonId: string, count: number) => {
       }));
     });
 
-    // 3. ACTUALIZACIÓN INMEDIATA DEL MAPA (pathData)
-    // Esto hace que el nodo cambie a amarillo y el siguiente se active sin esperar al fetch
+    // 3. Recalculamos el mapa de la unidad actual de forma inteligente
     setPathData(prevPath => {
-      let foundActive = false;
-      return prevPath.map((node) => {
-        // Si es la lección terminada -> COMPLETADA (Amarillo)
-        if (node.lessonId === lessonId) {
-          return { ...node, status: 'COMPLETED' };
+      const updatedPath = prevPath.map(node => 
+        node.lessonId === lessonId ? { ...node, status: 'COMPLETED' as PathNodeStatus } : node
+      );
+
+      // Buscamos la primera lección que quede bloqueada para activarla
+      // PERO solo si la lección que acabamos de terminar era la "ACTIVE"
+      const finishedNode = prevPath.find(n => n.lessonId === lessonId);
+      
+      if (finishedNode?.status === 'ACTIVE') {
+        const nextIncompleteIndex = updatedPath.findIndex(n => n.status === 'LOCKED');
+        if (nextIncompleteIndex !== -1) {
+          updatedPath[nextIncompleteIndex].status = 'ACTIVE';
         }
-        
-        // Lógica para desbloquear la siguiente lección si estaba bloqueada
-        if (node.status === 'COMPLETED') return node;
-        
-        if (!foundActive && node.status === 'LOCKED') {
-          foundActive = true;
-          return { ...node, status: 'ACTIVE' };
-        }
-        return node;
-      });
+      }
+
+      return updatedPath;
     });
 
-    // 4. Actualizamos el perfil del usuario (para ver las gemas/XP ganadas)
     fetchUserData();
-
     setShowQuizModal(false);
   } catch (error) {
-    console.error("Error al completar la lección:", error);
-    alert("Hubo un error al guardar tu progreso.");
+    console.error("Error al completar:", error);
   }
 };
 
@@ -858,15 +890,70 @@ console.log('pathData:', pathData);
       {!isWideSection && (
         <aside style={{ width: "350px", padding: "2rem", background: currentTheme.sidebarBg, borderLeft: `2px solid ${currentTheme.border}`, flexShrink: 0 }}>
           
-          {/* BARRA DE ESTADÍSTICAS */}
-          {userProfile && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', padding: '0.8rem', background: currentTheme.cardBg, border: `2px solid ${currentTheme.border}`, borderRadius: '1rem', alignItems: 'center' }}>
-                  <div style={{display:'flex', alignItems:'center', gap:'0.2rem'}}><span style={{fontSize:'1.2rem'}}>🔥</span><span style={{color:'#ff9600', fontWeight:'bold'}}>{userProfile.currentStreak}</span></div>
-                  <div style={{display:'flex', alignItems:'center', gap:'0.2rem'}}><span style={{fontSize:'1.2rem'}}>💎</span><span style={{color:'#1cb0f6', fontWeight:'bold'}}>{userProfile.lingots}</span></div>
-                  <div style={{display:'flex', alignItems:'center', color:'#ff4b4b', fontSize:'1.2rem'}}>{'❤️'.repeat(userProfile.heartsCount)}</div>
-                  <div style={{display:'flex', alignItems:'center', gap:'0.2rem'}}><span style={{fontSize:'1.2rem'}}>⚡</span><span style={{color:'#ffd900', fontWeight:'bold'}}>{userProfile.totalXp}</span></div>
-              </div>
-          )}
+         {/* BARRA DE ESTADÍSTICAS CORREGIDA */}
+{userProfile && (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'space-around', 
+    marginBottom: '1.5rem', 
+    padding: '0.6rem 1rem', 
+    background: currentTheme.cardBg, 
+    border: `2px solid ${currentTheme.border}`, 
+    borderRadius: '1.2rem', 
+    alignItems: 'center',
+    boxShadow: '0 4px 0 rgba(0,0,0,0.1)' 
+  }}>
+    
+    {/* RACHA */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <span style={{ fontSize: '1.3rem' }}>🔥</span>
+      <span style={{ color: '#ff9600', fontWeight: '900' }}>{userProfile.currentStreak}</span>
+    </div>
+
+    {/* GEMAS */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <span style={{ fontSize: '1.3rem' }}>💎</span>
+      <span style={{ color: '#1cb0f6', fontWeight: '900' }}>{userProfile.lingots}</span>
+    </div>
+
+    {/* SECCIÓN DE CORAZONES - APARECE CRONÓMETRO SOLO EN 0 */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span style={{ fontSize: '1.3rem' }}>❤️</span>
+      
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <span style={{ 
+          color: userProfile.heartsCount === 0 ? '#afafaf' : '#ff4b4b', 
+          fontWeight: '900', 
+          fontSize: '1.2rem' 
+        }}>
+          {userProfile.heartsCount}
+        </span>
+
+        {/* LÓGICA: Solo se muestra si vidas es EXACTAMENTE 0 */}
+        {userProfile.heartsCount === 0 && heartTimer && (
+          <span style={{ 
+            fontSize: '0.9rem', 
+            color: '#afafaf', 
+            fontWeight: '800',
+            fontFamily: 'monospace',
+            backgroundColor: '#f0f0f0',
+            padding: '2px 6px',
+            borderRadius: '6px'
+          }}>
+            {heartTimer}
+          </span>
+        )}
+      </div>
+    </div>
+
+    {/* XP */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <span style={{ fontSize: '1.3rem' }}>⚡</span>
+      <span style={{ color: '#ffd900', fontWeight: '900' }}>{userProfile.totalXp}</span>
+    </div>
+
+  </div>
+)}
           
           {/* TARJETAS INFORMATIVAS */}
 
@@ -944,20 +1031,88 @@ console.log('pathData:', pathData);
     {/* Al final de tu return en StudentDashboard */}
 {/* Busca este bloque al final de tu StudentDashboard */}
 <AnimatePresence>
-  {showQuizModal && (
+  {/* Agregamos 'userProfile &&' a la condición */}
+  {showQuizModal && quizQuestions && userProfile && (
     <QuizModal
+      isOpen={showQuizModal}
       questions={quizQuestions}
       lessonId={activeLessonId || ""}
-      // MODIFICADO: Añadimos confirmación para no perder progreso accidentalmente
-      onClose={() => {
-        if (window.confirm("¿Estás seguro de que quieres salir? Perderás el progreso de esta lección.")) {
+      userProfile={userProfile} // Ahora TS sabe que no es null aquí
+      onUpdateProfile={setUserProfile}
+      heartTimer={heartTimer}
+      onClose={(completed: boolean) => {
+        if (completed) {
           setShowQuizModal(false);
+        } else {
+          if (window.confirm("¿Estás seguro de que quieres salir? Perderás el progreso.")) {
+            setShowQuizModal(false);
+          }
         }
       }}
-      onComplete={(count) => handleQuizComplete(activeLessonId!, count)}
     />
   )}
 </AnimatePresence>
+
+{/* MODAL DE SIN VIDAS ESTILO EUROPEEK */}
+      <AnimatePresence>
+        {showNoHeartsModal && (
+          <div style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000,
+            backdropFilter: 'blur(8px)', padding: '20px'
+          }}>
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              style={{
+                background: currentTheme.cardBg, padding: '40px', borderRadius: '24px',
+                width: '100%', maxWidth: '400px', textAlign: 'center',
+                border: `2px solid ${currentTheme.border}`, boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+              }}
+            >
+              <div style={{ fontSize: "5rem", marginBottom: "1rem" }}>💔</div>
+              <h2 style={{ color: currentTheme.text, fontWeight: "800", marginBottom: '10px' }}>
+                ¡Te quedaste sin vidas!
+              </h2>
+              <p style={{ color: '#afafaf', marginBottom: "2rem" }}>
+                Necesitas al menos un corazón para empezar una lección.
+              </p>
+              
+              <div style={{ 
+                background: theme === 'dark' ? '#2c363a' : '#fff1f1', 
+                padding: '15px', borderRadius: '15px', marginBottom: '25px',
+                border: `1px solid ${theme === 'dark' ? '#3e494e' : '#ffcfcf'}`
+              }}>
+                <span style={{ fontSize: "1rem", color: currentTheme.text }}>⏱️ Siguiente vida en: </span>
+                <span style={{ fontWeight: "900", color: "#ff4b4b", fontSize: '1.2rem' }}>{heartTimer}</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <button 
+                  onClick={() => { setShowNoHeartsModal(false); setActiveSection("TIENDA"); }}
+                  style={{
+                    background: '#ffc800', color: '#3c3c3c', border: 'none',
+                    padding: '16px', borderRadius: '16px', fontWeight: "900",
+                    cursor: 'pointer', boxShadow: '0 4px 0 #d9a500'
+                  }}
+                >
+                  IR A LA TIENDA
+                </button>
+                <button 
+                  onClick={() => setShowNoHeartsModal(false)}
+                  style={{
+                    background: 'none', color: '#afafaf', border: 'none',
+                    padding: '10px', fontWeight: "700", cursor: 'pointer'
+                  }}
+                >
+                  TAL VEZ LUEGO
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

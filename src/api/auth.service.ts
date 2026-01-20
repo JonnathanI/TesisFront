@@ -109,6 +109,7 @@ export interface UserProfileData {
     currentStreak: number;
     lingots: number;
     heartsCount: number;
+nextHeartRegenTime: string | null;
     league: string;
     avatarData?: string; 
 }
@@ -646,5 +647,15 @@ export const getQuestionTypes = async (): Promise<QuestionType[]> => {
   const response = await apiFetch("/question-types", {
     method: "GET",
   });
+  return response.json();
+};
+
+// En api/auth.service.ts
+export const subtractHeart = async (): Promise<UserProfileData> => {
+  const response = await apiFetch('/users/me/subtract-heart', {
+    method: 'POST',
+    // No necesitas pasar el ID porque el backend lo saca del Token/Sesión
+  });
+  if (!response.ok) throw new Error("Error al restar vida");
   return response.json();
 };

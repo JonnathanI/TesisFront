@@ -10,28 +10,51 @@ export const GenerateCodeSection = () => {
     try {
       const newCode = await generateTeacherRegistrationCode();
       setCode(newCode);
-    } catch (err: any) {
-      alert(err.message || "Error al generar el código");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>🔐 Código de registro para estudiantes</h2>
+    <div style={{ maxWidth: "500px" }}>
+      <h2 style={{ fontSize: "22px", fontWeight: 800 }}>
+        🔐 Código para estudiantes
+      </h2>
 
-      <button onClick={handleGenerate} disabled={loading}>
-        {loading ? "Generando..." : "Generar código"}
-      </button>
+      <div
+        style={{
+          background: "#fff",
+          padding: 24,
+          borderRadius: 18,
+          boxShadow: "0 10px 24px rgba(0,0,0,.08)",
+          marginTop: 20,
+          textAlign: "center",
+        }}
+      >
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
+          style={{
+            background: "#1cb0f6",
+            color: "#fff",
+            padding: "14px 22px",
+            borderRadius: 14,
+            border: "none",
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "Generando..." : "Generar código"}
+        </button>
 
-      {code && (
-        <div style={{ marginTop: "1rem" }}>
-          <p>Código generado:</p>
-          <h3 style={{ letterSpacing: "4px" }}>{code}</h3>
-          <small>Compártelo con tus estudiantes</small>
-        </div>
-      )}
+        {code && (
+          <div style={{ marginTop: 20 }}>
+            <p>Código generado</p>
+            <h1 style={{ letterSpacing: "6px", color: "#1cb0f6" }}>{code}</h1>
+            <small>Compártelo con tus estudiantes</small>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
