@@ -9,6 +9,8 @@ import { LessonsSection } from "./sections/LessonsSection";
 import { GroupsSection } from "./sections/GroupsSection";
 import { GenerateCodeSection } from "./sections/GenerateCodeSection";
 import { QuestionsSection } from "./sections/QuestionsSection";
+import { EvaluationsSection } from "./sections/EvaluationsSection";
+
 
 import {
   getCourses,
@@ -71,7 +73,8 @@ export default function TeacherDashboard() {
           { id: "lessons", label: "Lecciones", icon: "📖" },
           { id: "questions", label: "Preguntas", icon: "❓" },
           { id: "groups", label: "Grupos", icon: "👥" },
-          { id: "code", label: "Código", icon: "🔐" }
+          { id: "code", label: "Código", icon: "🔐" },
+          { id: "evaluations", label: "Evaluaciones", icon: "📝" } 
         ]}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -191,6 +194,7 @@ export default function TeacherDashboard() {
         {activeTab === "questions" && <QuestionsSection />}
         {activeTab === "groups" && <GroupsSection groups={groups} />}
         {activeTab === "code" && <GenerateCodeSection />}
+        {activeTab === "evaluations" && <EvaluationsSection />}
       </main>
     </div>
   );

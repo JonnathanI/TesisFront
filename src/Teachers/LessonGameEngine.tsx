@@ -26,7 +26,7 @@ export default function LessonGameEngine({ question, onCorrect, onWrong }: Props
     setFeedback(null);
     setUserInput("");
     
-    if (question.category === 'ORDERING') {
+    if (question.questionType.typeName === 'ORDERING') {
       const words = question.textTarget?.split(' ') || [];
       setShuffledWords([...words].sort(() => Math.random() - 0.5));
       setSelectedWords([]);
@@ -170,10 +170,11 @@ export default function LessonGameEngine({ question, onCorrect, onWrong }: Props
       </AnimatePresence>
 
       <div className="w-full flex justify-center px-4">
-        {question.category === 'LISTENING' && <ListeningGame />}
-        {question.category === 'SPEAKING' && <SpeakingGame />}
-        {question.category === 'ORDERING' && <OrderingGame />}
-        {(question.category === 'GRAMMAR' || !question.category) && (
+       {question.questionType.typeName === 'LISTENING' && <ListeningGame />}
+{question.questionType.typeName === 'SPEAKING' && <SpeakingGame />}
+{question.questionType.typeName === 'ORDERING' && <OrderingGame />}
+{question.questionType.typeName === 'GRAMMAR' && (
+
            <div className="text-center w-full max-w-md">
              <h2 className="text-2xl font-bold text-[#4b4b4b] mb-4">Traduce esta frase</h2>
              <p className="text-xl italic text-[#afafaf] mb-8">"{question.textSource}"</p>

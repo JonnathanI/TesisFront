@@ -10,15 +10,6 @@ const BASE_URL = 'http://localhost:8081/api';
 // ==========================================
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-export type QuestionCategory = 
-  | 'GRAMMAR' 
-  | 'VOCABULARY' 
-  | 'LISTENING'  // Estudiante escucha y escribe/selecciona
-  | 'SPEAKING'   // Estudiante habla
-  | 'WRITING' 
-  | 'ORDERING' 
-  | 'IMAGE_SELECT' // ✅ Nuevo: Seleccionar imagen correcta
-  | 'MATCHING';    // ✅ Nuevo: Unir palabras
 
 export interface AuthResponse {
     token: string;
@@ -86,16 +77,18 @@ export interface LessonProgressDTO {
     lastPracticed: string | null; 
 }
 export interface QuestionDTO {
+  id: string;
+  textSource: string;
+  textTarget: string;
+  questionType: {
     id: string;
-    questionText: string; 
-    textSource: string;   
-    textTarget: string;   // <--- Esta es tu respuesta correcta
-    questionType: { typeName: string }; 
-    options: string[]; 
-    audioUrl?: string;    
-    category: QuestionCategory; 
-    feedback?: string;    // <--- Añade esta línea
+    typeName: string;
+  };
+  options: string[];
+  audioUrl?: string;
+  feedback?: string;
 }
+
 
 export interface AnswerSubmissionDTO {
     questionId: string;
@@ -131,13 +124,17 @@ isActive: boolean;
 }
 
 export interface QuestionData {
+  id: string;
+  textSource: string;
+  textTarget: string | null;
+  options: string[];
+  audioUrl?: string;
+  questionType: {
     id: string;
-    textSource: string;
-    textTarget: string | null;
-    options: string[];
-    audioUrl?: string;      // Nuevo campo
-    category: QuestionCategory; // Nuevo campo
+    typeName: string;
+  };
 }
+
 export interface Lesson {
   id: string;
   title: string;
@@ -181,14 +178,14 @@ export interface NewLessonPayload {
 }
 
 export interface NewQuestionPayload {
-    lessonId: string;
-    questionTypeId: string;
-    textSource: string;
-    textTarget: string;
-    options: string[];
-    audioUrl?: string;     // Nuevo campo
-    category: string;      // Nuevo campo
+  lessonId: string;
+  questionTypeId: string; // UUID
+  textSource: string;
+  textTarget?: string;
+  options: string[];
+  audioUrl?: string;
 }
+
 
 export interface LeaderboardEntry {
     userId: string;
@@ -209,6 +206,12 @@ export interface BulkRegisterResponse {
     successCount: number;
     failureCount: number;
     errors: { email: string; message: string }[];
+}
+
+export interface QuestionType {
+  id: string;
+  typeName: string;
+  description?: string;
 }
 
 // ==========================================
@@ -639,3 +642,9 @@ export const deleteCourse = async (id: string): Promise<void> => {
 };
 
 
+export const getQuestionTypes = async (): Promise<QuestionType[]> => {
+  const response = await apiFetch("/question-types", {
+    method: "GET",
+  });
+  return response.json();
+};

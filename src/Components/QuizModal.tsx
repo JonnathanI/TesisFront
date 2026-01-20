@@ -126,7 +126,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questions, lessonId, onClo
            </div>
         </div>
 
-        <h2 style={{ color: '#00FFC2' }}>{currentQuestion.questionText}</h2>
+        <h2 style={{ color: '#00FFC2' }}>{currentQuestion.textSource}</h2>
 
         {/* CONTENIDO DE PREGUNTA (Opciones) */}
         <div style={{ padding: '1rem' }}>
