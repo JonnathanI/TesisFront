@@ -4,6 +4,7 @@
 const BASE_URL = 'http://localhost:8081/api';
 // Cambia esto por tu IP real
 //const BASE_URL = "http://192.168.20.207:8081/api";
+//const BASE_URL = 'https://rex-unantagonised-tommy.ngrok-free.dev/api';
 
 // ==========================================
 // 1. INTERFACES DE DATOS (DTOs)
@@ -239,45 +240,31 @@ export const getUserRole = (): string | null => { // <--- Definición Única
 // ==========================================
 // 3. FUNCIÓN DE FETCH
 // ==========================================
+// ==========================================
+// 3. FUNCIÓN DE FETCH (Actualizada para ngrok)
+// ==========================================
 const apiFetch = async (
-    endpoint: string,
-    options: RequestInit = {},
-    isAuthenticated: boolean = true
+    endpoint: string,
+    options: RequestInit = {},
+    isAuthenticated: boolean = true
 ): Promise<Response> => {
-    
-    const headers = new Headers(options.headers);
-    
-    if (isAuthenticated) {
-        const token = getToken();
-        if (!token) {
-            removeToken();
-            throw new Error('No autorizado: Token JWT no encontrado.');
-        }
-        headers.set('Authorization', `Bearer ${token}`);
-    }
+    
+    const headers = new Headers(options.headers);
+    
+    // ✅ ESTO ES LO QUE FALTA: Salta la pantalla de ngrok que bloquea el fetch
+   headers.set('ngrok-skip-browser-warning', 'true');
 
-    if (options.method === 'POST' || options.method === 'PUT') {
-        headers.set('Content-Type', 'application/json');
-    }
+    if (isAuthenticated) {
+        const token = getToken();
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+    }
 
-    const url = `${BASE_URL}${endpoint}`;
-    const response = await fetch(url, { ...options, headers });
+    if (options.method === 'POST' || options.method === 'PUT') {
+        headers.set('Content-Type', 'application/json');
+    }
 
-    if (response.status === 401) {
-        removeToken();
-        throw new Error('Sesión expirada. Por favor, vuelve a iniciar sesión.');
-    }
-
-    if (!response.ok) {
-        let errorMessage = `Error ${response.status}: ${response.statusText}`;
-        try {
-            const errorBody = await response.json();
-            if (errorBody.message) errorMessage = errorBody.message;
-        } catch (e) { /* Ignorar */ }
-        throw new Error(errorMessage);
-    }
-
-    return response;
+    const url = `${BASE_URL}${endpoint}`;
+    return await fetch(url, { ...options, headers });
 };
 
 
