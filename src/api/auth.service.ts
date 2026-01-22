@@ -216,6 +216,17 @@ export interface QuestionType {
   description?: string;
 }
 
+// --- AGREGAR A LAS INTERFACES DE DATOS (Sección 1) ---
+export interface UserChallengesDTO {
+    dailyExpProgress: number;
+    dailyExpGoal: number;
+    minutesLearned: number;
+    minutesGoal: number;
+    perfectLessonsCount: number;
+    perfectLessonsGoal: number;
+    challengesCompleted: number;
+}
+
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
 // ==========================================
@@ -244,27 +255,28 @@ export const getUserRole = (): string | null => { // <--- Definición Única
 // 3. FUNCIÓN DE FETCH (Actualizada para ngrok)
 // ==========================================
 const apiFetch = async (
-    endpoint: string,
-    options: RequestInit = {},
-    isAuthenticated: boolean = true
+  endpoint: string,
+  options: RequestInit = {},
+  isAuthenticated: boolean = true
 ): Promise<Response> => {
-    
-    const headers = new Headers(options.headers);
-    
-    // ✅ ESTO ES LO QUE FALTA: Salta la pantalla de ngrok que bloquea el fetch
-   headers.set('ngrok-skip-browser-warning', 'true');
+  const headers = new Headers(options.headers);
+  headers.set('ngrok-skip-browser-warning', 'true');
 
-    if (isAuthenticated) {
-        const token = getToken();
-        if (token) headers.set('Authorization', `Bearer ${token}`);
-    }
+  if (isAuthenticated) {
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+  }
 
-    if (options.method === 'POST' || options.method === 'PUT') {
-        headers.set('Content-Type', 'application/json');
-    }
+  if (options.method === 'POST' || options.method === 'PUT') {
+    headers.set('Content-Type', 'application/json');
+  }
 
-    const url = `${BASE_URL}${endpoint}`;
-    return await fetch(url, { ...options, headers });
+  const url = `${BASE_URL}${endpoint}`;
+  const response = await fetch(url, { ...options, headers });
+
+  // OPCIONAL: Podrías lanzar el error aquí globalmente, 
+  // pero es mejor manejarlo por función para personalizar mensajes.
+  return response;
 };
 
 
@@ -548,10 +560,17 @@ export const getGlobalLeaderboard = async (): Promise<LeaderboardEntry[]> => {
 
 // Función para comprar ítems en la tienda
 export const buyShopItem = async (itemType: string): Promise<void> => {
-    await apiFetch('/shop/buy', {
-        method: 'POST',
-        body: JSON.stringify({ itemType }),
-    });
+  const response = await apiFetch('/shop/buy', {
+    method: 'POST',
+    body: JSON.stringify({ itemType }),
+  });
+
+  if (!response.ok) {
+    // Intentamos extraer el mensaje de error del backend (el que pusimos en Kotlin)
+    const errorBody = await response.json().catch(() => ({}));
+    const errorMessage = errorBody.error || `Error ${response.status}: No se pudo completar la compra`;
+    throw new Error(errorMessage);
+  }
 };
 
 // --- FUNCIÓN DE EXPORTACIÓN ---
@@ -645,4 +664,14 @@ export const subtractHeart = async (): Promise<UserProfileData> => {
   });
   if (!response.ok) throw new Error("Error al restar vida");
   return response.json();
+};
+
+export const getUserChallenges = async (): Promise<UserChallengesDTO> => {
+    const response = await apiFetch('/users/me/challenges', { method: 'GET' });
+    
+    if (!response.ok) {
+        throw new Error("No se pudieron cargar los desafíos diarios");
+    }
+    
+    return response.json();
 };
