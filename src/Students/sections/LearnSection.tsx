@@ -4,8 +4,6 @@ import {
   UserProfileData, 
   getLessonQuestions, 
   QuestionDTO,
-  getUserProfile,
-  getCourseStatus 
 } from "../../api/auth.service";
 import { QuizModal } from "../../Components/QuizModal";
 
