@@ -41,38 +41,32 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   };
 
 const handleCloseQuiz = async (completed: boolean) => {
-    setIsQuizOpen(false);
-    setSelectedLessonId(null);
+  setIsQuizOpen(false);
+  setSelectedLessonId(null);
 
-    if (completed) {
-      try {
-        // 1. Actualizamos el Dashboard en segundo plano (sin pantalla blanca)
-        // Pasamos 'true' para que loadData no active el spinner global
-        await onRefreshData(true); 
+  if (!completed || !selectedUnit) return;
 
-        // 2. Pedimos los datos más recientes de las unidades
-        // Asegúrate de que el ID sea el correcto (ej. "1")
-        const response: any = await getCourseStatus("1"); 
-        
-        // Validamos si la respuesta es un array o viene dentro de un objeto
-        const updatedUnits = Array.isArray(response) ? response : (response?.units || []);
+  try {
+    // 1️⃣ ACTUALIZACIÓN LOCAL INMEDIATA (🔥 CLAVE)
+    const updatedLessons = selectedUnit.lessons.map((lesson) =>
+      lesson.id === selectedLessonId
+        ? { ...lesson, isCompleted: true }
+        : lesson
+    );
 
-        // 3. ACTUALIZACIÓN REACTIVA INMEDIATA
-        if (selectedUnit && updatedUnits.length > 0) {
-          const freshUnit = updatedUnits.find((u: any) => u.id === selectedUnit.id);
-          
-          if (freshUnit) {
-            // USAMOS SPREAD OPERATOR {...} para crear una copia nueva.
-            // Esto es vital para que React detecte que el objeto cambió y
-            // actualice los colores de los nodos al instante.
-            setSelectedUnit({ ...freshUnit }); 
-          }
-        }
-      } catch (error) {
-        console.error("Error al actualizar nodos sin recargar:", error);
-      }
-    }
-  };
+    setSelectedUnit({
+      ...selectedUnit,
+      lessons: updatedLessons,
+    });
+
+    // 2️⃣ Sincronización backend (silenciosa)
+    await onRefreshData(true);
+
+  } catch (error) {
+    console.error("Error al actualizar progreso:", error);
+  }
+};
+
   const LessonNode = ({ lesson, index, isLocked }: { lesson: any; index: number; isLocked: boolean }) => {
     const radius = 55; 
     const stroke = 8;
