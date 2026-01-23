@@ -25,7 +25,8 @@ export interface LoginCredentials {
 }
 
 export interface RegisterCredentials {
-    username: string;
+  email: string;
+   // username: string;
     password: string;
     fullName: string;
 cedula: string;              // ✅ NUEVO
@@ -103,6 +104,7 @@ export interface AnswerResultDTO {
 }
 
 export interface UserProfileData {
+  userId?: string;
     fullName: string;
     username: string;
     joinedAt: string; 
@@ -284,32 +286,46 @@ const apiFetch = async (
 // 4. MÉTODOS EXPORTADOS
 // ==========================================
 
+// En src/api/auth.service.ts
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const response = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: credentials.username, password: credentials.password }),
-    }, false);
-    
-    const data: AuthResponse = await response.json();
-    
-    saveToken(data.token);
-    localStorage.setItem(ROLE_KEY, data.role); 
-    
-    return data;
+    const response = await apiFetch('/auth/login', {
+        method: 'POST',
+        // Cambiamos 'username' por 'email' para que Kotlin lo reciba correctamente
+        body: JSON.stringify({ email: credentials.username, password: credentials.password }),
+    }, false);
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        // Lanzamos el mensaje exacto que viene de tu AuthController (ej: "Usuario no registrado")
+        throw new Error(errorData.message || "Credenciales inválidas");
+    }
+
+    const data: AuthResponse = await response.json();
+    saveToken(data.token);
+    localStorage.setItem(ROLE_KEY, data.role); 
+    
+    return data;
 };
 
 export const register = async (credentials: RegisterCredentials): Promise<AuthResponse> => {
   const response = await apiFetch('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
-      email: credentials.username,
+      email: credentials.email,            // DEBE ser 'email'
       password: credentials.password,
       fullName: credentials.fullName,
-      cedula: credentials.cedula,                 // ✅
-      registrationCode: credentials.registrationCode, // ✅
-      adminCode: credentials.adminCode
+      cedula: credentials.cedula,
+      registrationCode: credentials.registrationCode, // Coincide con @JsonProperty
+      adminCode: credentials.adminCode || null
     }),
   }, false);
+
+  if (!response.ok) {
+    // Esto te ayudará a ver el error real del backend en la consola
+    const errorData = await response.json().catch(() => ({}));
+    console.error("Error del Backend:", errorData);
+    throw new Error(errorData.message || "Error 400: Datos inválidos");
+  }
 
   const data: AuthResponse = await response.json();
   saveToken(data.token);
@@ -370,8 +386,19 @@ export const completeLesson = async (lessonId: string, correctAnswers: number): 
 };
 
 export const getUserProfile = async (): Promise<UserProfileData> => {
-    const response = await apiFetch('/users/me', { method: 'GET' });
-    return response.json();
+    const response = await apiFetch('/users/me', { method: 'GET' });
+    
+    if (!response.ok) {
+        // Si el token es inválido, mejor limpiar y redirigir
+        if (response.status === 401) {
+            removeToken();
+            window.location.href = '/login';
+        }
+        const errorText = await response.text();
+        throw new Error(errorText || "Error al obtener perfil");
+    }
+    
+    return response.json();
 };
 
 export const updateUserAvatar = async (avatarData: any): Promise<void> => {
