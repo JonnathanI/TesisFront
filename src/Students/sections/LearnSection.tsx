@@ -6,13 +6,15 @@ import {
   QuestionDTO,
 } from "../../api/auth.service";
 import { QuizModal } from "../../Components/QuizModal";
+import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 
 interface LearnSectionProps {
   units: UnitWithLessons[];
   userProfile: UserProfileData;
   heartTimer: string;
   onUpdateProfile: (profile: UserProfileData) => void;
-  onRefreshData: (isSilent?: boolean) => Promise<void>; // Soporta carga silenciosa
+  onRefreshData: (isSilent?: boolean) => Promise<void>; 
 }
 
 export const LearnSection: React.FC<LearnSectionProps> = ({ 
@@ -27,6 +29,10 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
 
+  // ESTADOS PARA EL RESUMEN FINAL
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState({ score: 0, total: 0, isUnitDone: false });
+
   const handleOpenLesson = async (lessonId: string) => {
     try {
       const q = await getLessonQuestions(lessonId);
@@ -38,43 +44,60 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     }
   };
 
-const handleCloseQuiz = async (completed: boolean) => {
-  setIsQuizOpen(false);
-  setSelectedLessonId(null);
+  const handleCloseQuiz = async (completed: boolean, score: number, total: number) => {
+    setIsQuizOpen(false);
 
-  if (!completed || !selectedUnit) return;
+    if (!completed || !selectedUnit || !selectedLessonId) {
+      setSelectedLessonId(null);
+      return;
+    }
 
-  try {
-    // 1️⃣ ACTUALIZACIÓN LOCAL INMEDIATA (🔥 CLAVE)
-    const updatedLessons = selectedUnit.lessons.map((lesson) =>
-      lesson.id === selectedLessonId
-        ? { ...lesson, isCompleted: true }
-        : lesson
-    );
+    try {
+      // 1. Detectar si la unidad ya estaba terminada antes de este intento
+      const wasUnitAlreadyDone = selectedUnit.lessons.every(l => l.isCompleted);
 
-    setSelectedUnit({
-      ...selectedUnit,
-      lessons: updatedLessons,
-    });
+      // 2. Actualizar el estado local de las lecciones
+      const updatedLessons = selectedUnit.lessons.map((lesson) =>
+        lesson.id === selectedLessonId ? { ...lesson, isCompleted: true } : lesson
+      );
 
-    // 2️⃣ Sincronización backend (silenciosa)
-    await onRefreshData(true);
+      // 3. Detectar si la unidad está completa ahora
+      const isUnitDoneNow = updatedLessons.every(l => l.isCompleted);
 
-  } catch (error) {
-    console.error("Error al actualizar progreso:", error);
-  }
-};
+      // Lógica de distinción: Solo mostramos "Unidad Superada" si es la primera vez que la completa
+      const shouldShowUnitSummary = isUnitDoneNow && !wasUnitAlreadyDone;
+
+      setSummaryData({ 
+        score, 
+        total, 
+        isUnitDone: shouldShowUnitSummary 
+      });
+
+      setShowSummary(true);
+
+      if (shouldShowUnitSummary) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#58CC02', '#1CB0F6', '#FFC800']
+        });
+      }
+
+      // Actualizar vista y sincronizar con servidor
+      setSelectedUnit({ ...selectedUnit, lessons: updatedLessons });
+      setSelectedLessonId(null);
+      await onRefreshData(true);
+
+    } catch (error) {
+      console.error("Error al procesar cierre:", error);
+      setSelectedLessonId(null);
+    }
+  };
 
   const LessonNode = ({ lesson, index, isLocked }: { lesson: any; index: number; isLocked: boolean }) => {
     const radius = 55; 
-    const stroke = 8;
-    const normalizedRadius = radius - stroke * 2;
-    const circumference = normalizedRadius * 2 * Math.PI;
-    const progress = lesson.isCompleted ? 100 : 0; 
-    const strokeDashoffset = circumference - (progress / 100) * circumference;
     const offsetZigZag = Math.sin(index * 1.5) * 80;
-
-    // LÓGICA DE COLORES: Cambia de verde a amarillo/dorado al completar
     const bgColor = isLocked ? "#BDBDBD" : (lesson.isCompleted ? "#FFD700" : "#58CC02");
     const borderColor = isLocked ? "#9E9E9E" : (lesson.isCompleted ? "#E5C100" : "#46A302");
 
@@ -86,24 +109,9 @@ const handleCloseQuiz = async (completed: boolean) => {
         pointerEvents: isLocked ? "none" : "auto"
       }}>
         <div 
-          style={{ 
-            position: "relative", width: radius * 2, height: radius * 2, 
-            cursor: isLocked ? "not-allowed" : "pointer",
-            filter: isLocked ? "grayscale(100%)" : "none",
-          }}
+          style={{ position: "relative", width: radius * 2, height: radius * 2, cursor: isLocked ? "not-allowed" : "pointer" }}
           onClick={() => !isLocked && handleOpenLesson(lesson.id)}
         >
-          <svg height={radius * 2} width={radius * 2} style={{ position: "absolute", transform: "rotate(-90deg)" }}>
-            <circle stroke="#E5E5E5" fill="transparent" strokeWidth={stroke} r={normalizedRadius} cx={radius} cy={radius} />
-            {!isLocked && (
-              <circle
-                stroke="#1CB0F6" fill="transparent" strokeWidth={stroke}
-                strokeDasharray={circumference + " " + circumference}
-                style={{ strokeDashoffset, transition: "stroke-dashoffset 1s ease-in-out" }}
-                strokeLinecap="round" r={normalizedRadius} cx={radius} cy={radius}
-              />
-            )}
-          </svg>
           <button style={{
             position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
             width: 75, height: 70, borderRadius: "50%",
@@ -136,8 +144,8 @@ const handleCloseQuiz = async (completed: boolean) => {
               }}
               onClick={() => !isLocked && setSelectedUnit(unit)}
             >
-               <h3>{isLocked ? "🔒 " : ""}{unit.title}</h3>
-               <p>{unit.lessons?.filter(l => l.isCompleted).length} / {unit.lessons?.length} lecciones</p>
+                <h3>{isLocked ? "🔒 " : ""}{unit.title}</h3>
+                <p>{unit.lessons?.filter(l => l.isCompleted).length} / {unit.lessons?.length} lecciones</p>
             </div>
           );
         })}
@@ -149,7 +157,7 @@ const handleCloseQuiz = async (completed: boolean) => {
     <div style={{ width: "100%", minHeight: "100vh" }}>
       <div style={{ position: "sticky", top: 0, zIndex: 100, backgroundColor: "#1CB0F6", padding: "20px", color: "white" }}>
           <button onClick={() => setSelectedUnit(null)} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontWeight: "bold" }}>← VOLVER</button>
-          <h2>{selectedUnit.title}</h2>
+          <h2 style={{ margin: 0 }}>{selectedUnit.title}</h2>
       </div>
 
       <div style={{ padding: "60px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "60px" }}>
@@ -159,14 +167,73 @@ const handleCloseQuiz = async (completed: boolean) => {
         })}
       </div>
 
-      {selectedLessonId && (
+      {isQuizOpen && selectedLessonId && (
         <QuizModal 
           isOpen={isQuizOpen} questions={questions} lessonId={selectedLessonId} 
           userProfile={userProfile} heartTimer={heartTimer} 
           onUpdateProfile={onUpdateProfile} 
-          onClose={(completed) => handleCloseQuiz(completed)} 
+          onClose={(completed: boolean, score: number, total: number) => {
+            handleCloseQuiz(completed, score, total);
+          }} 
         />
       )}
+
+      {/* --- MODAL DE RESUMEN FINAL --- */}
+      <AnimatePresence>
+        {showSummary && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(255,255,255,0.98)",
+              zIndex: 6000, display: "flex", justifyContent: "center", alignItems: "center"
+            }}
+          >
+            <motion.div 
+              initial={{ scale: 0.8 }} animate={{ scale: 1 }} 
+              style={{ textAlign: "center", maxWidth: "450px", width: "90%", padding: "30px", border: "2px solid #E5E5E5", borderRadius: "30px", background: "white" }}
+            >
+              <h1 style={{ color: "#58CC02", fontSize: "32px", fontWeight: 900 }}>
+                {summaryData.isUnitDone ? "¡UNIDAD SUPERADA! 🏆" : "¡LECCIÓN COMPLETADA! ✨"}
+              </h1>
+
+              <div style={{ display: "flex", justifyContent: "center", gap: "15px", margin: "25px 0" }}>
+                <div style={{ background: "#FFC800", padding: "15px", borderRadius: "18px", flex: 1, color: "white" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>ACIERTOS</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{summaryData.score}</div>
+                </div>
+                <div style={{ background: "#1CB0F6", padding: "15px", borderRadius: "18px", flex: 1, color: "white" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>TOTAL</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900 }}>{summaryData.total}</div>
+                </div>
+              </div>
+
+              {/* ESTE RECUADRO SOLO APARECE SI SE ACABA DE TERMINAR LA UNIDAD */}
+              {summaryData.isUnitDone && (
+                <div style={{ background: "#F7F7F7", padding: "15px", borderRadius: "15px", marginBottom: "20px", textAlign: "left", border: "1px solid #EEE" }}>
+                  <h4 style={{ margin: "0 0 10px 0", color: "#4B4B4B" }}>Progreso de Unidad:</h4>
+                  {selectedUnit?.lessons.map((l, i) => (
+                    <div key={i} style={{ fontSize: "13px", color: "#666", display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <span>Lección {i+1}: {l.title}</span>
+                      <span style={{ color: "#58CC02", fontWeight: "bold" }}>✓</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowSummary(false)}
+                style={{
+                  width: "100%", background: "#58CC02", color: "white", border: "none",
+                  padding: "16px", borderRadius: "16px", fontSize: "18px", fontWeight: "bold",
+                  cursor: "pointer", boxShadow: "0 5px 0 #46A302"
+                }}
+              >
+                {summaryData.isUnitDone ? "¡ASOMBROSO!" : "CONTINUAR"}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

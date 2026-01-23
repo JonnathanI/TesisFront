@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     QuestionDTO,
     completeLesson,
-    buyShopItem,
-    getUserProfile,
     subtractHeart,
     UserProfileData,
 } from "../api/auth.service";
@@ -15,7 +13,7 @@ interface QuizModalProps {
     lessonId: string;
     userProfile: UserProfileData;
     heartTimer: string;
-    onClose: (completed: boolean) => void;
+    onClose: (completed: boolean, score: number, total: number) => void;
     onUpdateProfile: (profile: UserProfileData) => void;
 }
 
@@ -28,12 +26,14 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     const [isCorrect, setIsCorrect] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [showNoHeartsModal, setShowNoHeartsModal] = useState(false);
+    const [score, setScore] = useState(0);
 
     useEffect(() => {
         if (isOpen) {
             setCurrentIndex(0);
             setSelectedOption(null);
             setIsAnswered(false);
+            setScore(0);
             if (userProfile.heartsCount <= 0) setShowNoHeartsModal(true);
         }
     }, [isOpen, userProfile.heartsCount]);
@@ -47,7 +47,9 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         setIsCorrect(correct);
         setIsAnswered(true);
 
-        if (!correct) {
+        if (correct) {
+            setScore(prev => prev + 1);
+        } else {
             try {
                 const updatedProfile = await subtractHeart();
                 onUpdateProfile(updatedProfile);
@@ -67,12 +69,11 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         } else {
             setIsSyncing(true);
             try {
-                // Notificar al backend la finalización
                 await completeLesson(lessonId, questions.length);
-                onClose(true); // Cierra notificando éxito para recargar unidades
+                onClose(true, score, questions.length); 
             } catch (error) {
                 console.error("Error al finalizar", error);
-                onClose(false);
+                onClose(false, 0, questions.length);
             } finally {
                 setIsSyncing(false);
             }
@@ -84,41 +85,45 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     return (
         <div style={overlayStyle}>
             <div style={containerStyle}>
-                {/* Header con Progreso */}
                 <div style={headerStyle}>
-                    <button onClick={() => onClose(false)} style={closeBtn}>✕</button>
+                    <button onClick={() => onClose(false, 0, questions.length)} style={closeBtn}>✕</button>
                     <div style={progressWrapper}>
-                        <div style={{ ...progressFill, width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
+                        <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+                            style={progressFill} 
+                        />
                     </div>
                     <div style={heartsBox}>❤️ {userProfile.heartsCount}</div>
                 </div>
 
-                <motion.div key={currentIndex} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <h2 style={questionText}>{currentQuestion.textSource}</h2>
-                    <div style={optionsGrid}>
-                        {currentQuestion.options.map((opt) => (
-                            <button
-                                key={opt}
-                                disabled={isAnswered || isSyncing}
-                                onClick={() => setSelectedOption(opt)}
-                                style={{
-                                    ...optionStyle,
-                                    border: selectedOption === opt ? "2px solid #1cb0f6" : "2px solid #e5e5e5",
-                                    background: selectedOption === opt ? "#ddf4ff" : "white",
-                                }}
-                            >
-                                {opt}
-                            </button>
-                        ))}
-                    </div>
-                </motion.div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <motion.div key={currentIndex} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}>
+                        <h2 style={questionText}>{currentQuestion.textSource}</h2>
+                        <div style={optionsGrid}>
+                            {currentQuestion.options.map((opt) => (
+                                <button
+                                    key={opt}
+                                    disabled={isAnswered || isSyncing}
+                                    onClick={() => setSelectedOption(opt)}
+                                    style={{
+                                        ...optionStyle,
+                                        border: selectedOption === opt ? "2px solid #1cb0f6" : "2px solid #e5e5e5",
+                                        background: selectedOption === opt ? "#ddf4ff" : "white",
+                                    }}
+                                >
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </motion.div>
+                </div>
 
-                {/* Footer de Feedback */}
                 <div style={{ ...feedbackBar, background: isAnswered ? (isCorrect ? "#d7ffb8" : "#ffdfe0") : "white" }}>
                     <div style={footerContent}>
                         {isAnswered && (
                             <div style={{ color: isCorrect ? "#58cc02" : "#ff4b4b", fontWeight: "900" }}>
-                                {isCorrect ? "¡Excelente!" : `Incorrecto. Era: ${currentQuestion.textTarget}`}
+                                {isCorrect ? "¡Excelente!" : `Incorrecto: ${currentQuestion.textTarget}`}
                             </div>
                         )}
                         <button
@@ -132,14 +137,13 @@ export const QuizModal: React.FC<QuizModalProps> = ({
                 </div>
             </div>
 
-            {/* Modal de Reintento si no hay vidas */}
             <AnimatePresence>
                 {showNoHeartsModal && (
                     <motion.div style={noHeartsOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                         <div style={noHeartsContent}>
                             <h2>💔 ¡Sin vidas!</h2>
-                            <p>Espera a: {heartTimer}</p>
-                            <button onClick={() => onClose(false)} style={primaryBtn}>SALIR</button>
+                            <p>Vuelven en: {heartTimer}</p>
+                            <button onClick={() => onClose(false, 0, questions.length)} style={primaryBtn}>SALIR</button>
                         </div>
                     </motion.div>
                 )}
@@ -148,19 +152,18 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     );
 };
 
-// Estilos rápidos (puedes moverlos a CSS)
 const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "#fff", zIndex: 5000 };
-const containerStyle: React.CSSProperties = { maxWidth: 600, margin: "0 auto", padding: "2rem" };
-const headerStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 20, marginBottom: 40 };
-const progressWrapper: React.CSSProperties = { flex: 1, height: 14, background: "#E5E5E5", borderRadius: 10 };
-const progressFill: React.CSSProperties = { height: "100%", background: "#58CC02", borderRadius: 10, transition: "width 0.3s" };
-const closeBtn: React.CSSProperties = { background: "none", border: "none", fontSize: 24, cursor: "pointer" };
-const heartsBox: React.CSSProperties = { fontWeight: "bold", color: "#ff4b4b" };
-const questionText: React.CSSProperties = { fontSize: "1.8rem", fontWeight: "bold", margin: "40px 0" };
-const optionsGrid: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 12 };
-const optionStyle: React.CSSProperties = { padding: "16px", borderRadius: 12, fontSize: "1.1rem", textAlign: "left", cursor: "pointer" };
-const feedbackBar: React.CSSProperties = { position: "fixed", bottom: 0, left: 0, right: 0, padding: "30px", borderTop: "2px solid #E5E5E5" };
-const footerContent: React.CSSProperties = { maxWidth: 600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" };
-const primaryBtn: React.CSSProperties = { padding: "12px 40px", borderRadius: 12, border: "none", background: "#58CC02", color: "#fff", fontWeight: "bold", cursor: "pointer" };
-const noHeartsOverlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 6000 };
-const noHeartsContent: React.CSSProperties = { background: "#fff", padding: 40, borderRadius: 20, textAlign: "center" };
+const containerStyle: React.CSSProperties = { maxWidth: 650, margin: "0 auto", padding: "40px 20px", height: "100vh", display: "flex", flexDirection: "column" };
+const headerStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 20, marginBottom: 20 };
+const progressWrapper: React.CSSProperties = { flex: 1, height: 16, background: "#E5E5E5", borderRadius: 12, overflow: "hidden" };
+const progressFill: React.CSSProperties = { height: "100%", background: "#58CC02", borderRadius: 12 };
+const closeBtn: React.CSSProperties = { background: "none", border: "none", fontSize: 26, cursor: "pointer", color: "#afafaf" };
+const heartsBox: React.CSSProperties = { fontWeight: "900", color: "#ff4b4b" };
+const questionText: React.CSSProperties = { fontSize: "2rem", fontWeight: "800", color: "#3c3c3c" };
+const optionsGrid: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 14 };
+const optionStyle: React.CSSProperties = { padding: "18px", borderRadius: 16, fontSize: "1.1rem", textAlign: "left", cursor: "pointer", fontWeight: "bold" };
+const feedbackBar: React.CSSProperties = { position: "fixed", bottom: 0, left: 0, right: 0, padding: "40px 20px" };
+const footerContent: React.CSSProperties = { maxWidth: 650, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" };
+const primaryBtn: React.CSSProperties = { padding: "15px 50px", borderRadius: 16, border: "none", fontSize: "16px", fontWeight: "900", cursor: "pointer", background: "#58CC02", color: "white" };
+const noHeartsOverlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 6000 };
+const noHeartsContent: React.CSSProperties = { background: "#fff", padding: "40px", borderRadius: "24px", textAlign: "center" };

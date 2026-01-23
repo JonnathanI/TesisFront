@@ -141,7 +141,12 @@ const StudentDashboard = () => {
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "white", fontFamily: "'Poppins', sans-serif" }}>
       <style>{dashboardStyles}</style>
       
-      <Sidebar active={section} onChange={setSection} onLogout={handleLogout} />
+<Sidebar 
+  active={section} 
+  onChange={setSection} 
+  onLogout={handleLogout} 
+  userProfile={userProfile} 
+/>
       
       <div style={{ flex: 1, marginLeft: 260, display: "flex" }}>
         
