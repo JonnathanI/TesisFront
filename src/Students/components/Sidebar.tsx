@@ -9,6 +9,8 @@ import {
   Settings,
   LogOut 
 } from "lucide-react";
+// Asegúrate de que la ruta a AvatarEditor sea la correcta en tu proyecto
+import { AnimatedAvatarRenderer } from "../AvatarEditor";
 
 interface SidebarProps {
   active: string;
@@ -27,6 +29,20 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
     { id: "challenges", label: "Desafíos", icon: <Trophy size={28} strokeWidth={2.5} /> },
     { id: "settings", label: "Configuración", icon: <Settings size={28} strokeWidth={2.5} /> },
   ];
+
+  // Lógica para obtener los atributos del avatar desde el JSON de la DB
+  const avatarAttrs = React.useMemo(() => {
+    try {
+      if (userProfile?.avatarData) {
+        return typeof userProfile.avatarData === 'string' 
+          ? JSON.parse(userProfile.avatarData) 
+          : userProfile.avatarData;
+      }
+    } catch (e) {
+      console.error("Error al procesar avatarData en Sidebar", e);
+    }
+    return null;
+  }, [userProfile?.avatarData]);
 
   const sideStyles = `
     @keyframes slideIn {
@@ -69,7 +85,6 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
       margin-right: 15px;
     }
 
-    /* CONTENEDOR DE PERFIL */
     .profile-wrapper {
       position: relative;
       margin: 0 10px 25px;
@@ -92,10 +107,29 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
       background: #F0F9FF;
     }
 
-    /* TOOLTIP CORREGIDO */
+    /* Contenedor circular para el avatar animado */
+    .avatar-mini-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #EDF2F7;
+      border: 2px solid #1CB0F6;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Escalado para centrar la cara del avatar animado */
+    .avatar-scaler {
+      transform: scale(0.45) translateY(25px); 
+      transform-origin: center;
+    }
+
     .profile-tooltip {
       position: absolute;
-      left: 250px; /* Lo mueve fuera del sidebar */
+      left: 250px;
       top: 0;
       width: 210px;
       background: #4B4B4B;
@@ -156,28 +190,39 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
         </h1>
       </div>
 
-      {/* SECCIÓN DE PERFIL CON TOOLTIP */}
+      {/* SECCIÓN DE PERFIL CON AVATAR ANIMADO */}
       <div className="profile-wrapper">
-        <div className="profile-card">
-          <div style={{
-            width: 42, height: 42, borderRadius: "50%",
-            background: "linear-gradient(45deg, #1CB0F6, #12D8FA)",
-            display: "flex", justifyContent: "center", alignItems: "center",
-            color: "white", fontWeight: 800, fontSize: "18px",
-            boxShadow: "0 3px 8px rgba(28, 176, 246, 0.3)"
-          }}>
-            {userProfile?.fullName?.[0].toUpperCase() || "U"}
+        <div className="profile-card" onClick={() => onChange("profile")}>
+          <div className="avatar-mini-circle">
+            {avatarAttrs ? (
+              <div className="avatar-scaler">
+                <AnimatedAvatarRenderer attrs={avatarAttrs} size={100} />
+              </div>
+            ) : (
+              <div style={{ fontWeight: 800, color: "#1CB0F6", fontSize: "18px" }}>
+                {userProfile?.fullName?.[0].toUpperCase() || "U"}
+              </div>
+            )}
           </div>
           
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <div style={{ fontSize: "14px", fontWeight: 800, color: "#4B4B4B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ 
+              fontSize: "14px", 
+              fontWeight: 800, 
+              color: "#4B4B4B", 
+              whiteSpace: "nowrap", 
+              overflow: "hidden", 
+              textOverflow: "ellipsis" 
+            }}>
               {userProfile?.fullName || "Usuario"}
             </div>
-            <div style={{ fontSize: "11px", color: "#AFB4B8", fontWeight: 700, textTransform: "uppercase" }}>Estudiante</div>
+            <div style={{ fontSize: "11px", color: "#AFB4B8", fontWeight: 700, textTransform: "uppercase" }}>
+              Estudiante
+            </div>
           </div>
         </div>
 
-        {/* CONTENIDO DEL TOOLTIP */}
+        {/* TOOLTIP DE PROGRESO */}
         <div className="profile-tooltip">
           <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#1CB0F6", textTransform: "uppercase" }}>
              Mi Progreso
@@ -185,12 +230,11 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
           <div style={{ fontSize: "13px", marginBottom: "6px", color: "#DDD" }}>
             📅 Se unió en: <br/> 
             <span style={{ color: "white", fontWeight: "bold" }}>
-              {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : "Reciente"}
+              {userProfile?.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : "Reciente"}
             </span>
           </div>
           <div style={{ fontSize: "13px", color: "#DDD", borderTop: "1px solid #666", paddingTop: "8px", marginTop: "4px" }}>
             ⭐ Experiencia Total: <br/>
-            {/* CORREGIDO: Usamos totalXp para que coincida con StatsBar */}
             <span style={{ color: "#FFC800", fontWeight: "900", fontSize: "16px" }}>
               {userProfile?.totalXp || 0} XP
             </span>
@@ -213,7 +257,7 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
         ))}
       </nav>
 
-      {/* Footer */}
+      {/* Footer / Cerrar Sesión */}
       <div className="logout-section">
         <button onClick={onLogout} className="nav-item logout-item">
           <span className="icon-wrapper"><LogOut size={28} strokeWidth={2.5} /></span>
