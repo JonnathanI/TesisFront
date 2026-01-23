@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout }) => {
       {/* Logo estilo marca */}
       <div style={{ padding: "0 15px 40px" }}>
         <h1 style={{ color: "#1CB0F6", fontSize: "32px", fontWeight: 900, margin: 0, letterSpacing: "-1.5px" }}>
-          duolingo
+          EuroPeek
         </h1>
       </div>
 

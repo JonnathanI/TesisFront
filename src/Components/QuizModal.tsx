@@ -20,13 +20,7 @@ interface QuizModalProps {
 }
 
 export const QuizModal: React.FC<QuizModalProps> = ({
-    isOpen,
-    questions,
-    lessonId,
-    userProfile,
-    heartTimer,
-    onClose,
-    onUpdateProfile,
+    isOpen, questions, lessonId, userProfile, heartTimer, onClose, onUpdateProfile,
 }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -35,21 +29,12 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     const [isSyncing, setIsSyncing] = useState(false);
     const [showNoHeartsModal, setShowNoHeartsModal] = useState(false);
 
-    // NUEVO: Estado para verificar si la lección es perfecta
-    const [errorsCount, setErrorsCount] = useState(0);
-
-    // Reiniciar el quiz cuando se abre
     useEffect(() => {
         if (isOpen) {
             setCurrentIndex(0);
             setSelectedOption(null);
             setIsAnswered(false);
-            setIsCorrect(false);
-            setErrorsCount(0); // Reset de errores
-
-            if (userProfile.heartsCount <= 0) {
-                setShowNoHeartsModal(true);
-            }
+            if (userProfile.heartsCount <= 0) setShowNoHeartsModal(true);
         }
     }, [isOpen, userProfile.heartsCount]);
 
@@ -57,27 +42,18 @@ export const QuizModal: React.FC<QuizModalProps> = ({
 
     const handleCheckAnswer = async () => {
         if (!selectedOption || isSyncing || !currentQuestion) return;
-
         setIsSyncing(true);
         const correct = selectedOption === currentQuestion.textTarget;
         setIsCorrect(correct);
         setIsAnswered(true);
 
         if (!correct) {
-            // Registramos el error para que ya no sea "lección perfecta"
-            setErrorsCount(prev => prev + 1);
-            
             try {
                 const updatedProfile = await subtractHeart();
                 onUpdateProfile(updatedProfile);
-                if (updatedProfile.heartsCount <= 0) {
-                    setShowNoHeartsModal(true);
-                }
+                if (updatedProfile.heartsCount <= 0) setShowNoHeartsModal(true);
             } catch {
-                onUpdateProfile({
-                    ...userProfile,
-                    heartsCount: Math.max(0, userProfile.heartsCount - 1),
-                });
+                console.error("Fallo al restar corazón");
             }
         }
         setIsSyncing(false);
@@ -86,44 +62,20 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     const handleNextQuestion = async () => {
         if (currentIndex < questions.length - 1) {
             setIsAnswered(false);
-            setIsCorrect(false);
             setSelectedOption(null);
-            setCurrentIndex((prev) => prev + 1);
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            setCurrentIndex(prev => prev + 1);
         } else {
-            // FINALIZAR LECCIÓN
             setIsSyncing(true);
             try {
-                // Enviamos la finalización al servidor
+                // Notificar al backend la finalización
                 await completeLesson(lessonId, questions.length);
-                
-                // IMPORTANTE: Refrescamos el perfil completo para actualizar XP 
-                // y contadores de desafíos diarios en el Dashboard
-                const freshProfile = await getUserProfile();
-                onUpdateProfile(freshProfile);
-                
-                onClose(true);
+                onClose(true); // Cierra notificando éxito para recargar unidades
             } catch (error) {
-                console.error("Error al completar lección", error);
+                console.error("Error al finalizar", error);
                 onClose(false);
             } finally {
                 setIsSyncing(false);
             }
-        }
-    };
-
-    const handleBuyHearts = async () => {
-        if (userProfile.lingots < 400) {
-            alert("No tienes suficientes gemas 💎");
-            return;
-        }
-        try {
-            await buyShopItem("HEART_REFILL");
-            const profile = await getUserProfile();
-            onUpdateProfile(profile);
-            setShowNoHeartsModal(false);
-        } catch {
-            alert("Error al comprar corazones");
         }
     };
 
@@ -132,31 +84,17 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     return (
         <div style={overlayStyle}>
             <div style={containerStyle}>
-                {/* HEADER */}
+                {/* Header con Progreso */}
                 <div style={headerStyle}>
                     <button onClick={() => onClose(false)} style={closeBtn}>✕</button>
                     <div style={progressWrapper}>
-                        <div
-                            style={{
-                                ...progressFill,
-                                width: `${((currentIndex + 1) / questions.length) * 100}%`,
-                            }}
-                        />
+                        <div style={{ ...progressFill, width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
                     </div>
-                    <div style={heartsBox}>
-                        ❤️ <strong>{userProfile.heartsCount}</strong>
-                    </div>
+                    <div style={heartsBox}>❤️ {userProfile.heartsCount}</div>
                 </div>
 
-                {/* CONTENIDO DE PREGUNTA */}
-                <motion.div
-                    key={currentIndex}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    style={{ minHeight: '400px' }}
-                >
+                <motion.div key={currentIndex} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                     <h2 style={questionText}>{currentQuestion.textSource}</h2>
-
                     <div style={optionsGrid}>
                         {currentQuestion.options.map((opt) => (
                             <button
@@ -167,8 +105,6 @@ export const QuizModal: React.FC<QuizModalProps> = ({
                                     ...optionStyle,
                                     border: selectedOption === opt ? "2px solid #1cb0f6" : "2px solid #e5e5e5",
                                     background: selectedOption === opt ? "#ddf4ff" : "white",
-                                    boxShadow: selectedOption === opt ? "0 4px 0 #1cb0f6" : "0 4px 0 #e5e5e5",
-                                    cursor: isAnswered ? "default" : "pointer"
                                 }}
                             >
                                 {opt}
@@ -177,69 +113,34 @@ export const QuizModal: React.FC<QuizModalProps> = ({
                     </div>
                 </motion.div>
 
-                {/* FEEDBACK BAR (FOOTER) */}
-                <div
-                    style={{
-                        ...feedbackBar,
-                        background: isAnswered
-                            ? isCorrect ? "#d7ffb8" : "#ffdfe0"
-                            : "white",
-                        borderTop: isAnswered ? "none" : "2px solid #e5e5e5"
-                    }}
-                >
-                    <div style={{ maxWidth: 600, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 auto" }}>
+                {/* Footer de Feedback */}
+                <div style={{ ...feedbackBar, background: isAnswered ? (isCorrect ? "#d7ffb8" : "#ffdfe0") : "white" }}>
+                    <div style={footerContent}>
                         {isAnswered && (
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <span style={{ fontSize: "2rem" }}>{isCorrect ? "✅" : "❌"}</span>
-                                <div style={{ color: isCorrect ? "#58cc02" : "#ff4b4b", fontWeight: "900", fontSize: "1.2rem" }}>
-                                    {isCorrect ? "¡Buen trabajo!" : `Incorrecto. Era: ${currentQuestion.textTarget}`}
-                                </div>
+                            <div style={{ color: isCorrect ? "#58cc02" : "#ff4b4b", fontWeight: "900" }}>
+                                {isCorrect ? "¡Excelente!" : `Incorrecto. Era: ${currentQuestion.textTarget}`}
                             </div>
                         )}
-                        
-                        {!isAnswered ? (
-                            <button
-                                onClick={handleCheckAnswer}
-                                disabled={!selectedOption || isSyncing}
-                                style={{...primaryBtn, marginLeft: "auto", opacity: !selectedOption ? 0.5 : 1}}
-                            >
-                                COMPROBAR
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleNextQuestion}
-                                style={{...(isCorrect ? successBtn : errorBtn), marginLeft: "auto"}}
-                            >
-                                {currentIndex === questions.length - 1 ? "FINALIZAR" : "CONTINUAR"}
-                            </button>
-                        )}
+                        <button
+                            onClick={isAnswered ? handleNextQuestion : handleCheckAnswer}
+                            disabled={!selectedOption || isSyncing}
+                            style={primaryBtn}
+                        >
+                            {isAnswered ? (currentIndex === questions.length - 1 ? "FINALIZAR" : "CONTINUAR") : "COMPROBAR"}
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* MODAL SIN VIDAS */}
+            {/* Modal de Reintento si no hay vidas */}
             <AnimatePresence>
                 {showNoHeartsModal && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        style={noHeartsOverlay}
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                            style={noHeartsContent}
-                        >
-                            <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>💔</div>
-                            <h2 style={{ fontWeight: "900", color: "#3c3c3c" }}>¡Sin vidas!</h2>
-                            <p style={{ color: "#777", marginBottom: "1rem" }}>Próxima vida en: <strong>{heartTimer}</strong></p>
-
-                            <button onClick={handleBuyHearts} style={{...successBtn, width: "100%", marginBottom: 10}}>
-                                RELLENAR VIDAS 💎 400
-                            </button>
-
-                            <button onClick={() => onClose(false)} style={exitBtn}>
-                                SALIR
-                            </button>
-                        </motion.div>
+                    <motion.div style={noHeartsOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <div style={noHeartsContent}>
+                            <h2>💔 ¡Sin vidas!</h2>
+                            <p>Espera a: {heartTimer}</p>
+                            <button onClick={() => onClose(false)} style={primaryBtn}>SALIR</button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -247,21 +148,19 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     );
 };
 
-// --- ESTILOS ---
-const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "#fff", zIndex: 5000, overflowY: "auto" };
-const containerStyle: React.CSSProperties = { maxWidth: 600, margin: "0 auto", padding: "2rem 2rem 10rem 2rem" };
-const headerStyle: React.CSSProperties = { display: "flex", gap: 15, alignItems: "center", marginBottom: "2rem" };
-const closeBtn: React.CSSProperties = { background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#afafaf", fontWeight: "bold" };
-const progressWrapper: React.CSSProperties = { flex: 1, height: 16, background: "#e5e5e5", borderRadius: 10 };
-const progressFill: React.CSSProperties = { height: "100%", background: "#58cc02", borderRadius: 10, transition: "width 0.3s ease" };
-const heartsBox: React.CSSProperties = { fontWeight: 900, color: "#ff4b4b", fontSize: "1.2rem" };
-const questionText: React.CSSProperties = { margin: "2rem 0", fontSize: "1.8rem", fontWeight: "900", color: "#3c3c3c" };
-const optionsGrid: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 15 };
-const optionStyle: React.CSSProperties = { padding: "1.2rem", borderRadius: 16, fontWeight: "bold", fontSize: "1.1rem", textAlign: "left", transition: "all 0.1s", border: "2px solid #e5e5e5" };
-const feedbackBar: React.CSSProperties = { position: "fixed", bottom: 0, left: 0, right: 0, padding: "2rem", display: "flex", justifyContent: "center", zIndex: 5001, minHeight: "140px" };
-const primaryBtn: React.CSSProperties = { padding: "16px 60px", background: "#58cc02", color: "#fff", borderRadius: 16, border: "none", fontWeight: "900", fontSize: "1.1rem", cursor: "pointer", boxShadow: "0 5px 0 #46a302" };
-const successBtn: React.CSSProperties = { ...primaryBtn };
-const errorBtn: React.CSSProperties = { ...primaryBtn, background: "#ff4b4b", boxShadow: "0 5px 0 #a83232" };
-const noHeartsOverlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 6000, backdropFilter: "blur(4px)" };
-const noHeartsContent: React.CSSProperties = { background: "#fff", padding: "3rem", borderRadius: 28, width: "90%", maxWidth: 400, textAlign: "center" };
-const exitBtn: React.CSSProperties = { background: "none", border: "none", fontWeight: "800", color: "#1cb0f6", cursor: "pointer", marginTop: "15px", fontSize: "1rem" };
+// Estilos rápidos (puedes moverlos a CSS)
+const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "#fff", zIndex: 5000 };
+const containerStyle: React.CSSProperties = { maxWidth: 600, margin: "0 auto", padding: "2rem" };
+const headerStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 20, marginBottom: 40 };
+const progressWrapper: React.CSSProperties = { flex: 1, height: 14, background: "#E5E5E5", borderRadius: 10 };
+const progressFill: React.CSSProperties = { height: "100%", background: "#58CC02", borderRadius: 10, transition: "width 0.3s" };
+const closeBtn: React.CSSProperties = { background: "none", border: "none", fontSize: 24, cursor: "pointer" };
+const heartsBox: React.CSSProperties = { fontWeight: "bold", color: "#ff4b4b" };
+const questionText: React.CSSProperties = { fontSize: "1.8rem", fontWeight: "bold", margin: "40px 0" };
+const optionsGrid: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 12 };
+const optionStyle: React.CSSProperties = { padding: "16px", borderRadius: 12, fontSize: "1.1rem", textAlign: "left", cursor: "pointer" };
+const feedbackBar: React.CSSProperties = { position: "fixed", bottom: 0, left: 0, right: 0, padding: "30px", borderTop: "2px solid #E5E5E5" };
+const footerContent: React.CSSProperties = { maxWidth: 600, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" };
+const primaryBtn: React.CSSProperties = { padding: "12px 40px", borderRadius: 12, border: "none", background: "#58CC02", color: "#fff", fontWeight: "bold", cursor: "pointer" };
+const noHeartsOverlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 6000 };
+const noHeartsContent: React.CSSProperties = { background: "#fff", padding: 40, borderRadius: 20, textAlign: "center" };

@@ -25,19 +25,26 @@ export default function Register() {
       if (form.password.length < 8) throw new Error("Mínimo 8 caracteres en contraseña");
       if (form.cedula.length !== 10) throw new Error("Cédula debe tener 10 dígitos");
 
-      // 2. Limpieza del Payload para Kotlin
+      const codeTrimmed = form.registrationCode.trim();
+
+      // 2. Lógica de separación de códigos
+      // Si el código es el secreto, se envía como adminCode. 
+      // Si no, se envía como registrationCode para alumnos.
       const payload = {
         email: form.email.trim(),
         password: form.password,
         fullName: form.fullName.trim(),
         cedula: form.cedula.trim(),
-        registrationCode: form.registrationCode.trim() || null,
+        // --- CAMBIO CLAVE AQUÍ ---
+        adminCode: codeTrimmed === "supersecreto123" ? codeTrimmed : null,
+        registrationCode: codeTrimmed !== "supersecreto123" ? (codeTrimmed || null) : null,
       };
 
       await register(payload as any);
       alert("¡Registro exitoso! Ahora inicia sesión.");
       navigate("/login");
     } catch (err: any) {
+      // Captura el error "Código inválido" o "Cédula ya registrada" del backend
       setError(err.message);
     } finally {
       setLoading(false);
@@ -63,7 +70,13 @@ export default function Register() {
           <input style={inputStyle} type="email" placeholder="Correo Electrónico" onChange={e => setForm({...form, email: e.target.value})} required />
           <input style={inputStyle} placeholder="Cédula" maxLength={10} onChange={e => setForm({...form, cedula: e.target.value})} required />
           <input style={inputStyle} type="password" placeholder="Contraseña (min. 8)" onChange={e => setForm({...form, password: e.target.value})} required />
-          <input style={inputStyle} placeholder="Código de Aula (Opcional)" onChange={e => setForm({...form, registrationCode: e.target.value})} />
+          
+          {/* Este campo ahora sirve para Código de Aula (Alumnos) O Código Maestro (Admin) */}
+          <input 
+            style={inputStyle} 
+            placeholder="Código de Aula o Maestro (Opcional)" 
+            onChange={e => setForm({...form, registrationCode: e.target.value})} 
+          />
 
           <button type="submit" disabled={loading}
             style={{ width: "100%", padding: "12px", background: "#FFD700", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer" }}>

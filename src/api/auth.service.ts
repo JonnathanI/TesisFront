@@ -13,48 +13,41 @@ const BASE_URL = 'http://localhost:8081/api';
 export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
 
 export interface AuthResponse {
-    token: string;
-    userId: string;
-    role: UserRole;
-    fullName: string;
+    token: string;
+    userId: string;
+    role: UserRole;
+    fullName: string;
 }
 
 export interface LoginCredentials {
-    username: string;
-    password: string;
+    username: string;
+    password: string;
 }
 
 export interface RegisterCredentials {
   email: string;
-   // username: string;
-    password: string;
-    fullName: string;
+   // username: string;
+    password: string;
+    fullName: string;
 cedula: string;              // ✅ NUEVO
   registrationCode?: string;
-    adminCode?: string; 
+    adminCode?: string; 
 }
 
 // --- CURSOS Y UNIDADES ---
 export interface Course {
-    id: number;
-    title: string;
-    description: string;
+    id: number;
+    title: string;
+    description: string;
 }
 
 export interface UnitData {
-  id: string;
-  title: string;
-  unitOrder: number;
-  description?: string;
+  id: string;
+  title: string;
+  unitOrder: number;
+  description?: string;
 }
-/*
-export interface UnitStatus {
-  id: string;
-  title: string;
-  unitOrder: number;
-  isLocked: boolean;
-  isCompleted: boolean;
-}*/
+
 export interface UnitWithLessons {
   id: string;
   title: string;
@@ -65,18 +58,18 @@ export interface UnitWithLessons {
 }
 // --- PROGRESO ---
 export interface UserProgress {
-    totalPoints: number;
-    lastLessonId: number;
+    totalPoints: number;
+    lastLessonId: number;
 }
 
 export interface LessonProgressDTO {
-    id: string; 
-    title: string;
-    lessonOrder: number;
-    requiredXp: number;
-    isCompleted: boolean;
-    masteryLevel: number;
-    lastPracticed: string | null; 
+    id: string; 
+    title: string;
+    lessonOrder: number;
+    requiredXp: number;
+    isCompleted: boolean;
+    masteryLevel: number;
+    lastPracticed: string | null; 
 }
 export interface QuestionDTO {
   id: string;
@@ -93,37 +86,37 @@ export interface QuestionDTO {
 
 
 export interface AnswerSubmissionDTO {
-    questionId: string;
-    userAnswer: string; 
+    questionId: string;
+    userAnswer: string; 
 }
 
 export interface AnswerResultDTO {
-    questionId: string;
-    userAnswer: string;
-    isCorrect: boolean;
+    questionId: string;
+    userAnswer: string;
+    isCorrect: boolean;
 }
 
 export interface UserProfileData {
   userId?: string;
-    fullName: string;
-    username: string;
-    joinedAt: string; 
-    totalXp: number;
-    currentStreak: number;
-    lingots: number;
-    heartsCount: number;
+    fullName: string;
+    username: string;
+    joinedAt: string; 
+    totalXp: number;
+    currentStreak: number;
+    lingots: number;
+    heartsCount: number;
 nextHeartRegenTime: string | null;
-    league: string;
-    avatarData?: string; 
+    league: string;
+    avatarData?: string; 
 }
 // --- TEACHER / ADMIN ---
 export interface StudentData {
-    id: string;
-    fullName: string;
-    email?: string;
-    username?: string;
-    xpTotal: number;
-    currentStreak: number;
+    id: string;
+    fullName: string;
+    email?: string;
+    username?: string;
+    xpTotal: number;
+    currentStreak: number;
 isActive: boolean; 
 }
 
@@ -149,36 +142,36 @@ export interface Lesson {
 }
 
 export interface ClassroomData {
-    id: string;
-    name: string;
-    code: string;
+    id: string;
+    name: string;
+    code: string;
 }
 
 export interface AssignmentData {
-    id: string;
-    title: string;
-    description: string;
-    xpReward: number;
-    dueDate?: string;
+    id: string;
+    title: string;
+    description: string;
+    xpReward: number;
+    dueDate?: string;
 }
 
 export interface LessonData {
-    id: string;
-    title: string;
-    lessonOrder: number;
+    id: string;
+    title: string;
+    lessonOrder: number;
 }
 // Payloads
 export interface NewUnitPayload {
-    courseId: string;
-    title: string;
-    unitOrder: number;
+    courseId: string;
+    title: string;
+    unitOrder: number;
 }
 
 export interface NewLessonPayload {
-    unitId: string;
-    title: string;
-    lessonOrder: number;
-    requiredXp: number;
+    unitId: string;
+    title: string;
+    lessonOrder: number;
+    requiredXp: number;
 }
 
 export interface NewQuestionPayload {
@@ -192,10 +185,10 @@ export interface NewQuestionPayload {
 
 
 export interface LeaderboardEntry {
-    userId: string;
-    fullName: string;
-    xpTotal: number;
-    position: number;
+    userId: string;
+    fullName: string;
+    xpTotal: number;
+    position: number;
 }
 
 // --- TIPOS PARA REGISTRO MASIVO ---
@@ -236,27 +229,24 @@ const TOKEN_KEY = 'jwt-token';
 const ROLE_KEY = 'user-role'; 
 
 export const saveToken = (token: string): void => {
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
 };
 export const getToken = (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY);
 };
 export const removeToken = (): void => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(ROLE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ROLE_KEY);
 };
 
-export const getUserRole = (): string | null => { // <--- Definición Única
-    return localStorage.getItem(ROLE_KEY);
+export const getUserRole = (): string | null => { 
+    return localStorage.getItem(ROLE_KEY);
 };
 
 // ==========================================
-// 3. FUNCIÓN DE FETCH
+// 3. FUNCIÓN DE FETCH (CORREGIDA: AHORA EXPORTADA)
 // ==========================================
-// ==========================================
-// 3. FUNCIÓN DE FETCH (Actualizada para ngrok)
-// ==========================================
-const apiFetch = async (
+export const apiFetch = async ( // ✅ Añadido 'export' aquí
   endpoint: string,
   options: RequestInit = {},
   isAuthenticated: boolean = true
@@ -276,8 +266,6 @@ const apiFetch = async (
   const url = `${BASE_URL}${endpoint}`;
   const response = await fetch(url, { ...options, headers });
 
-  // OPCIONAL: Podrías lanzar el error aquí globalmente, 
-  // pero es mejor manejarlo por función para personalizar mensajes.
   return response;
 };
 
@@ -286,17 +274,14 @@ const apiFetch = async (
 // 4. MÉTODOS EXPORTADOS
 // ==========================================
 
-// En src/api/auth.service.ts
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response = await apiFetch('/auth/login', {
         method: 'POST',
-        // Cambiamos 'username' por 'email' para que Kotlin lo reciba correctamente
         body: JSON.stringify({ email: credentials.username, password: credentials.password }),
     }, false);
     
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        // Lanzamos el mensaje exacto que viene de tu AuthController (ej: "Usuario no registrado")
         throw new Error(errorData.message || "Credenciales inválidas");
     }
 
@@ -311,17 +296,16 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
   const response = await apiFetch('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
-      email: credentials.email,            // DEBE ser 'email'
+      email: credentials.email,
       password: credentials.password,
       fullName: credentials.fullName,
       cedula: credentials.cedula,
-      registrationCode: credentials.registrationCode, // Coincide con @JsonProperty
+      registrationCode: credentials.registrationCode,
       adminCode: credentials.adminCode || null
     }),
   }, false);
 
   if (!response.ok) {
-    // Esto te ayudará a ver el error real del backend en la consola
     const errorData = await response.json().catch(() => ({}));
     console.error("Error del Backend:", errorData);
     throw new Error(errorData.message || "Error 400: Datos inválidos");
@@ -335,61 +319,60 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
 
 
 export const getCourses = async (): Promise<Course[]> => {
-    const response = await apiFetch('/courses', { method: 'GET' }, false);
-    return response.json();
+    const response = await apiFetch('/courses', { method: 'GET' }, false);
+    return response.json();
 };
 
 export const getUserProgress = async (): Promise<UserProgress> => {
-    const response = await apiFetch('/progress/me', { method: 'GET' });
-    return response.json();
+    const response = await apiFetch('/progress/me', { method: 'GET' });
+    return response.json();
 };
 
 export const purchaseItem = async (itemId: number): Promise<void> => {
-    await apiFetch(`/shop/purchase/${itemId}`, { method: 'POST' });
+    await apiFetch(`/shop/purchase/${itemId}`, { method: 'POST' });
 };
 
 // --- UNIDADES Y CAMINO ---
 export const getCourseStatus = async (courseId: string): Promise<UnitWithLessons[]> => {
-  const response = await apiFetch(`/progress/course/${courseId}`, { method: 'GET' });
-  return response.json();
+  const response = await apiFetch(`/progress/course/${courseId}`, { method: 'GET' });
+  return response.json();
 };
 
 
 export const getCourseUnits = async (courseId: string): Promise<UnitData[]> => {
-    const response = await apiFetch(`/courses/${courseId}/units`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/courses/${courseId}/units`, { method: 'GET' });
+    return response.json();
 };
 
 export const getUnitProgress = async (unitId: string): Promise<LessonProgressDTO[]> => {
-    const response = await apiFetch(`/progress/units/${unitId}`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/progress/units/${unitId}`, { method: 'GET' });
+    return response.json();
 };
 
 export const getLessonQuestions = async (lessonId: string): Promise<QuestionDTO[]> => {
-    const response = await apiFetch(`/progress/lessons/${lessonId}/questions`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/progress/lessons/${lessonId}/questions`, { method: 'GET' });
+    return response.json();
 };
 
 export const submitAnswer = async (submission: AnswerSubmissionDTO): Promise<AnswerResultDTO> => {
-    const response = await apiFetch('/progress/submit', {
-        method: 'POST',
-        body: JSON.stringify(submission),
-    });
-    return response.json();
+    const response = await apiFetch('/progress/submit', {
+        method: 'POST',
+        body: JSON.stringify(submission),
+    });
+    return response.json();
 };
 
 export const completeLesson = async (lessonId: string, correctAnswers: number): Promise<any> => {
-    const response = await apiFetch(`/progress/lessons/${lessonId}/complete?correct=${correctAnswers}`, {
-        method: 'POST',
-    });
-    return response.json();
+    const response = await apiFetch(`/progress/lessons/${lessonId}/complete?correct=${correctAnswers}`, {
+        method: 'POST',
+    });
+    return response.json();
 };
 
 export const getUserProfile = async (): Promise<UserProfileData> => {
     const response = await apiFetch('/users/me', { method: 'GET' });
     
     if (!response.ok) {
-        // Si el token es inválido, mejor limpiar y redirigir
         if (response.status === 401) {
             removeToken();
             window.location.href = '/login';
@@ -402,32 +385,32 @@ export const getUserProfile = async (): Promise<UserProfileData> => {
 };
 
 export const updateUserAvatar = async (avatarData: any): Promise<void> => {
-    await apiFetch('/users/me/avatar', {
-        method: 'POST',
-        body: JSON.stringify({ avatarData: JSON.stringify(avatarData) }),
-    });
+    await apiFetch('/users/me/avatar', {
+        method: 'POST',
+        body: JSON.stringify({ avatarData: JSON.stringify(avatarData) }),
+    });
 };
 
 // --- TEACHER (GESTIÓN DE CONTENIDO Y ESTUDIANTES) ---
 
 export const getStudentList = async (): Promise<StudentData[]> => {
-    const response = await apiFetch('/teacher/students', { method: 'GET' });
-    return response.json();
+    const response = await apiFetch('/teacher/students', { method: 'GET' });
+    return response.json();
 };
 
 export const getQuestionsByLesson = async (lessonId: string): Promise<QuestionData[]> => {
-    const response = await apiFetch(`/teacher/content/lessons/${lessonId}/questions`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/teacher/content/lessons/${lessonId}/questions`, { method: 'GET' });
+    return response.json();
 };
 
 export const getLessonsByUnit = async (unitId: string): Promise<LessonData[]> => {
-    const response = await apiFetch(`/progress/units/${unitId}`, { method: 'GET' });
-    const data = await response.json();
-    return data.map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      lessonOrder: item.lessonOrder
-    }));
+    const response = await apiFetch(`/progress/units/${unitId}`, { method: 'GET' });
+    const data = await response.json();
+    return data.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      lessonOrder: item.lessonOrder
+    }));
 };
 export const createUnit = async (
   payload: NewUnitPayload
@@ -468,121 +451,121 @@ export const getAllUnits = async (): Promise<any[]> => {
 
 
 export const createLesson = async (payload: NewLessonPayload): Promise<any> => {
-    const response = await apiFetch('/teacher/content/lessons', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+    const response = await apiFetch('/teacher/content/lessons', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    return response.json();
 };
 
 export const updateLesson = async (id: string, payload: any): Promise<any> => {
-    const response = await apiFetch(`/teacher/content/lessons/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+    const response = await apiFetch(`/teacher/content/lessons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+    });
+    return response.json();
 };
 
 export const deleteLesson = async (id: string): Promise<void> => {
-    await apiFetch(`/teacher/content/lessons/${id}`, {
-        method: 'DELETE',
-    });
+    await apiFetch(`/teacher/content/lessons/${id}`, {
+        method: 'DELETE',
+    });
 };
 
 export const createQuestion = async (payload: NewQuestionPayload): Promise<QuestionData> => {
-    const response = await apiFetch('/teacher/content/questions', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
+    const response = await apiFetch('/teacher/content/questions', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 console.log(payload);
-    return response.json();
+    return response.json();
 };
 
 export const updateQuestion = async (id: string, payload: any): Promise<QuestionData> => {
-    const response = await apiFetch(`/teacher/content/questions/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+    const response = await apiFetch(`/teacher/content/questions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+    });
+    return response.json();
 };
 
 export const deleteQuestion = async (questionId: string): Promise<void> => {
-    await apiFetch(`/teacher/content/questions/${questionId}`, {
-        method: 'DELETE',
-    });
+    await apiFetch(`/teacher/content/questions/${questionId}`, {
+        method: 'DELETE',
+    });
 };
 
 // --- GRUPOS DEL PROFESOR ---
 export const getTeacherClassrooms = async (): Promise<ClassroomData[]> => {
-  const response = await apiFetch('/teacher/classrooms', { method: 'GET' });
-  return response.json();
+  const response = await apiFetch('/teacher/classrooms', { method: 'GET' });
+  return response.json();
 };
 
 export const createClassroom = async (name: string): Promise<ClassroomData> => {
-  const response = await apiFetch('/teacher/classrooms', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  });
-  return response.json();
+  const response = await apiFetch('/teacher/classrooms', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  return response.json();
 };
 
 export const deleteClassroom = async (id: string): Promise<void> => {
-  await apiFetch(`/teacher/classrooms/${id}`, { method: 'DELETE' });
+  await apiFetch(`/teacher/classrooms/${id}`, { method: 'DELETE' });
 };
 
 // --- DETALLES DE GRUPO ---
 export const getClassroomDetails = async (classId: string): Promise<any> => {
-  const response = await apiFetch(`/teacher/classrooms/${classId}`, { method: 'GET' });
-  return response.json();
+  const response = await apiFetch(`/teacher/classrooms/${classId}`, { method: 'GET' });
+  return response.json();
 };
 
 export const addStudentToClassroom = async (classId: string, email: string): Promise<void> => {
-  await apiFetch(`/teacher/classrooms/${classId}/students`, {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
+  await apiFetch(`/teacher/classrooms/${classId}/students`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 };
 
 export const createAssignment = async (classId: string, payload: any): Promise<AssignmentData> => {
-  const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  return response.json();
+  const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.json();
 };
 
 export const getClassroomAssignments = async (classId: string): Promise<AssignmentData[]> => {
-  const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, { method: 'GET' });
-  return response.json();
+  const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, { method: 'GET' });
+  return response.json();
 };
 
 // --- ALUMNO (UNIRSE A GRUPO) ---
 export const joinClassroom = async (code: string): Promise<void> => {
-  await apiFetch('/student/classrooms/join', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  });
+  await apiFetch('/student/classrooms/join', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 };
 
 export const getStudentClassrooms = async (): Promise<any[]> => {
-    const response = await apiFetch('/student/classrooms', { method: 'GET' });
-    return response.json();
+    const response = await apiFetch('/student/classrooms', { method: 'GET' });
+    return response.json();
 };
 
 export const getStudentClassroomDetails = async (classId: string): Promise<any> => {
-    const response = await apiFetch(`/student/classrooms/${classId}`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/student/classrooms/${classId}`, { method: 'GET' });
+    return response.json();
 };
 
 // Obtener ranking del grupo
 export const getClassroomLeaderboard = async (classId: string): Promise<LeaderboardEntry[]> => {
-    const response = await apiFetch(`/student/classrooms/${classId}/leaderboard`, { method: 'GET' });
-    return response.json();
+    const response = await apiFetch(`/student/classrooms/${classId}/leaderboard`, { method: 'GET' });
+    return response.json();
 };
 
 export const getGlobalLeaderboard = async (): Promise<LeaderboardEntry[]> => {
-    const response = await apiFetch('/users/leaderboard/global', { method: 'GET' });
-    return response.json();
+    const response = await apiFetch('/users/leaderboard/global', { method: 'GET' });
+    return response.json();
 };
 
 // Función para comprar ítems en la tienda
@@ -593,7 +576,6 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
   });
 
   if (!response.ok) {
-    // Intentamos extraer el mensaje de error del backend (el que pusimos en Kotlin)
     const errorBody = await response.json().catch(() => ({}));
     const errorMessage = errorBody.error || `Error ${response.status}: No se pudo completar la compra`;
     throw new Error(errorMessage);
@@ -631,21 +613,27 @@ const TeacherAPI = {
   getCourses: () => apiFetch('/courses'),
 };
 export const generateTeacherRegistrationCode = async (): Promise<string> => {
-  const response = await apiFetch('/teacher/generate-code', {
+  // Cambiamos la ruta para que coincida exactamente con @PostMapping("/admin/generate-teacher-code")
+  // Recuerda que apiFetch ya le pone el prefijo /auth si tu controlador tiene @RequestMapping("/api/auth")
+  const response = await apiFetch('/auth/admin/generate-teacher-code', { 
     method: 'POST',
   });
 
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Error al generar código de profesor");
+  }
+
   const data = await response.json();
-  return data.code;
+  return data.code; // Retorna el string "PROF-XXXXXX"
 };
 // --- RECUPERACIÓN DE CONTRASEÑA ---
 
 export const forgotPassword = async (email: string): Promise<any> => {
-    // Nota: Tu controlador mapea a /api/auth/password/forgot
     const response = await apiFetch('/auth/password/forgot', {
         method: 'POST',
         body: JSON.stringify({ email }),
-    }, false); // false porque no requiere estar logueado
+    }, false); 
     return response.json();
 };
 
@@ -687,7 +675,6 @@ export const getQuestionTypes = async (): Promise<QuestionType[]> => {
 export const subtractHeart = async (): Promise<UserProfileData> => {
   const response = await apiFetch('/users/me/subtract-heart', {
     method: 'POST',
-    // No necesitas pasar el ID porque el backend lo saca del Token/Sesión
   });
   if (!response.ok) throw new Error("Error al restar vida");
   return response.json();
@@ -701,4 +688,20 @@ export const getUserChallenges = async (): Promise<UserChallengesDTO> => {
     }
     
     return response.json();
+};
+
+// BUSCA O AGREGA ESTA FUNCIÓN EN TU auth.service.ts
+export const generateClassroomCode = async (): Promise<string> => {
+  // 1. Apuntamos a /teacher/ (Ruta del Profesor), NO a /auth/admin/
+  const response = await apiFetch('/teacher/generate-classroom-code', { 
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo generar el código de aula");
+  }
+
+  const data = await response.json();
+  // Retornará el JSON { "code": "AULA-XXXXXX" }
+  return data.code; 
 };

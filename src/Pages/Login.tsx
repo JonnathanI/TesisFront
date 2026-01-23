@@ -112,32 +112,36 @@ export const Login: React.FC = () => {
   }), []);
 
   // --- LÓGICA DE LOGIN ---
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setError("Por favor, ingresa correo y contraseña.");
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    setSuccess(null);
+// --- LÓGICA DE LOGIN CORREGIDA ---
+const handleLogin = async () => {
+  if (!email || !password) {
+    setError("Por favor, ingresa correo y contraseña.");
+    return;
+  }
+  setIsLoading(true);
+  setError(null);
+  setSuccess(null);
 
-    try {
-      const data: AuthResponse = await login({ username: email, password });
-      setSuccess("¡Inicio de sesión exitoso! Redirigiendo...");
-      
-      setTimeout(() => {
-        if (data.role === "ADMIN" || data.role === "TEACHER") {
-          navigate("/teacher/dashboard");
-        } else {
-          navigate("/student/dashboard");
-        }
-      }, 1500);
-    } catch (err: any) {
-      setError(err.message || "Credenciales inválidas.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    const data: AuthResponse = await login({ username: email, password });
+    setSuccess("¡Inicio de sesión exitoso! Redirigiendo...");
+    
+    setTimeout(() => {
+      // Separamos las rutas según el rol exacto
+      if (data.role === "ADMIN") {
+        navigate("/admin/dashboard"); // Redirige al dashboard de Admin
+      } else if (data.role === "TEACHER") {
+        navigate("/teacher/dashboard"); // Redirige al dashboard de Profesor
+      } else {
+        navigate("/student/dashboard"); // Redirige al dashboard de Estudiante
+      }
+    }, 1500);
+  } catch (err: any) {
+    setError(err.message || "Credenciales inválidas.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // --- LÓGICA DE RECUPERACIÓN REAL ---
   const handleRecoverPassword = async () => {

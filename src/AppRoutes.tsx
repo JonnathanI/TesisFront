@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./Pages/Home";
 import { Login } from "./Pages/Login";
 import Register from "./Pages/Register";
+import ResetPassword from "./Pages/ResetPassword";
 
 // Páginas de estudiantes
 import StudentDashboard from "./Students/StudentDashboard";
@@ -15,14 +16,14 @@ import Lesson from "./Students/Lesson";
 import TeacherDashboard from "./Teachers/TeacherDashboard";
 import StatsChart from "./Teachers/StatsChart";
 import StudentTable from "./Teachers/StudentTable";
-import ResetPassword from "./Pages/ResetPassword";
+
+// --- NUEVA IMPORTACIÓN: Panel de Administrador ---
+import { AdminDashboard } from "./admin/AdminDashboard";
 
 // Layout opcional (header/footer compartido)
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div>
-    {/* Aquí podrías agregar <Header /> */}
     {children}
-    {/* Aquí podrías agregar <Footer /> */}
   </div>
 );
 
@@ -33,6 +34,7 @@ export default function AppRoutes() {
       <Route path="/" element={<Layout><Home /></Layout>} />
       <Route path="/login" element={<Layout><Login /></Layout>} />
       <Route path="/register" element={<Layout><Register /></Layout>} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Rutas de estudiantes */}
       <Route path="/student/dashboard" element={<Layout><StudentDashboard /></Layout>} />
@@ -43,7 +45,11 @@ export default function AppRoutes() {
       <Route path="/teacher/dashboard" element={<Layout><TeacherDashboard /></Layout>} />
       <Route path="/teacher/stats" element={<Layout><StatsChart /></Layout>} />
       <Route path="/teacher/students" element={<Layout><StudentTable /></Layout>} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+
+      {/* --- NUEVA RUTA: Administrador --- */}
+      {/* Asegúrate de que el path sea exactamente el mismo que usas en el navigate del Login */}
+      <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+
       {/* Redirige cualquier ruta desconocida al Home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

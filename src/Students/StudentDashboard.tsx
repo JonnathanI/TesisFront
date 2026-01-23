@@ -44,12 +44,14 @@ const StudentDashboard = () => {
   const [groupTab, setGroupTab] = useState<"TAREAS" | "LIGA">("TAREAS");
 
   // --- CARGA DE DATOS (Manejo robusto) ---
-  const loadData = useCallback(async () => {
+ const loadData = useCallback(async (isSilent = false) => {
     try {
-      setIsLoading(true);
+      // Solo mostramos la pantalla blanca si NO es una actualización silenciosa
+      if (!isSilent) setIsLoading(true);
+      
       setErrorMsg(null);
 
-      // 1. Obtener Perfil (Si falla aquí con 401, el service redirige)
+      // 1. Obtener Perfil
       const profile = await getUserProfile();
       setUserProfile(profile);
       setHeartTimer(profile.nextHeartRegenTime ?? "");
@@ -58,19 +60,19 @@ const StudentDashboard = () => {
       const topUsers = await getGlobalLeaderboard();
       setLeaderboard(topUsers);
 
-      // 3. Cargar Unidades del curso actual
+      // 3. Cargar Unidades
       const courses = await getCourses();
       if (courses && courses.length > 0) {
-        // Usamos el primer curso por defecto
         const unitsData = await getCourseStatus(String(courses[0].id));
         setUnits(unitsData);
       }
 
     } catch (error: any) {
       console.error("Error al sincronizar dashboard:", error);
-      setErrorMsg("No pudimos conectar con el servidor. Verifica tu conexión.");
+      if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
     } finally {
-      setIsLoading(false);
+      // Solo quitamos el loading si lo pusimos nosotros
+      if (!isSilent) setIsLoading(false);
     }
   }, []);
 
@@ -153,6 +155,7 @@ const StudentDashboard = () => {
                 userProfile={userProfile} 
                 heartTimer={heartTimer} 
                 onUpdateProfile={setUserProfile} 
+                onRefreshData={loadData}
               />
             )}
 

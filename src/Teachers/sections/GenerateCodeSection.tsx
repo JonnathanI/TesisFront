@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { generateTeacherRegistrationCode } from "../../api/auth.service";
+// 1. Cambiamos la importación a la función de aula (estudiantes)
+import { generateClassroomCode } from "../../api/auth.service"; 
 
 export const GenerateCodeSection = () => {
   const [code, setCode] = useState<string | null>(null);
@@ -8,8 +9,12 @@ export const GenerateCodeSection = () => {
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const newCode = await generateTeacherRegistrationCode();
+      // 2. Llamamos a la función que apunta a /api/teacher/generate-classroom-code
+      const newCode = await generateClassroomCode(); 
       setCode(newCode);
+    } catch (error) {
+      console.error("Error al generar código de aula:", error);
+      alert("No se pudo generar el código. Inténtalo de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -35,13 +40,13 @@ export const GenerateCodeSection = () => {
           onClick={handleGenerate}
           disabled={loading}
           style={{
-            background: "#1cb0f6",
+            background: loading ? "#ccc" : "#1cb0f6", // Cambio de color si carga
             color: "#fff",
             padding: "14px 22px",
             borderRadius: 14,
             border: "none",
             fontWeight: 800,
-            cursor: "pointer",
+            cursor: loading ? "not-allowed" : "pointer",
           }}
         >
           {loading ? "Generando..." : "Generar código"}
@@ -49,9 +54,14 @@ export const GenerateCodeSection = () => {
 
         {code && (
           <div style={{ marginTop: 20 }}>
-            <p>Código generado</p>
-            <h1 style={{ letterSpacing: "6px", color: "#1cb0f6" }}>{code}</h1>
-            <small>Compártelo con tus estudiantes</small>
+            <p style={{ fontWeight: 600, color: "#777" }}>Código generado</p>
+            {/* El código ahora aparecerá como AULA-XXXXXX */}
+            <h1 style={{ letterSpacing: "4px", color: "#1cb0f6", fontSize: "32px" }}>
+              {code}
+            </h1>
+            <small style={{ color: "#afafaf" }}>
+              Compártelo con tus estudiantes para que se unan a tu clase
+            </small>
           </div>
         )}
       </div>
