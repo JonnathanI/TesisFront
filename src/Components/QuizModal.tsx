@@ -61,24 +61,30 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         setIsSyncing(false);
     };
 
-    const handleNextQuestion = async () => {
-        if (currentIndex < questions.length - 1) {
-            setIsAnswered(false);
-            setSelectedOption(null);
-            setCurrentIndex(prev => prev + 1);
-        } else {
-            setIsSyncing(true);
-            try {
-                await completeLesson(lessonId, questions.length);
-                onClose(true, score, questions.length); 
-            } catch (error) {
-                console.error("Error al finalizar", error);
-                onClose(false, 0, questions.length);
-            } finally {
-                setIsSyncing(false);
-            }
+   const handleNextQuestion = async () => {
+    if (currentIndex < questions.length - 1) {
+        setIsAnswered(false);
+        setSelectedOption(null);
+        setCurrentIndex(prev => prev + 1);
+    } else {
+        setIsSyncing(true);
+        try {
+            // ✅ CÁLCULO DE ERRORES: Total de preguntas menos los aciertos acumulados
+            const totalQuestions = questions.length;
+            const mistakes = totalQuestions - score;
+
+            // ✅ ENVIAMOS LOS 3 PARÁMETROS: ID, Aciertos, Errores
+            await completeLesson(lessonId, score, mistakes);
+            
+            onClose(true, score, totalQuestions); 
+        } catch (error) {
+            console.error("Error al finalizar", error);
+            onClose(false, 0, questions.length);
+        } finally {
+            setIsSyncing(false);
         }
-    };
+    }
+};
 
     if (!isOpen || !currentQuestion) return null;
 

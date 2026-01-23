@@ -70,6 +70,7 @@ export interface LessonProgressDTO {
     isCompleted: boolean;
     masteryLevel: number;
     lastPracticed: string | null; 
+    xpEarned: number;
 }
 export interface QuestionDTO {
   id: string;
@@ -108,6 +109,21 @@ export interface UserProfileData {
 nextHeartRegenTime: string | null;
     league: string;
     avatarData?: string; 
+}
+export interface DetailedStudentProgress {
+  units: {
+    id: string;
+    title: string;
+    lessons: {
+      id: string;
+      title: string;
+      isCompleted: boolean;
+      mistakesCount: number; // Asegúrate que tu backend envíe esto
+      correctAnswers: number;
+      lastPracticed: string | null;
+      xpEarned: number;
+    }[];
+  }[];
 }
 // --- TEACHER / ADMIN ---
 export interface StudentData {
@@ -362,10 +378,19 @@ export const submitAnswer = async (submission: AnswerSubmissionDTO): Promise<Ans
     return response.json();
 };
 
-export const completeLesson = async (lessonId: string, correctAnswers: number): Promise<any> => {
-    const response = await apiFetch(`/progress/lessons/${lessonId}/complete?correct=${correctAnswers}`, {
+// ✅ FUNCIÓN CORREGIDA
+export const completeLesson = async (
+  lessonId: string, 
+  correctAnswers: number, 
+  mistakesCount: number // <--- Agregamos este parámetro
+): Promise<any> => {
+    // Enviamos ambos valores en la Query String
+    const response = await apiFetch(
+      `/progress/lessons/${lessonId}/complete?correct=${correctAnswers}&mistakes=${mistakesCount}`, 
+      {
         method: 'POST',
-    });
+      }
+    );
     return response.json();
 };
 
@@ -704,4 +729,12 @@ export const generateClassroomCode = async (): Promise<string> => {
   const data = await response.json();
   // Retornará el JSON { "code": "AULA-XXXXXX" }
   return data.code; 
+};
+
+export const getStudentDetailProgress = async (studentId: string): Promise<DetailedStudentProgress> => {
+  const response = await apiFetch(`/teacher/students/${studentId}/progress`, { 
+    method: 'GET' 
+  });
+  if (!response.ok) throw new Error("No se pudo cargar el detalle del alumno");
+  return response.json();
 };
