@@ -11,13 +11,15 @@ import ResetPassword from "./Pages/ResetPassword";
 import StudentDashboard from "./Students/StudentDashboard";
 import LevelMap from "./Students/LevelMap";
 import Lesson from "./Students/Lesson";
+// --- NUEVA IMPORTACIÓN: Perfil de Amigo ---
+import { FriendProfile } from "./Students/components/FriendProfile"; 
 
 // Páginas de profesores
 import TeacherDashboard from "./Teachers/TeacherDashboard";
 import StatsChart from "./Teachers/StatsChart";
 import StudentTable from "./Teachers/StudentTable";
 
-// --- NUEVA IMPORTACIÓN: Panel de Administrador ---
+// --- Panel de Administrador ---
 import { AdminDashboard } from "./admin/AdminDashboard";
 
 // Layout opcional (header/footer compartido)
@@ -40,14 +42,17 @@ export default function AppRoutes() {
       <Route path="/student/dashboard" element={<Layout><StudentDashboard /></Layout>} />
       <Route path="/student/level-map" element={<Layout><LevelMap skillTitle="Skill Ejemplo" /></Layout>} />
       <Route path="/student/lesson/:lessonId" element={<Layout><Lesson /></Layout>} />
+      
+      {/* --- NUEVA RUTA: Perfil de Amigo --- */}
+      {/* Esta ruta permite ver las medallas y XP de otros alumnos */}
+      <Route path="/friend-profile/:friendId" element={<Layout><FriendProfile /></Layout>} />
 
       {/* Rutas de profesores */}
       <Route path="/teacher/dashboard" element={<Layout><TeacherDashboard /></Layout>} />
       <Route path="/teacher/stats" element={<Layout><StatsChart /></Layout>} />
       <Route path="/teacher/students" element={<Layout><StudentTable /></Layout>} />
 
-      {/* --- NUEVA RUTA: Administrador --- */}
-      {/* Asegúrate de que el path sea exactamente el mismo que usas en el navigate del Login */}
+      {/* Rutas de Administrador */}
       <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
 
       {/* Redirige cualquier ruta desconocida al Home */}

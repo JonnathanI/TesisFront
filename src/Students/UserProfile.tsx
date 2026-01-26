@@ -115,15 +115,7 @@ export default function UserProfile() {
           </div>
         </div>
 
-        {/* COLUMNA LATERAL */}
-        <div style={{ flex: '1 1 300px', maxWidth: '350px' }}>
-          <div style={{ border: '2px solid #e5e5e5', borderRadius: '1rem', padding: '1.5rem', backgroundColor: 'white' }}>
-            <h3 style={{ marginTop: 0 }}>Amigos</h3>
-            <p style={{ color: '#777', fontSize: '0.9rem' }}>Busca amigos para comparar tu progreso en la liga {profile.league}.</p>
-            <MenuLink icon={<SearchIcon />} text="Buscar amigos" />
-            <MenuLink icon={<EnvelopeIcon />} text="Invitar contactos" />
-          </div>
-        </div>
+      
       </div>
 
       {/* MODAL DEL EDITOR */}

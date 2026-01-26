@@ -111,19 +111,24 @@ nextHeartRegenTime: string | null;
     avatarData?: string; 
 }
 export interface DetailedStudentProgress {
-  units: {
-    id: string;
-    title: string;
-    lessons: {
-      id: string;
-      title: string;
-      isCompleted: boolean;
-      mistakesCount: number; // Asegúrate que tu backend envíe esto
-      correctAnswers: number;
-      lastPracticed: string | null;
-      xpEarned: number;
+    fullName: String;
+    username: string;
+    avatarData: string | null;
+    totalXp: number;
+    currentStreak: number;
+    units: {
+        id: string;
+        title: string;
+        lessons: {
+            id: string;
+            title: string;
+            isCompleted: boolean;
+            mistakesCount: number;
+            correctAnswers: number;
+            lastPracticed: string | null;
+            xpEarned: number;
+        }[];
     }[];
-  }[];
 }
 // --- TEACHER / ADMIN ---
 export interface StudentData {
@@ -237,6 +242,27 @@ export interface UserChallengesDTO {
     perfectLessonsGoal: number;
     challengesCompleted: number;
 }
+
+// --- PROGRESO DETALLADO ACTUALIZADO ---
+export interface DetailedStudentProgress {
+  currentStreak: number; // 🔥 Agregado para solucionar error TS2339
+  xpTotal: number;       // ⚡ Agregado para mostrar en el perfil
+  units: {
+    id: string;
+    title: string;
+    lessons: {
+      id: string;
+      title: string;
+      isCompleted: boolean;
+      mistakesCount: number; 
+      correctAnswers: number;
+      lastPracticed: string | null;
+      xpEarned: number;
+    }[];
+  }[];
+}
+
+
 
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
@@ -607,12 +633,25 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
   }
 };
 
-// --- FUNCIÓN DE EXPORTACIÓN ---
-export const registerBulk = async (data: { students: BulkUserItem[] }): Promise<BulkRegisterResponse> => {
+// --- MODIFICA ESTA INTERFAZ ---
+export interface BulkRegisterRequest {
+    students: BulkUserItem[];      // Coincide con tu lista en Kotlin
+    registrationCode: string;     // Añadido para que TS no dé error
+    roleToAssign: UserRole;       // Añadido para enviar el rol dinámico
+}
+
+// --- MODIFICA ESTA FUNCIÓN ---
+export const registerBulk = async (data: BulkRegisterRequest): Promise<BulkRegisterResponse> => {
     const response = await apiFetch('/auth/register-bulk', {
         method: 'POST',
         body: JSON.stringify(data),
     });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Error en la carga masiva");
+    }
+    
     return response.json();
 };
 
@@ -731,10 +770,51 @@ export const generateClassroomCode = async (): Promise<string> => {
   return data.code; 
 };
 
+// En auth.service.ts
 export const getStudentDetailProgress = async (studentId: string): Promise<DetailedStudentProgress> => {
-  const response = await apiFetch(`/teacher/students/${studentId}/progress`, { 
+  const response = await apiFetch(`/users/friends/${studentId}/progress`, { 
     method: 'GET' 
   });
-  if (!response.ok) throw new Error("No se pudo cargar el detalle del alumno");
+
+  if (!response.ok) throw new Error("Error al cargar");
+  
+  const data = await response.json();
+
+  // Simplemente retornamos la data porque ya viene con el formato correcto desde Kotlin
+  return {
+    ...data,
+    xpTotal: data.totalXp // Aseguramos compatibilidad si usas nombres distintos
+  };
+};
+// Buscar usuarios para agregar
+export const searchUsers = async (query: string): Promise<StudentData[]> => {
+  const response = await apiFetch(`/users/search?query=${query}`, { method: 'GET' });
   return response.json();
+};
+
+// Enviar solicitud de amistad (Follow)
+export const followUser = async (followedId: string): Promise<void> => {
+  await apiFetch(`/users/${followedId}/follow`, { method: 'POST' });
+};
+
+// Obtener lista de amigos aceptados
+export const getFriendsList = async (): Promise<StudentData[]> => {
+  const response = await apiFetch('/users/friends', { method: 'GET' });
+  return response.json();
+};
+
+// Obtener solicitudes pendientes
+export const getPendingRequests = async (): Promise<StudentData[]> => {
+  const response = await apiFetch('/users/friend-requests/pending', { method: 'GET' });
+  return response.json();
+};
+
+// Aceptar solicitud
+export const acceptFriendRequest = async (senderId: string): Promise<void> => {
+  await apiFetch(`/users/friends/accept/${senderId}`, { method: 'POST' });
+};
+
+// Rechazar o eliminar solicitud (Opcional pero recomendado)
+export const rejectFriendRequest = async (senderId: string): Promise<void> => {
+  await apiFetch(`/users/friends/reject/${senderId}`, { method: 'DELETE' });
 };
