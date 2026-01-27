@@ -50,8 +50,8 @@
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
     "@types/react-icons": "^2.2.7",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",

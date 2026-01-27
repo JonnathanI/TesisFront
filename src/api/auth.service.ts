@@ -147,6 +147,7 @@ export interface QuestionData {
   textTarget: string | null;
   options: string[];
   audioUrl?: string;
+  active?: boolean;
   questionType: {
     id: string;
     typeName: string;
@@ -202,6 +203,7 @@ export interface NewQuestionPayload {
   textTarget?: string;
   options: string[];
   audioUrl?: string;
+  active?: boolean;
 }
 
 
