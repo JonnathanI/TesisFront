@@ -21,6 +21,8 @@ import StudentTable from "./Teachers/StudentTable";
 
 // --- Panel de Administrador ---
 import { AdminDashboard } from "./admin/AdminDashboard";
+import { AdminPage } from "./admin/AdminPage";
+import { AdminLayout } from "./admin/AdminLayout";
 
 // Layout opcional (header/footer compartido)
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -52,8 +54,8 @@ export default function AppRoutes() {
       <Route path="/teacher/stats" element={<Layout><StatsChart /></Layout>} />
       <Route path="/teacher/students" element={<Layout><StudentTable /></Layout>} />
 
-      {/* Rutas de Administrador */}
-      <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+    
+      <Route path="/admin/dashboard" element={<AdminLayout />} />
 
       {/* Redirige cualquier ruta desconocida al Home */}
       <Route path="*" element={<Navigate to="/" replace />} />

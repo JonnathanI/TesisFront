@@ -635,7 +635,7 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
 
 // --- MODIFICA ESTA INTERFAZ ---
 export interface BulkRegisterRequest {
-    students: BulkUserItem[];      // Coincide con tu lista en Kotlin
+    users: BulkUserItem[];      // Coincide con tu lista en Kotlin
     registrationCode: string;     // Añadido para que TS no dé error
     roleToAssign: UserRole;       // Añadido para enviar el rol dinámico
 }
