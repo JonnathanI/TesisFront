@@ -264,7 +264,41 @@ export interface DetailedStudentProgress {
   }[];
 }
 
+export interface EvaluationRequest {
+  title: string;
+  description?: string;
+  questions: {
+    textSource: string;
+    textTarget?: string;
+    questionTypeId: string;
+    options: string[];
+  }[];
+}
 
+// Para cuando el estudiante recibe el examen
+export interface EvaluationAssignment {
+  id: string;
+  evaluation: {
+    id: string;
+    title: string;
+    description: string;
+    questions: EvaluationQuestion[];
+  };
+  dueDate: string;
+  completed: boolean;
+  score?: number;
+}
+
+export interface EvaluationQuestion {
+  id: string;
+  textSource: string;
+  textTarget: string;
+  options: string[];
+  questionType: {
+    id: string;
+    typeName: string;
+  };
+}
 
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
@@ -549,10 +583,10 @@ export const deleteQuestion = async (questionId: string): Promise<void> => {
 };
 
 // --- GRUPOS DEL PROFESOR ---
-export const getTeacherClassrooms = async (): Promise<ClassroomData[]> => {
+/*export const getTeacherClassrooms = async (): Promise<ClassroomData[]> => {
   const response = await apiFetch('/teacher/classrooms', { method: 'GET' });
   return response.json();
-};
+};*/
 
 export const createClassroom = async (name: string): Promise<ClassroomData> => {
   const response = await apiFetch('/teacher/classrooms', {
@@ -819,4 +853,79 @@ export const acceptFriendRequest = async (senderId: string): Promise<void> => {
 // Rechazar o eliminar solicitud (Opcional pero recomendado)
 export const rejectFriendRequest = async (senderId: string): Promise<void> => {
   await apiFetch(`/users/friends/reject/${senderId}`, { method: 'DELETE' });
+};
+
+export const createFullEvaluation = async (payload: EvaluationRequest): Promise<any> => {
+  const response = await apiFetch('/teacher/evaluations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("Error al crear la evaluación");
+  return response.json();
+};
+
+export const getAllEvaluations = async (): Promise<any[]> => {
+  const response = await apiFetch('/teacher/evaluations', {
+    method: 'GET'
+  });
+  return response.json();
+};
+
+// Reemplaza las funciones duplicadas al final de tu auth.service.ts con estas:
+
+export const getTeacherEvaluations = async (): Promise<any[]> => {
+  const response = await apiFetch('/teacher/evaluations', { method: 'GET' });
+  if (!response.ok) throw new Error('Error al obtener evaluaciones');
+  return response.json();
+};
+
+export const getTeacherClassrooms = async (): Promise<ClassroomData[]> => {
+  const response = await apiFetch('/teacher/classrooms', { method: 'GET' });
+  if (!response.ok) throw new Error('Error al obtener aulas');
+  return response.json();
+};
+
+export const assignEvaluationToClassroom = async (evaluationId: string, classroomId: string): Promise<string> => {
+  const response = await apiFetch(`/teacher/evaluations/${evaluationId}/assign/${classroomId}`, {
+    method: 'POST'
+  });
+  if (!response.ok) throw new Error('Error en la asignación');
+  return response.text(); 
+};
+
+export const assignEvaluationToStudent = async (evaluationId: string, studentId: string): Promise<string> => {
+    const response = await apiFetch(`/teacher/evaluations/${evaluationId}/assign-student/${studentId}`, {
+        method: 'POST'
+    });
+    if (!response.ok) throw new Error('Error en la asignación individual');
+    return response.text(); 
+};
+
+// Obtener evaluaciones pendientes del alumno
+export const getStudentPendingEvaluations = async (userId: string): Promise<any[]> => {
+    const response = await apiFetch(`/student/evaluations/pending?studentId=${userId}`, { 
+        method: 'GET' 
+    });
+    if (!response.ok) throw new Error("Error al obtener evaluaciones pendientes");
+    return response.json();
+};
+
+// Obtener los detalles de una asignación específica para empezar el examen
+export const getEvaluationAssignment = async (assignmentId: string): Promise<EvaluationAssignment> => {
+    const response = await apiFetch(`/student/evaluations/assign/${assignmentId}`, { 
+        method: 'GET' 
+    });
+    if (!response.ok) throw new Error("No se pudo cargar el examen");
+    return response.json();
+};
+
+// Guardar el resultado final del examen
+export const submitEvaluationResult = async (assignmentId: string, score: number): Promise<any> => {
+    const response = await apiFetch(`/student/evaluations/assign/${assignmentId}/complete`, {
+        method: 'POST',
+        // Cambiamos a enviar el score como objeto JSON
+        body: JSON.stringify({ score })
+    });
+    if (!response.ok) throw new Error("Error al enviar resultados");
+    return response.json();
 };

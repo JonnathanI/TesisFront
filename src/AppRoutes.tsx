@@ -23,6 +23,7 @@ import StudentTable from "./Teachers/StudentTable";
 import { AdminDashboard } from "./admin/AdminDashboard";
 import { AdminPage } from "./admin/AdminPage";
 import { AdminLayout } from "./admin/AdminLayout";
+import { EvaluationPlayer } from "./Students/EvaluationPlayer";
 
 // Layout opcional (header/footer compartido)
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -56,6 +57,7 @@ export default function AppRoutes() {
 
     
       <Route path="/admin/dashboard" element={<AdminLayout />} />
+      <Route path="/evaluation/:id" element={<EvaluationPlayer />} />
 
       {/* Redirige cualquier ruta desconocida al Home */}
       <Route path="*" element={<Navigate to="/" replace />} />

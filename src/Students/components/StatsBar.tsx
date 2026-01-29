@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { UserProfileData } from "../../api/auth.service";
 
 interface Props {
@@ -6,41 +6,80 @@ interface Props {
 }
 
 const StatsBar: React.FC<Props> = ({ profile }) => {
-  const animations = `
-    @keyframes burn { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.1); filter: brightness(1.2); } }
-    @keyframes heartbeat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.2); } 30% { transform: scale(1.1); } }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-    .stat-item { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; color: #4b4b4b; }
+
+  useEffect(() => {
+    console.log("📊 StatsBar actualizado:", profile);
+  }, [profile]);
+
+  const styles = `
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+
+    .stats-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 14px 16px;
+      border-radius: 18px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 800;
+      font-size: 15px;
+      color: #3c3c3c;
+    }
+
+    .stat-icon {
+      font-size: 22px;
+    }
+
+    .animate {
+      animation: pop 0.3s ease-out;
+    }
   `;
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-      <style>{animations}</style>
-      
-      {/* Racha */}
-      <div className="stat-item">
-        <span style={{ animation: "burn 1.5s infinite ease-in-out", fontSize: "20px" }}>🔥</span>
-        <span>{profile.currentStreak || 0}</span>
-      </div>
+    <>
+      <style>{styles}</style>
 
-      {/* XP */}
-      <div className="stat-item">
-        <span style={{ animation: "float 2s infinite ease-in-out", fontSize: "20px" }}>⭐</span>
-        <span style={{ color: "#ffc800" }}>{profile.totalXp || 0}</span>
-      </div>
+      <div className="stats-container">
 
-      {/* Vidas */}
-      <div className="stat-item">
-        <span style={{ animation: "heartbeat 1.2s infinite ease-in-out", fontSize: "20px", display: "inline-block" }}>❤️</span>
-        <span style={{ color: "#ff4b4b" }}>{profile.heartsCount || 0}</span>
-      </div>
+        <div className="stat-item">
+          <span className="stat-icon">🔥</span>
+          <span>{profile.currentStreak ?? 0}</span>
+        </div>
 
-      {/* Gemas */}
-      <div className="stat-item">
-        <span style={{ animation: "float 2.5s infinite ease-in-out", fontSize: "20px" }}>💎</span>
-        <span style={{ color: "#1cb0f6" }}>{profile.lingots || 0}</span>
+        <div className="stat-item">
+          <span className="stat-icon">⭐</span>
+          <span key={profile.totalXp} className="animate" style={{ color: "#ffc800" }}>
+            {profile.totalXp ?? 0}
+          </span>
+        </div>
+
+        <div className="stat-item">
+          <span className="stat-icon">❤️</span>
+          <span key={profile.heartsCount} className="animate" style={{ color: "#ff4b4b" }}>
+            {profile.heartsCount ?? 0}
+          </span>
+        </div>
+
+        <div className="stat-item">
+          <span className="stat-icon">💎</span>
+          <span key={profile.lingots} className="animate" style={{ color: "#1cb0f6" }}>
+            {profile.lingots ?? 0}
+          </span>
+        </div>
+
       </div>
-    </div>
+    </>
   );
 };
 

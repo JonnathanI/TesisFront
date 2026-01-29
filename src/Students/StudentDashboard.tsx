@@ -55,39 +55,46 @@ const StudentDashboard = () => {
   const [viewingGroupId, setViewingGroupId] = useState<string | null>(null);
   const [groupTab, setGroupTab] = useState<"TAREAS" | "LIGA">("TAREAS");
 
-  // --- CARGA DE DATOS ---
-  const loadData = useCallback(async (isSilent = false) => {
+const loadData = useCallback(
+  async (isSilent = false): Promise<UserProfileData> => {
     try {
       if (!isSilent) setIsLoading(true);
       setErrorMsg(null);
 
-      // 1. Obtener Perfil
+      // 1. Perfil
       const profile = await getUserProfile();
       setUserProfile(profile);
       setHeartTimer(profile.nextHeartRegenTime ?? "");
 
-      // 2. Cargar Ranking Global
+      // 2. Ranking
       const topUsers = await getGlobalLeaderboard();
       setLeaderboard(topUsers);
 
-      // 3. Cargar Amigos Aceptados
+      // 3. Amigos
       const friendsData = await getFriendsList();
       setFriends(friendsData);
 
-      // 4. Cargar Unidades
+      // 4. Cursos
       const courses = await getCourses();
-      if (courses && courses.length > 0) {
+      if (courses?.length > 0) {
         const unitsData = await getCourseStatus(String(courses[0].id));
         setUnits(unitsData);
       }
 
-    } catch (error: any) {
+      // 🔥 ESTO ES LO QUE FALTABA
+      return profile;
+
+    } catch (error) {
       console.error("Error al sincronizar dashboard:", error);
       if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
+      throw error;
     } finally {
       if (!isSilent) setIsLoading(false);
     }
-  }, []);
+  },
+  []
+);
+
 
   useEffect(() => {
     loadData();
