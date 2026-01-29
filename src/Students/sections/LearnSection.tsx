@@ -29,11 +29,23 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
 
-  // ESTADOS PARA EL RESUMEN FINAL
   const [showSummary, setShowSummary] = useState(false);
-  const [summaryData, setSummaryData] = useState({ score: 0, total: 0, isUnitDone: false });
+  const [summaryData, setSummaryData] = useState({ 
+    score: 0, 
+    total: 0, 
+    isUnitDone: false,
+    xpEarned: 0,
+    gemsEarned: 0 
+  });
+
+  // PRECISIÓN CALCULADA DINÁMICAMENTE
+  const accuracy = summaryData.total > 0 ? Math.round((summaryData.score / summaryData.total) * 100) : 0;
 
   const handleOpenLesson = async (lessonId: string) => {
+    if (userProfile.heartsCount === 0) {
+      alert("¡No tienes vidas! Espera a que se recarguen.");
+      return;
+    }
     try {
       const q = await getLessonQuestions(lessonId);
       setQuestions(q);
@@ -53,33 +65,35 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     }
 
     try {
-      // 1. Detectar si la unidad ya estaba terminada antes
       const wasUnitAlreadyDone = selectedUnit.lessons.every(l => l.isCompleted);
-
-      // 2. Actualizar estado local
       const updatedLessons = selectedUnit.lessons.map((lesson) =>
         lesson.id === selectedLessonId ? { ...lesson, isCompleted: true } : lesson
       );
 
-      // 3. Detectar si se completa la unidad justo ahora
       const isUnitDoneNow = updatedLessons.every(l => l.isCompleted);
       const shouldShowUnitSummary = isUnitDoneNow && !wasUnitAlreadyDone;
 
+      const xp = score * 15; 
+      const gems = shouldShowUnitSummary ? 100 : 20; 
+
       setSummaryData({ 
-        score, 
-        total, 
-        isUnitDone: shouldShowUnitSummary 
+        score, total, isUnitDone: shouldShowUnitSummary, xpEarned: xp, gemsEarned: gems
       });
+
+      // ACTUALIZAR PERFIL (Solución error TS de tus imágenes)
+      const currentXP = (userProfile as any).xp || 0;
+      const currentGems = (userProfile as any).gems || 0;
+
+      onUpdateProfile({
+        ...userProfile,
+        xp: currentXP + xp,
+        gems: currentGems + gems
+      } as any);
 
       setShowSummary(true);
 
-      if (shouldShowUnitSummary) {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#58CC02', '#1CB0F6', '#FFC800']
-        });
+      if (score === total) {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
       }
 
       setSelectedUnit({ ...selectedUnit, lessons: updatedLessons });
@@ -92,13 +106,11 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     }
   };
 
-  // --- VISTA 1: LISTA DE UNIDADES CON BARRA DE PROGRESO ---
   if (!selectedUnit) {
     return (
       <div style={{ width: "100%", maxWidth: "650px", padding: "20px", margin: "0 auto" }}>
         {[...units].sort((a, b) => a.unitOrder - b.unitOrder).map((unit, index, arr) => {
           const isLocked = index === 0 ? false : !arr[index - 1].lessons.every(l => l.isCompleted);
-          
           const completedCount = unit.lessons?.filter(l => l.isCompleted).length || 0;
           const totalCount = unit.lessons?.length || 1;
           const progressPercentage = (completedCount / totalCount) * 100;
@@ -123,8 +135,6 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
                 <h3 style={{ margin: "0 0 20px 0", color: "#3C3C3C", fontWeight: 800, fontSize: "22px" }}>
                   {isLocked ? "🔒 " : ""}{unit.title}
                 </h3>
-
-                {/* BARRA DE PROGRESO LIMPIA */}
                 <div style={{ width: "100%", height: "16px", backgroundColor: "#E5E5E5", borderRadius: "12px", overflow: "hidden" }}>
                   <motion.div 
                     initial={{ width: 0 }}
@@ -144,14 +154,15 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     );
   }
 
-  // --- VISTA 2: RUTA DE LECCIONES (ZIG-ZAG) ---
   return (
     <div style={{ width: "100%", minHeight: "100vh" }}>
+      {/* HEADER STICKY */}
       <div style={{ position: "sticky", top: 0, zIndex: 100, backgroundColor: "#1CB0F6", padding: "15px 20px", color: "white", display: "flex", alignItems: "center", gap: "15px" }}>
           <button onClick={() => setSelectedUnit(null)} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", cursor: "pointer", fontWeight: "bold", padding: "8px 15px", borderRadius: "12px" }}>← VOLVER</button>
           <h2 style={{ margin: 0, fontSize: "20px" }}>{selectedUnit.title}</h2>
       </div>
 
+      {/* RUTA DE LECCIONES */}
       <div style={{ padding: "60px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "60px" }}>
         {selectedUnit.lessons.map((lesson, idx) => {
           const isLocked = idx === 0 ? false : !selectedUnit.lessons[idx - 1].isCompleted;
@@ -182,48 +193,48 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
 
       {isQuizOpen && selectedLessonId && (
         <QuizModal 
-          isOpen={isQuizOpen} questions={questions} lessonId={selectedLessonId} 
-          userProfile={userProfile} heartTimer={heartTimer} 
-          onUpdateProfile={onUpdateProfile} 
-          onClose={(completed: boolean, score: number, total: number) => handleCloseQuiz(completed, score, total)} 
+          isOpen={isQuizOpen} questions={questions} 
+          userProfile={userProfile} onUpdateProfile={onUpdateProfile} 
+          onClose={handleCloseQuiz} 
         />
       )}
 
-      {/* --- MODAL DE RESUMEN --- */}
+      {/* MODAL DE RESUMEN CON PRECISIÓN REAL */}
       <AnimatePresence>
         {showSummary && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={overlayStyle}>
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} style={summaryCardStyle}>
-              <h1 style={{ color: "#58CC02", fontSize: "28px", fontWeight: 900 }}>
-                {summaryData.isUnitDone ? "¡UNIDAD SUPERADA! 🏆" : "¡LECCIÓN COMPLETADA! ✨"}
+            <motion.div 
+              initial={{ scale: 0.5, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              style={summaryCardStyle}
+            >
+              <h1 style={{ color: "#3C3C3C", fontSize: "28px", fontWeight: 900, marginBottom: "10px" }}>
+                {summaryData.isUnitDone ? "¡UNIDAD COMPLETADA! 🏆" : "¡LECCIÓN TERMINADA! ✨"}
               </h1>
               
-              <div style={{ display: "flex", gap: "15px", margin: "25px 0" }}>
-                <div style={{ background: "#FFC800", padding: "15px", borderRadius: "18px", flex: 1, color: "white" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>ACIERTOS</div>
-                  <div style={{ fontSize: "22px", fontWeight: 900 }}>{summaryData.score}</div>
+              <div style={{ display: "flex", justifyContent: "center", gap: "20px", margin: "30px 0" }}>
+                <div style={{ ...badgeBase, background: "#FFD700" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>PUNTOS XP</div>
+                  <div style={{ fontSize: "32px", fontWeight: 900 }}>+{summaryData.xpEarned}</div>
                 </div>
-                <div style={{ background: "#1CB0F6", padding: "15px", borderRadius: "18px", flex: 1, color: "white" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>TOTAL</div>
-                  <div style={{ fontSize: "22px", fontWeight: 900 }}>{summaryData.total}</div>
+                <div style={{ ...badgeBase, background: "#1CB0F6" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "bold" }}>GEMAS</div>
+                  <div style={{ fontSize: "32px", fontWeight: 900 }}>+{summaryData.gemsEarned}</div>
                 </div>
               </div>
 
-              {/* LISTA DE LECCIONES SOLO EN FIN DE UNIDAD */}
-              {summaryData.isUnitDone && (
-                <div style={{ background: "#F7F7F7", padding: "15px", borderRadius: "15px", marginBottom: "20px", textAlign: "left", border: "1px solid #EEE" }}>
-                  <h4 style={{ margin: "0 0 10px 0", color: "#4B4B4B" }}>Resumen:</h4>
-                  {selectedUnit?.lessons.map((l, i) => (
-                    <div key={i} style={{ fontSize: "13px", color: "#666", display: "flex", justifyContent: "space-between" }}>
-                      <span>Lección {i+1}</span> <span style={{ color: "#58CC02" }}>✓</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* AQUÍ SE MUESTRA LA PRECISIÓN REAL CORREGIDA */}
+              <div style={{ marginBottom: "30px", fontSize: "20px", fontWeight: "800", color: "#4B4B4B" }}>
+                Precisión: <span style={{ color: "#58CC02" }}>{accuracy}%</span> ({summaryData.score}/{summaryData.total})
+              </div>
 
-              <button onClick={() => setShowSummary(false)} style={continueBtnStyle}>
+              <motion.button 
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowSummary(false)} 
+                style={continueBtnStyle}
+              >
                 CONTINUAR
-              </button>
+              </motion.button>
             </motion.div>
           </motion.div>
         )}
@@ -232,6 +243,8 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   );
 };
 
-const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, backgroundColor: "rgba(255,255,255,0.95)", zIndex: 6000, display: "flex", justifyContent: "center", alignItems: "center" };
-const summaryCardStyle: React.CSSProperties = { textAlign: "center", maxWidth: "400px", width: "90%", padding: "30px", border: "2px solid #E5E5E5", borderRadius: "24px", background: "white" };
-const continueBtnStyle: React.CSSProperties = { width: "100%", background: "#58CC02", color: "white", border: "none", padding: "15px", borderRadius: "16px", fontSize: "18px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 5px 0 #46A302" };
+// --- ESTILOS ---
+const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, backgroundColor: "rgba(255,255,255,0.98)", zIndex: 6000, display: "flex", justifyContent: "center", alignItems: "center" };
+const summaryCardStyle: React.CSSProperties = { textAlign: "center", maxWidth: "450px", width: "92%", padding: "50px 30px", border: "2px solid #E5E5E5", borderRadius: "35px", background: "white", boxShadow: "0 20px 40px rgba(0,0,0,0.12)" };
+const badgeBase: React.CSSProperties = { flex: 1, padding: "20px 10px", borderRadius: "25px", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
+const continueBtnStyle: React.CSSProperties = { width: "100%", background: "#58CC02", color: "white", border: "none", padding: "20px", borderRadius: "20px", fontSize: "20px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 6px 0 #46A302" };
