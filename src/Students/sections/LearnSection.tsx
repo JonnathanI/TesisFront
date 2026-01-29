@@ -248,7 +248,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         {showSummary && (
           <motion.div style={overlayStyle}>
             <motion.div style={summaryCardStyle}>
-              <h1>¡Buen trabajo!</h1>
+              <h1>Resumen de Leccion</h1>
               <p>✅ {summaryData.score} / {summaryData.total}</p>
             </motion.div>
           </motion.div>
