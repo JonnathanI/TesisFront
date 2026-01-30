@@ -10,10 +10,24 @@ import {
   QuestionData,
   QuestionType,
 } from "../../api/auth.service";
-import { FiEdit2, FiTrash2, FiPlus, FiEye, FiEyeOff, FiCheck, FiX } from "react-icons/fi";
 
-interface Unit { id: string; title: string; }
-interface Lesson { id: string; title: string; }
+import {
+  FiEdit2,
+  FiTrash2,
+  FiPlus,
+  FiX,
+  FiUploadCloud,
+} from "react-icons/fi";
+
+interface Unit {
+  id: string;
+  title: string;
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+}
 
 export function QuestionsSection() {
   const [units, setUnits] = useState<Unit[]>([]);
@@ -24,6 +38,7 @@ export function QuestionsSection() {
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState("");
 
+  // Estados del Formulario
   const [editingId, setEditingId] = useState<string | null>(null);
   const [textSource, setTextSource] = useState("");
   const [textTarget, setTextTarget] = useState("");
@@ -31,18 +46,30 @@ export function QuestionsSection() {
   const [questionTypeId, setQuestionTypeId] = useState("");
   const [isActive, setIsActive] = useState(true);
 
+  // Estados de Archivos
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null]);
+
+  /* ===================== LOADERS ===================== */
+
   useEffect(() => {
     getAllUnits().then(setUnits);
     getQuestionTypes().then(setQuestionTypes);
   }, []);
 
   useEffect(() => {
-    if (!selectedUnitId) return;
+    if (!selectedUnitId) {
+      setLessons([]);
+      return;
+    }
     getLessonsByUnit(selectedUnitId).then(setLessons);
   }, [selectedUnitId]);
 
   useEffect(() => {
-    if (!selectedLessonId) return;
+    if (!selectedLessonId) {
+      setQuestions([]);
+      return;
+    }
     loadQuestions();
   }, [selectedLessonId]);
 
@@ -51,179 +78,286 @@ export function QuestionsSection() {
     setQuestions(data);
   };
 
+  /* ===================== HELPERS CORREGIDOS ===================== */
+
   const resetForm = () => {
     setEditingId(null);
     setTextSource("");
     setTextTarget("");
     setOptions(["", ""]);
+    setImageFiles([null, null]);
+    setAudioFile(null);
     setQuestionTypeId("");
     setIsActive(true);
+    const inputs = document.querySelectorAll('input[type="file"]');
+    inputs.forEach((i: any) => (i.value = ""));
   };
 
-  const selectedType = questionTypes.find(t => t.id === questionTypeId);
+  const selectedType = questionTypes.find((t) => t.id === questionTypeId);
+  // Normalizamos a mayúsculas para evitar errores de comparación
+  const typeName = (selectedType?.typeName || "").toUpperCase();
+
+  // LISTENING ahora está incluido en ambas condiciones
   const usesOptions = [
-    "IMAGE_SELECT", "LISTENING", "ORDERING", "MATCHING",
-    "TRANSLATION_TO_TARGET", "TRANSLATION_TO_SOURCE",
-  ].includes(selectedType?.typeName || "");
+    "IMAGE_SELECT",
+    "TRANSLATION_TO_TARGET",
+    "TRANSLATION_TO_SOURCE",
+    "MATCHING",
+    "MULTIPLE_CHOICE",
+    "LISTENING",
+    "AUDIO_SELECT"
+  ].includes(typeName);
+
+  const usesAudio = ["LISTENING", "AUDIO_SELECT"].includes(typeName);
+
+  /* ===================== SAVE (API CALL) ===================== */
 
   const handleSave = async () => {
     if (!selectedLessonId || !questionTypeId) {
-      alert("Selecciona lección y tipo de pregunta");
+      alert("Por favor selecciona lección y tipo de pregunta");
       return;
     }
 
-    const payload = {
-      lessonId: selectedLessonId,
-      questionTypeId,
-      textSource,
-      textTarget,
-      options: usesOptions ? options.filter(o => o.trim() !== "") : [],
-      active: isActive,
-    };
+    const formData = new FormData();
+    formData.append("lessonId", selectedLessonId);
+    formData.append("questionTypeId", questionTypeId);
+    formData.append("textSource", textSource);
+    formData.append("textTarget", textTarget);
+    formData.append("active", String(isActive));
+
+    if (usesOptions) {
+      options.forEach((opt) => formData.append("options", opt));
+    }
+
+    if (typeName === "IMAGE_SELECT") {
+      imageFiles.forEach((file) => {
+        if (file) {
+          formData.append("imageFiles", file);
+        } else {
+          formData.append("imageFiles", new Blob(), "placeholder.txt");
+        }
+      });
+    }
+
+    if (usesAudio && audioFile) {
+      formData.append("audioFile", audioFile);
+    }
 
     try {
       if (editingId) {
-        await updateQuestion(editingId, payload);
+        await updateQuestion(editingId, formData);
       } else {
-        await createQuestion(payload);
+        await createQuestion(formData);
       }
+      alert("¡Guardado con éxito!");
       resetForm();
       loadQuestions();
-    } catch (error: any) {
-      alert("Error al guardar la pregunta");
+    } catch (err) {
+      console.error(err);
+      alert("Error al procesar la solicitud.");
     }
   };
 
-  // --- LÓGICA DE TOGGLE REVISADA ---
-  const toggleQuestionStatus = async (q: QuestionData) => {
-    // 1. Calculamos el nuevo estado
-    const newActiveStatus = !q.active;
-    
-    // 2. Log para depuración (mira la consola del navegador F12)
-    console.log("Cambiando estado de la pregunta:", q.id, "a:", newActiveStatus);
+  /* ===================== ACTIONS ===================== */
 
-    try {
-      // 3. Enviamos el objeto con la estructura exacta que espera Prisma/Backend
-      const response = await updateQuestion(q.id, {
-        textSource: q.textSource,
-        textTarget: q.textTarget,
-        questionTypeId: q.questionType.id, // ID del tipo de pregunta
-        lessonId: selectedLessonId,        // ID de la lección actual
-        active: newActiveStatus,           // El cambio real
-        options: q.options || []
-      });
-
-      console.log("Respuesta del servidor:", response);
-
-      // 4. ACTUALIZACIÓN MANUAL DEL ESTADO LOCAL
-      // Esto fuerza a React a pintar el ojo nuevo sin esperar a recargar todo
-      setQuestions(prevQuestions => 
-        prevQuestions.map(item => 
-          item.id === q.id ? { ...item, active: newActiveStatus } : item
-        )
-      );
-
-    } catch (error: any) {
-      console.error("Error detallado al cambiar estado:", error.response?.data || error.message);
-      alert("Error en el servidor: " + (error.response?.data?.message || "No se pudo actualizar"));
-    }
-  };
-
-  const handleEdit = (q: QuestionData) => {
+  const handleEdit = (q: any) => {
     setEditingId(q.id);
     setTextSource(q.textSource);
     setTextTarget(q.textTarget || "");
-    setOptions(q.options?.length ? q.options : ["", ""]);
     setQuestionTypeId(q.questionType.id);
-    setIsActive(q.active ?? true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsActive(q.active);
+    
+    if (q.options && q.options.length > 0) {
+        const parsed = q.options.map((opt: string) => {
+            try { return JSON.parse(opt).value || opt; } 
+            catch { return opt; }
+        });
+        setOptions(parsed);
+        setImageFiles(new Array(parsed.length).fill(null));
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Casting de iconos para evitar TS2786
+  const handleDelete = async (id: string) => {
+    if (window.confirm("¿Estás seguro de eliminar esta pregunta?")) {
+      await deleteQuestion(id);
+      loadQuestions();
+    }
+  };
+
   const IconEdit = FiEdit2 as any;
-  const IconPlus = FiPlus as any;
   const IconTrash = FiTrash2 as any;
-  const IconEye = FiEye as any;
-  const IconEyeOff = FiEyeOff as any;
-  const IconCheck = FiCheck as any;
+  const IconPlus = FiPlus as any;
   const IconX = FiX as any;
+  const IconUpload = FiUploadCloud as any;
 
   return (
-    <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "20px" }}>
-      <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "20px" }}>❓ Gestión de Preguntas</h2>
+    <div style={{ maxWidth: 900, margin: "40px auto", fontFamily: "system-ui, sans-serif" }}>
+      <h2 style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800 }}>
+        <IconPlus /> Gestión de Contenido Académico
+      </h2>
 
-      <div style={{ display: "flex", gap: "15px", marginBottom: "30px" }}>
-        <select value={selectedUnitId} onChange={e => { setSelectedUnitId(e.target.value); setSelectedLessonId(""); }} style={{ padding: "12px", borderRadius: "12px", border: "2px solid #eee", flex: 1 }}>
-          <option value="">Seleccionar Unidad</option>
-          {units.map(u => <option key={u.id} value={u.id}>{u.title}</option>)}
-        </select>
-        <select value={selectedLessonId} onChange={e => setSelectedLessonId(e.target.value)} disabled={!selectedUnitId} style={{ padding: "12px", borderRadius: "12px", border: "2px solid #eee", flex: 1 }}>
-          <option value="">Seleccionar Lección</option>
-          {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-        </select>
+      {/* SELECTORES */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 30 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <label style={{ fontWeight: "bold", fontSize: 14 }}>Unidad</label>
+          <select 
+            style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
+            value={selectedUnitId} 
+            onChange={(e) => setSelectedUnitId(e.target.value)}
+          >
+            <option value="">Selecciona Unidad</option>
+            {units.map((u) => <option key={u.id} value={u.id}>{u.title}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <label style={{ fontWeight: "bold", fontSize: 14 }}>Lección</label>
+          <select 
+            style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
+            value={selectedLessonId} 
+            onChange={(e) => setSelectedLessonId(e.target.value)}
+            disabled={!selectedUnitId}
+          >
+            <option value="">Selecciona Lección</option>
+            {lessons.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
+          </select>
+        </div>
       </div>
 
+      {/* FORMULARIO */}
       {selectedLessonId && (
-        <div style={{ background: "#fff", padding: "30px", borderRadius: "24px", boxShadow: "0 10px 25px rgba(0,0,0,0.05)", marginBottom: "40px", border: "1px solid #f0f0f0" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-            <h3 style={{ fontSize: "18px", fontWeight: 800, display: "flex", alignItems: "center", gap: "10px" }}>
-              {editingId ? <IconEdit /> : <IconPlus />}
-              {editingId ? "Editar Pregunta" : "Nueva Pregunta Inteligente"}
-            </h3>
-            <button 
-              onClick={() => setIsActive(!isActive)}
-              style={{ padding: "8px 16px", borderRadius: "10px", border: "none", fontWeight: "bold", cursor: "pointer", background: isActive ? "#e8f5e9" : "#ffebee", color: isActive ? "#2e7d32" : "#c62828", display: "flex", alignItems: "center", gap: "8px" }}
+        <div style={{ background: "#fff", padding: 30, borderRadius: 20, border: "2px solid #e5e5e5", marginBottom: 40 }}>
+          <h3 style={{ marginTop: 0 }}>{editingId ? "Editando Pregunta" : "Nueva Pregunta"}</h3>
+          
+          <div style={{ display: "grid", gap: 15 }}>
+            <input
+              placeholder="Pregunta o Texto fuente"
+              style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
+              value={textSource}
+              onChange={(e) => setTextSource(e.target.value)}
+            />
+
+            <input
+              placeholder="Traducción o Respuesta correcta"
+              style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
+              value={textTarget}
+              onChange={(e) => setTextTarget(e.target.value)}
+            />
+
+            <select
+              style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
+              value={questionTypeId}
+              onChange={(e) => setQuestionTypeId(e.target.value)}
             >
-              {isActive ? <><IconCheck /> Visible para Alumnos</> : <><IconX /> Oculto / Borrador</>}
+              <option value="">-- Tipo de Dinámica --</option>
+              {questionTypes.map((t) => <option key={t.id} value={t.id}>{t.typeName}</option>)}
+            </select>
+
+            {/* SECCIÓN DE AUDIO */}
+            {usesAudio && (
+              <div style={{ padding: 15, background: "#f0f7ff", borderRadius: 12, border: "1px dashed #2b70c9" }}>
+                <label style={{ display: "block", marginBottom: 8, fontWeight: "bold", color: "#2b70c9" }}>
+                   <IconUpload /> Subir Audio para Listening
+                </label>
+                <input type="file" accept="audio/*" onChange={(e) => e.target.files && setAudioFile(e.target.files[0])} />
+                {audioFile && <p style={{fontSize: 12, marginTop: 5}}>Archivo: {audioFile.name}</p>}
+              </div>
+            )}
+
+            {/* SECCIÓN DE OPCIONES (VISIBLE PARA LISTENING) */}
+            {usesOptions && (
+              <div style={{ marginTop: 10, background: "#f9f9f9", padding: 20, borderRadius: 15 }}>
+                <label style={{ fontWeight: "bold", display: "block", marginBottom: 10 }}>Opciones de respuesta:</label>
+                {options.map((opt, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
+                    <input
+                      placeholder={`Opción ${i + 1}`}
+                      style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
+                      value={opt}
+                      onChange={(e) => {
+                        const newOpts = [...options];
+                        newOpts[i] = e.target.value;
+                        setOptions(newOpts);
+                      }}
+                    />
+
+                    {typeName === "IMAGE_SELECT" && (
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => {
+                          if (!e.target.files?.[0]) return;
+                          const newFiles = [...imageFiles];
+                          newFiles[i] = e.target.files[0];
+                          setImageFiles(newFiles);
+                        }}
+                      />
+                    )}
+
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setOptions(options.filter((_, idx) => idx !== i));
+                        setImageFiles(imageFiles.filter((_, idx) => idx !== i));
+                      }}
+                      style={{ background: "none", border: "none", color: "#ff4b4b", cursor: "pointer" }}
+                    >
+                      <IconX />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  type="button"
+                  style={{ background: "#fff", border: "2px solid #e5e5e5", padding: "8px 15px", borderRadius: 10, cursor: "pointer", fontWeight: "bold" }}
+                  onClick={() => {
+                    setOptions([...options, ""]);
+                    setImageFiles([...imageFiles, null]);
+                  }}
+                >
+                  + Añadir Opción
+                </button>
+              </div>
+            )}
+
+            <button 
+              style={{ 
+                background: "#58cc02", color: "#fff", padding: 15, borderRadius: 15, 
+                border: "none", fontWeight: "bold", fontSize: 16, cursor: "pointer",
+                boxShadow: "0 4px 0 #46a302"
+              }}
+              onClick={handleSave}
+            >
+              {editingId ? "ACTUALIZAR PREGUNTA" : "GUARDAR PREGUNTA"}
             </button>
-          </div>
-
-          <input placeholder="Texto Fuente" value={textSource} onChange={e => setTextSource(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "10px", marginBottom: "10px", border: "1px solid #eee" }} />
-          <input placeholder="Traducción" value={textTarget} onChange={e => setTextTarget(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "10px", marginBottom: "15px", border: "1px solid #eee" }} />
-
-          <select value={questionTypeId} onChange={e => setQuestionTypeId(e.target.value)} style={{ width: "100%", padding: "12px", borderRadius: "10px", marginBottom: "20px", border: "1px solid #eee" }}>
-            <option value="">Tipo de pregunta</option>
-            {questionTypes.map(t => <option key={t.id} value={t.id}>{t.typeName}</option>)}
-          </select>
-
-          {usesOptions && (
-            <div style={{ marginBottom: "20px", padding: "15px", background: "#f8f9fa", borderRadius: "15px" }}>
-              <button onClick={() => setOptions([...options, ""])} style={{ float: "right", fontSize: "12px", color: "#1cb0f6", border: "none", background: "none", cursor: "pointer" }}>+ Añadir opción</button>
-              <p style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "10px" }}>Opciones:</p>
-              {options.map((opt, i) => (
-                <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "5px" }}>
-                  <input value={opt} onChange={e => { const c = [...options]; c[i] = e.target.value; setOptions(c); }} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid #ddd" }} />
-                  <button onClick={() => setOptions(options.filter((_, idx) => idx !== i))} style={{ border: "none", background: "none", color: "#ff4d4f" }}>✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={handleSave} style={{ flex: 1, padding: "15px", background: "#1cb0f6", color: "#fff", border: "none", borderRadius: "12px", fontWeight: "bold", cursor: "pointer" }}>Guardar</button>
-            {editingId && <button onClick={resetForm} style={{ padding: "15px", background: "#eee", border: "none", borderRadius: "12px", cursor: "pointer" }}>Cancelar</button>}
+            {editingId && <button onClick={resetForm} style={{ background: "none", border: "none", color: "#afafaf", cursor: "pointer" }}>Cancelar edición</button>}
           </div>
         </div>
       )}
 
-      <div style={{ display: "grid", gap: "10px" }}>
-        {questions.map(q => (
-          <div key={q.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#fff", borderRadius: "18px", border: "1px solid #f0f0f0", opacity: q.active ? 1 : 0.6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-              <button 
-                onClick={() => toggleQuestionStatus(q)} 
-                style={{ border: "none", background: "none", fontSize: "20px", cursor: "pointer", display: "flex", alignItems: "center" }}
-              >
-                {q.active ? <IconEye style={{ color: "#1cb0f6" }} /> : <IconEyeOff style={{ color: "#aaa" }} />}
-              </button>
-              <div>
-                <div style={{ fontWeight: "bold", color: q.active ? "#333" : "#aaa" }}>{q.textSource}</div>
-                <div style={{ fontSize: "11px", color: "#1cb0f6", fontWeight: "bold" }}>{q.questionType.typeName}</div>
-              </div>
+      {/* LISTADO DE PREGUNTAS */}
+      <div style={{ display: "grid", gap: 15 }}>
+        {questions.length === 0 && selectedLessonId && <p style={{ textAlign: "center", color: "#afafaf" }}>No hay preguntas en esta lección.</p>}
+        {questions.map((q) => (
+          <div key={q.id} style={{ 
+            display: "flex", justifyContent: "space-between", alignItems: "center", 
+            padding: 20, borderRadius: 15, border: "2px solid #e5e5e5",
+            background: q.active ? "#fff" : "#f5f5f5"
+          }}>
+            <div>
+              <span style={{ fontSize: 11, background: "#e5e5e5", padding: "2px 8px", borderRadius: 5, fontWeight: "bold", marginRight: 10 }}>
+                {q.questionType.typeName.toUpperCase()}
+              </span>
+              <h4 style={{ margin: "5px 0" }}>{q.textSource}</h4>
+              <p style={{ margin: 0, fontSize: 14, color: "#777" }}>Respuesta: {q.textTarget}</p>
             </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => handleEdit(q)} style={{ padding: "10px", borderRadius: "10px", border: "none", background: "#e3f2fd", color: "#2196f3", cursor: "pointer" }}><IconEdit /></button>
-              <button onClick={() => { if(window.confirm("¿Eliminar?")) deleteQuestion(q.id).then(loadQuestions); }} style={{ padding: "10px", borderRadius: "10px", border: "none", background: "#ffebee", color: "#f44336", cursor: "pointer" }}><IconTrash /></button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => handleEdit(q)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}>
+                <IconEdit />
+              </button>
+              <button onClick={() => handleDelete(q.id)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd", background: "#fff", cursor: "pointer", color: "#ff4b4b" }}>
+                <IconTrash />
+              </button>
             </div>
           </div>
         ))}

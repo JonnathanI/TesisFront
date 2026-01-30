@@ -80,7 +80,7 @@ export interface QuestionDTO {
     id: string;
     typeName: string;
   };
-  options: string[];
+  options: any[];
   audioUrl?: string;
   feedback?: string;
 }
@@ -324,7 +324,7 @@ export const getUserRole = (): string | null => {
 // ==========================================
 // 3. FUNCIÓN DE FETCH (CORREGIDA: AHORA EXPORTADA)
 // ==========================================
-export const apiFetch = async ( // ✅ Añadido 'export' aquí
+export const apiFetch = async (
   endpoint: string,
   options: RequestInit = {},
   isAuthenticated: boolean = true
@@ -337,7 +337,8 @@ export const apiFetch = async ( // ✅ Añadido 'export' aquí
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
 
-  if (options.method === 'POST' || options.method === 'PUT') {
+  // 🚨 CORRECCIÓN: Solo poner JSON si NO es FormData
+  if ((options.method === 'POST' || options.method === 'PUT') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -559,12 +560,11 @@ export const deleteLesson = async (id: string): Promise<void> => {
     });
 };
 
-export const createQuestion = async (payload: NewQuestionPayload): Promise<QuestionData> => {
+export const createQuestion = async (formData: FormData): Promise<QuestionData> => {
     const response = await apiFetch('/teacher/content/questions', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: formData, // Enviamos el FormData directamente
     });
-console.log(payload);
     return response.json();
 };
 
