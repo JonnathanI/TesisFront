@@ -78,7 +78,7 @@ export function QuestionsSection() {
     setQuestions(data);
   };
 
-  /* ===================== HELPERS CORREGIDOS ===================== */
+  /* ===================== HELPERS ===================== */
 
   const resetForm = () => {
     setEditingId(null);
@@ -94,10 +94,8 @@ export function QuestionsSection() {
   };
 
   const selectedType = questionTypes.find((t) => t.id === questionTypeId);
-  // Normalizamos a mayúsculas para evitar errores de comparación
   const typeName = (selectedType?.typeName || "").toUpperCase();
 
-  // LISTENING ahora está incluido en ambas condiciones
   const usesOptions = [
     "IMAGE_SELECT",
     "TRANSLATION_TO_TARGET",
@@ -105,10 +103,12 @@ export function QuestionsSection() {
     "MATCHING",
     "MULTIPLE_CHOICE",
     "LISTENING",
-    "AUDIO_SELECT"
+    "AUDIO_SELECT",
+    "ORDERING"
   ].includes(typeName);
 
-  const usesAudio = ["LISTENING", "AUDIO_SELECT"].includes(typeName);
+  // CONFIGURACIÓN DE AUDIO: Se activa para SPEAKING
+  const usesAudio = ["LISTENING", "AUDIO_SELECT", "SPEAKING"].includes(typeName);
 
   /* ===================== SAVE (API CALL) ===================== */
 
@@ -174,6 +174,9 @@ export function QuestionsSection() {
         });
         setOptions(parsed);
         setImageFiles(new Array(parsed.length).fill(null));
+    } else {
+        setOptions(["", ""]);
+        setImageFiles([null, null]);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -232,14 +235,14 @@ export function QuestionsSection() {
           
           <div style={{ display: "grid", gap: 15 }}>
             <input
-              placeholder="Pregunta o Texto fuente"
+              placeholder={typeName === "SPEAKING" ? "Frase que el alumno debe leer (Inglés)" : "Texto Fuente (Lo que el alumno verá)"}
               style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
               value={textSource}
               onChange={(e) => setTextSource(e.target.value)}
             />
 
             <input
-              placeholder="Traducción o Respuesta correcta"
+              placeholder={typeName === "SPEAKING" ? "Repite la misma frase (Para validar pronunciación)" : "Respuesta Correcta"}
               style={{ padding: 12, borderRadius: 10, border: "2px solid #e5e5e5" }}
               value={textTarget}
               onChange={(e) => setTextTarget(e.target.value)}
@@ -254,25 +257,32 @@ export function QuestionsSection() {
               {questionTypes.map((t) => <option key={t.id} value={t.id}>{t.typeName}</option>)}
             </select>
 
-            {/* SECCIÓN DE AUDIO */}
+            {/* SECCIÓN DE AUDIO (ACTIVADA PARA SPEAKING) */}
             {usesAudio && (
               <div style={{ padding: 15, background: "#f0f7ff", borderRadius: 12, border: "1px dashed #2b70c9" }}>
                 <label style={{ display: "block", marginBottom: 8, fontWeight: "bold", color: "#2b70c9" }}>
-                   <IconUpload /> Subir Audio para Listening
+                   <IconUpload /> {typeName === "SPEAKING" ? "Subir Audio de Pronunciación Correcta" : "Subir Audio de Referencia"}
                 </label>
                 <input type="file" accept="audio/*" onChange={(e) => e.target.files && setAudioFile(e.target.files[0])} />
                 {audioFile && <p style={{fontSize: 12, marginTop: 5}}>Archivo: {audioFile.name}</p>}
+                {typeName === "SPEAKING" && (
+                    <p style={{ fontSize: 11, color: "#555", marginTop: 5 }}>
+                        * Sube un audio donde se escuche la frase para que el alumno pueda imitarla.
+                    </p>
+                )}
               </div>
             )}
 
-            {/* SECCIÓN DE OPCIONES (VISIBLE PARA LISTENING) */}
+            {/* SECCIÓN DE OPCIONES */}
             {usesOptions && (
               <div style={{ marginTop: 10, background: "#f9f9f9", padding: 20, borderRadius: 15 }}>
-                <label style={{ fontWeight: "bold", display: "block", marginBottom: 10 }}>Opciones de respuesta:</label>
+                <label style={{ fontWeight: "bold", display: "block", marginBottom: 10 }}>
+                    {typeName === "ORDERING" ? "Banco de Palabras (Separadas):" : "Opciones de respuesta:"}
+                </label>
                 {options.map((opt, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "center" }}>
                     <input
-                      placeholder={`Opción ${i + 1}`}
+                      placeholder={typeName === "ORDERING" ? `Palabra ${i + 1}` : `Opción ${i + 1}`}
                       style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
                       value={opt}
                       onChange={(e) => {
@@ -298,8 +308,10 @@ export function QuestionsSection() {
                     <button 
                       type="button"
                       onClick={() => {
-                        setOptions(options.filter((_, idx) => idx !== i));
-                        setImageFiles(imageFiles.filter((_, idx) => idx !== i));
+                        if (options.length > 1) {
+                          setOptions(options.filter((_, idx) => idx !== i));
+                          setImageFiles(imageFiles.filter((_, idx) => idx !== i));
+                        }
                       }}
                       style={{ background: "none", border: "none", color: "#ff4b4b", cursor: "pointer" }}
                     >
@@ -315,7 +327,7 @@ export function QuestionsSection() {
                     setImageFiles([...imageFiles, null]);
                   }}
                 >
-                  + Añadir Opción
+                  + Añadir {typeName === "ORDERING" ? "Palabra" : "Opción"}
                 </button>
               </div>
             )}

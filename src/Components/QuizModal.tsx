@@ -36,6 +36,10 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [score, setScore] = useState(0);
 
+  /* ====== ESTADOS SPEAKING ====== */
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+
   /* ====== ORDENAR ====== */
   const [availableWords, setAvailableWords] = useState<string[]>([]);
   const [orderedWords, setOrderedWords] = useState<string[]>([]);
@@ -43,34 +47,70 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   const currentQuestion = questions[currentIndex];
   const type = currentQuestion?.questionType?.typeName;
 
-  /* 🔒 BLINDAJE */
   const optionsSafe = Array.isArray(currentQuestion?.options)
     ? currentQuestion.options
     : [];
 
-  /* ================== RESET ================== */
-  useEffect(() => {
-    if (!isOpen) return;
-    setCurrentIndex(0);
-    setScore(0);
-    setSelectedOption(null);
-    setIsAnswered(false);
-  }, [isOpen]);
+  /* ================== LÓGICA RECONOCIMIENTO DE VOZ ================== */
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  /* ====== INIT POR TIPO ====== */
+    if (!SpeechRecognition) {
+      alert("Tu navegador no soporta el reconocimiento de voz. Prueba con Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US"; 
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setTranscript("");
+    };
+
+    recognition.onresult = (event: any) => {
+      const current = event.results[0][0].transcript;
+      setTranscript(current);
+      setSelectedOption(current); // La voz capturada se vuelve nuestra opción seleccionada
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognition.start();
+  };
+
+  /* ================== RESET AL CAMBIAR PREGUNTA ================== */
   useEffect(() => {
     if (!currentQuestion) return;
 
     setSelectedOption(null);
     setIsAnswered(false);
     setIsCorrect(false);
+    setOrderedWords([]);
+    setAvailableWords([]);
+    setTranscript(""); // Limpiar lo que el usuario dijo
+    setIsListening(false);
 
-    if (type === "WRITING" || type === "ORDERING") {
-      const words = currentQuestion.textTarget?.split(" ") ?? [];
-      setAvailableWords(shuffleArray(words));
-      setOrderedWords([]);
+    if (type === "WRITING" || type === "ORDERING" || type === "TRANSLATION_TO_TARGET") {
+      if (optionsSafe.length > 0) {
+        const parsedOptions = optionsSafe.map((opt: any) => {
+          try {
+            const parsed = typeof opt === "string" && opt.startsWith("{") ? JSON.parse(opt) : opt;
+            return typeof parsed === "object" ? (parsed.value || parsed.text) : parsed;
+          } catch (e) {
+            return opt;
+          }
+        });
+        setAvailableWords(shuffleArray(parsedOptions));
+      } else {
+        const words = currentQuestion.textTarget?.split(" ") ?? [];
+        setAvailableWords(shuffleArray(words));
+      }
     }
-  }, [currentIndex, currentQuestion, type]);
+  }, [currentIndex, currentQuestion, type, isOpen]);
 
   /* ================== CHECK ================== */
   const handleCheckAnswer = async () => {
@@ -79,12 +119,12 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     setIsSyncing(true);
     let correct = false;
 
-    if (type === "WRITING" || type === "ORDERING") {
-      correct = orderedWords.join(" ").trim().toLowerCase() === currentQuestion.textTarget.trim().toLowerCase();
-    } else {
-      // Comparamos el valor seleccionado con el texto objetivo
-      correct = selectedOption?.trim().toLowerCase() === currentQuestion.textTarget.trim().toLowerCase();
-    }
+    const target = currentQuestion.textTarget.trim().toLowerCase().replace(/[.,?!]/g, "");
+    const answer = (type === "WRITING" || type === "ORDERING") 
+        ? orderedWords.join(" ").trim().toLowerCase() 
+        : (selectedOption || "").trim().toLowerCase().replace(/[.,?!]/g, "");
+
+    correct = answer === target;
 
     setIsCorrect(correct);
     setIsAnswered(true);
@@ -101,13 +141,11 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     setIsSyncing(false);
   };
 
-  /* ================== NEXT ================== */
   const handleNext = async () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((i) => i + 1);
       return;
     }
-
     const mistakes = questions.length - score;
     await completeLesson(lessonId, score, mistakes);
     onClose(true, score, questions.length);
@@ -118,33 +156,51 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   return (
     <div style={overlay}>
       <div style={container}>
-        {/* Barra de Progreso Simple */}
         <div style={progressBarContainer}>
           <div style={{ ...progressBar, width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
         </div>
 
         <h2 style={questionTitle}>
-          {type === "WRITING" || type === "ORDERING"
-            ? "Ordena la frase correctamente"
-            : type === "IMAGE_SELECT"
-            ? "Selecciona la imagen correcta"
-            : "Selecciona la opción correcta"}
+          {type === "SPEAKING" ? "Escucha y repite la frase" : 
+           (type === "WRITING" || type === "ORDERING" ? "Ordena la frase correctamente" : "Selecciona la opción correcta")}
         </h2>
 
-        <p style={sourceText}>"{currentQuestion.textSource}"</p>
+        <div style={sourceCard}>
+           <p style={sourceText}>"{currentQuestion.textSource}"</p>
+           {currentQuestion.audioUrl && (
+             <button onClick={() => new Audio(currentQuestion.audioUrl).play()} style={audioBtn}>
+               🔊 Escuchar referencia
+             </button>
+           )}
+        </div>
 
-        {/* ================= AUDIO ================= */}
-        {currentQuestion.audioUrl && (
-          <button 
-            onClick={() => new Audio(currentQuestion.audioUrl).play()}
-            style={audioBtn}
-          >
-            🔊 Escuchar
-          </button>
-        )}
+        {/* ================= CONTENIDO POR TIPO ================= */}
+        
+        {type === "SPEAKING" ? (
+          /* VISTA DE SPEAKING */
+          <div style={speakingContainer}>
+            <button
+              onClick={startListening}
+              disabled={isAnswered || isListening}
+              style={{
+                ...micBtn,
+                background: isListening ? "#ff4b4b" : "#1cb0f6",
+                boxShadow: isListening ? "0 0 20px #ff4b4b" : "0 4px 0 #1899d6",
+              }}
+            >
+              {isListening ? "🎙️" : "🎤"}
+            </button>
+            <p style={{ marginTop: 10, color: "#777", fontWeight: "bold" }}>
+              {isListening ? "Escuchando..." : "Toca el micro para hablar"}
+            </p>
 
-        {/* ================= ORDENAR ================= */}
-        {(type === "WRITING" || type === "ORDERING") ? (
+            <div style={transcriptDisplay}>
+              <span style={{ fontSize: "0.8rem", color: "#afafaf", display: "block" }}>Tu pronunciación:</span>
+              <strong>{transcript || "..."}</strong>
+            </div>
+          </div>
+        ) : (type === "WRITING" || type === "ORDERING") ? (
+          /* VISTA DE ORDENAR */
           <>
             <div style={sentenceBox}>
               {orderedWords.map((word, i) => (
@@ -176,47 +232,26 @@ export const QuizModal: React.FC<QuizModalProps> = ({
             </div>
           </>
         ) : (
-          /* ================= OPCIONES GRID ================= */
-          <div style={{
-            ...optionsGrid,
-            gridTemplateColumns: type === "IMAGE_SELECT" ? "repeat(2, 1fr)" : "1fr",
-          }}>
+          /* VISTA DE OPCIONES (GRID) */
+          <div style={{ ...optionsGrid, gridTemplateColumns: type === "IMAGE_SELECT" ? "repeat(2, 1fr)" : "1fr" }}>
             {optionsSafe.map((opt: any, idx: number) => {
-              let text = "";
-              let img = null;
-
+              let text = ""; let img = null;
               try {
                 const parsed = typeof opt === "string" && opt.startsWith("{") ? JSON.parse(opt) : opt;
                 text = typeof parsed === "object" ? (parsed.value || parsed.text) : parsed;
                 img = typeof parsed === "object" ? parsed.imageUrl : null;
-              } catch (e) {
-                text = opt;
-              }
+              } catch (e) { text = opt; }
 
               const isSelected = selectedOption === text;
-
               return (
                 <button
                   key={idx}
-                  style={{
-                    ...optionCard,
-                    minHeight: type === "IMAGE_SELECT" ? "160px" : "auto",
-                    background: isSelected ? "#ddf4ff" : "white",
-                    borderColor: isSelected ? "#84d8ff" : "#e5e5e5",
-                    boxShadow: isSelected ? "0 2px 0 #84d8ff" : "0 4px 0 #e5e5e5",
-                    transform: isSelected ? "translateY(2px)" : "none",
-                  }}
+                  style={{ ...optionCard, background: isSelected ? "#ddf4ff" : "white", borderColor: isSelected ? "#84d8ff" : "#e5e5e5" }}
                   onClick={() => setSelectedOption(text)}
                   disabled={isAnswered}
                 >
-                  {img && (
-                    <div style={imageWrapper}>
-                      <img src={img} alt={text} style={responsiveImg} />
-                    </div>
-                  )}
-                  <div style={{ fontSize: "1.1rem", color: isSelected ? "#1899d6" : "#4b4b4b" }}>
-                    {text}
-                  </div>
+                  {img && <div style={imageWrapper}><img src={img} alt={text} style={responsiveImg} /></div>}
+                  <div style={{ fontSize: "1.1rem", color: isSelected ? "#1899d6" : "#4b4b4b" }}>{text}</div>
                 </button>
               );
             })}
@@ -226,13 +261,9 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         {/* ================= FOOTER ================= */}
         <div style={footer}>
           {isAnswered && (
-            <div style={{
-              ...feedbackBox,
-              background: isCorrect ? "#d7ffb8" : "#ffdfe0",
-              borderColor: isCorrect ? "#58cc02" : "#ff4b4b"
-            }}>
+            <div style={{ ...feedbackBox, background: isCorrect ? "#d7ffb8" : "#ffdfe0", borderColor: isCorrect ? "#58cc02" : "#ff4b4b" }}>
               <p style={{ color: isCorrect ? "#258300" : "#ea2b2b", fontWeight: "bold", margin: 0 }}>
-                {isCorrect ? "¡Excelente!" : `Respuesta correcta: ${currentQuestion.textTarget}`}
+                {isCorrect ? "¡Excelente!" : `Casi, lo correcto era: "${currentQuestion.textTarget}"`}
               </p>
             </div>
           )}
@@ -254,154 +285,62 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   );
 };
 
-/* ================== STYLES ================== */
-const overlay: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "#fff",
-  zIndex: 5000,
-  overflowY: "auto",
-  fontFamily: "sans-serif"
+/* ================== ESTILOS ADICIONALES ================== */
+const speakingContainer: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20
 };
 
-const container: React.CSSProperties = {
-  maxWidth: 600,
-  margin: "0 auto",
-  padding: "20px",
-  display: "flex",
-  flexDirection: "column",
-  minHeight: "100vh"
+const micBtn: React.CSSProperties = {
+    width: 80,
+    height: 80,
+    borderRadius: "50%",
+    border: "none",
+    color: "white",
+    fontSize: "2rem",
+    cursor: "pointer",
+    transition: "all 0.2s ease"
 };
 
-const progressBarContainer: React.CSSProperties = {
-  width: "100%",
-  height: 12,
-  background: "#e5e5e5",
-  borderRadius: 10,
-  marginBottom: 30
+const transcriptDisplay: React.CSSProperties = {
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 15,
+    background: "#f9f9f9",
+    border: "2px dashed #e5e5e5",
+    width: "100%",
+    textAlign: "center",
+    fontSize: "1.2rem",
+    minHeight: 60
 };
 
-const progressBar: React.CSSProperties = {
-  height: "100%",
-  background: "#58cc02",
-  borderRadius: 10,
-  transition: "width 0.3s ease"
+const sourceCard: React.CSSProperties = {
+    background: "#f0f0f0",
+    padding: 20,
+    borderRadius: 15,
+    textAlign: "center" as const,
+    marginBottom: 20
 };
 
-const questionTitle: React.CSSProperties = {
-  fontSize: "1.5rem",
-  fontWeight: "bold",
-  color: "#3c3c3c",
-  marginBottom: 10
-};
-
-const sourceText: React.CSSProperties = {
-  fontSize: "1.2rem",
-  color: "#4b4b4b",
-  marginBottom: 20,
-  fontStyle: "italic"
-};
-
-const optionsGrid: React.CSSProperties = {
-  display: "grid",
-  gap: 15,
-  marginTop: 20
-};
-
-const optionCard: React.CSSProperties = {
-  padding: "15px",
-  borderRadius: 16,
-  border: "2px solid #e5e5e5",
-  fontWeight: "bold",
-  cursor: "pointer",
-  transition: "all 0.1s",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
-const imageWrapper: React.CSSProperties = {
-  width: "100%",
-  height: 100,
-  marginBottom: 10,
-  display: "flex",
-  justifyContent: "center"
-};
-
-const responsiveImg: React.CSSProperties = {
-  maxHeight: "100%",
-  maxWidth: "100%",
-  objectFit: "contain"
-};
-
-const audioBtn: React.CSSProperties = {
-  padding: "10px 20px",
-  borderRadius: 12,
-  border: "2px solid #1cb0f6",
-  background: "#fff",
-  color: "#1cb0f6",
-  fontWeight: "bold",
-  cursor: "pointer",
-  marginBottom: 20,
-  alignSelf: "flex-start"
-};
-
-const sentenceBox: React.CSSProperties = {
-  minHeight: 100,
-  borderBottom: "2px solid #e5e5e5",
-  padding: 10,
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginBottom: 20
-};
-
-const wordsPool: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  justifyContent: "center"
-};
-
-const chip: React.CSSProperties = {
-  padding: "10px 15px",
-  borderRadius: 10,
-  border: "2px solid #e5e5e5",
-  background: "#fff",
-  fontWeight: "bold",
-  cursor: "pointer",
-  boxShadow: "0 2px 0 #e5e5e5"
-};
-
-const chipSelected: React.CSSProperties = {
-  ...chip,
-  background: "#ddf4ff",
-  borderColor: "#84d8ff",
-  boxShadow: "0 2px 0 #84d8ff"
-};
-
-const footer: React.CSSProperties = {
-  marginTop: "auto",
-  paddingTop: 20,
-  borderTop: "2px solid #e5e5e5"
-};
-
-const feedbackBox: React.CSSProperties = {
-  padding: 15,
-  borderRadius: 12,
-  marginBottom: 15,
-  border: "2px solid"
-};
-
-const mainBtn: React.CSSProperties = {
-  width: "100%",
-  padding: "16px",
-  borderRadius: 16,
-  border: "none",
-  color: "white",
-  fontWeight: "bold",
-  fontSize: "1.1rem",
-  cursor: "pointer",
-  boxShadow: "0 4px 0 rgba(0,0,0,0.2)"
-};
+// ... (se mantienen los estilos que ya tenías)
+const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "#fff", zIndex: 5000, overflowY: "auto", fontFamily: "sans-serif" };
+const container: React.CSSProperties = { maxWidth: 600, margin: "0 auto", padding: "20px", display: "flex", flexDirection: "column", minHeight: "100vh" };
+const progressBarContainer: React.CSSProperties = { width: "100%", height: 12, background: "#e5e5e5", borderRadius: 10, marginBottom: 30 };
+const progressBar: React.CSSProperties = { height: "100%", background: "#58cc02", borderRadius: 10, transition: "width 0.3s ease" };
+const questionTitle: React.CSSProperties = { fontSize: "1.5rem", fontWeight: "bold", color: "#3c3c3c", marginBottom: 10 };
+const sourceText: React.CSSProperties = { fontSize: "1.4rem", color: "#4b4b4b", marginBottom: 10, fontWeight: "bold" };
+const optionsGrid: React.CSSProperties = { display: "grid", gap: 15, marginTop: 20 };
+const optionCard: React.CSSProperties = { padding: "15px", borderRadius: 16, border: "2px solid #e5e5e5", fontWeight: "bold", cursor: "pointer", transition: "all 0.1s", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
+const imageWrapper: React.CSSProperties = { width: "100%", height: 100, marginBottom: 10, display: "flex", justifyContent: "center" };
+const responsiveImg: React.CSSProperties = { maxHeight: "100%", maxWidth: "100%", objectFit: "contain" };
+const audioBtn: React.CSSProperties = { padding: "8px 15px", borderRadius: 10, border: "2px solid #1cb0f6", background: "#fff", color: "#1cb0f6", fontWeight: "bold", cursor: "pointer" };
+const sentenceBox: React.CSSProperties = { minHeight: 100, borderBottom: "2px solid #e5e5e5", padding: 10, display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 };
+const wordsPool: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" };
+const chip: React.CSSProperties = { padding: "10px 15px", borderRadius: 10, border: "2px solid #e5e5e5", background: "#fff", fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 0 #e5e5e5" };
+const chipSelected: React.CSSProperties = { ...chip, background: "#ddf4ff", borderColor: "#84d8ff", boxShadow: "0 2px 0 #84d8ff" };
+const footer: React.CSSProperties = { marginTop: "auto", paddingTop: 20, borderTop: "2px solid #e5e5e5" };
+const feedbackBox: React.CSSProperties = { padding: 15, borderRadius: 12, marginBottom: 15, border: "2px solid" };
+const mainBtn: React.CSSProperties = { width: "100%", padding: "16px", borderRadius: 16, border: "none", color: "white", fontWeight: "bold", fontSize: "1.1rem", cursor: "pointer", boxShadow: "0 4px 0 rgba(0,0,0,0.2)" };
