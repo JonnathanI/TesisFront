@@ -136,6 +136,8 @@ export interface StudentData {
     fullName: string;
     email?: string;
     username?: string;
+    cedula?: string;
+    role: string;
     xpTotal: number;
     currentStreak: number;
 isActive: boolean; 
@@ -311,6 +313,60 @@ export const apiFetch = async ( // ✅ Añadido 'export' aquí
   return response;
 };
 
+export const getAllUsersAdmin = async (): Promise<StudentData[]> => {
+    try {
+        const response = await apiFetch('/auth/admin/users', { method: 'GET' });
+        if (!response.ok) {
+            // Fallback en caso de que la ruta de admin no esté lista
+            const fallback = await apiFetch('/users/search?query=', { method: 'GET' });
+            return fallback.json();
+        }
+        return response.json();
+    } catch (error) {
+        console.error("Error en API getAllUsersAdmin:", error);
+        return [];
+    }
+};
+
+/**
+ * ==========================================
+ * 5. MÉTODOS DE ADMINISTRACIÓN (NUEVOS)
+ * ==========================================
+ */
+
+/**
+ * Actualiza el rol de un usuario (Admin Only)
+ * @param userId ID del usuario a modificar
+ * @param newRole Nuevo rol: 'STUDENT', 'TEACHER', o 'ADMIN'
+ */
+export const updateUserRole = async (userId: string, newRole: string): Promise<void> => {
+    const response = await apiFetch(`/auth/admin/users/${userId}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: newRole })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "No se pudo actualizar el rol del usuario");
+    }
+};
+
+/**
+ * Cambia el estado de activación de un usuario (Bloquear/Activar)
+ * @param userId ID del usuario
+ * @param status true para activar, false para bloquear
+ */
+export const updateUserStatus = async (userId: string, status: boolean): Promise<any> => {
+    const response = await apiFetch(`/auth/admin/users/${userId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ active: status })
+    });
+
+    if (!response.ok) {
+        throw new Error("No se pudo cambiar el estado del usuario");
+    }
+    return response.json();
+};
 
 // ==========================================
 // 4. MÉTODOS EXPORTADOS
