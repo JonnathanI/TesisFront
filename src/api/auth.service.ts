@@ -310,6 +310,14 @@ export interface PendingEvaluationDTO {
   score: number | null;
 }
 
+export interface StudentEvaluation {
+  id: string;
+  title: string;
+  description: string;
+  questions: EvaluationQuestion[];
+}
+
+
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
 // ==========================================
@@ -917,7 +925,7 @@ export const assignEvaluationToStudent = async (evaluationId: string, studentId:
 // IMPORTANTE: Cambié el nombre de getEvaluationAssignment a getEvaluationDetails para que coincida con el componente
 export const getEvaluationDetails = async (
   assignmentId: string
-): Promise<EvaluationAssignment> => {
+): Promise<StudentEvaluation> => {
   const response = await apiFetch(
     `/student/evaluations/assignment/${assignmentId}`,
     { method: 'GET' }
@@ -930,15 +938,7 @@ export const getEvaluationDetails = async (
   return response.json();
 };
 
-/*
-export const getMyPendingEvaluations = async (studentId: string) => {
-    // Coincidimos con @GetMapping("/student/pending") y @RequestParam studentId
-    const response = await apiFetch(`/teacher/evaluations/student/pending?studentId=${studentId}`, { 
-        method: 'GET' 
-    });
-    if (!response.ok) throw new Error("No se pudieron cargar las tareas");
-    return response.json();
-};*/
+
 
 // Guardar el resultado final del examen
 // Adaptamos para recibir un objeto con 'score' o 'status' según necesites

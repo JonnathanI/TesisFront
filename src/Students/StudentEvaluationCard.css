@@ -1,0 +1,76 @@
+.evaluations {
+  margin-top: 24px;
+}
+
+.evaluations h3 {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.evaluation-card {
+  background: #fff;
+  border: 2px solid #e5e5e5;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  transition: all 0.2s ease;
+}
+
+.evaluation-card:hover {
+  border-color: #1cb0f6;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.evaluation-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.evaluation-icon {
+  background: #ffc800;
+  padding: 14px;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 22px;
+}
+
+.evaluation-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #444;
+}
+
+.evaluation-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #999;
+  margin-top: 4px;
+}
+
+.evaluation-btn {
+  background: #1cb0f6;
+  color: white;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #1899d6;
+  transition: all 0.1s ease;
+}
+
+.evaluation-btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}

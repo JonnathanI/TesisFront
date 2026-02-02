@@ -5,7 +5,10 @@ import AppRoutes from "./AppRoutes";
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      {/* CONTENEDOR GLOBAL */}
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <AppRoutes />
+      </div>
     </BrowserRouter>
   );
 }

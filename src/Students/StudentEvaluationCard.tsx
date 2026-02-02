@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FiClock, FiAward, FiAlertCircle } from "react-icons/fi";
 import { getStudentPendingEvaluations } from "../api/auth.service";
 import { useNavigate } from "react-router-dom";
+import "./StudentEvaluationCard.css";
 
 // Evitar conflictos JSX con react-icons
 const IconAward = FiAward as any;
@@ -41,6 +42,8 @@ export function StudentEvaluationCard() {
     const fetchEvaluations = async () => {
       const studentId = getStudentIdFromToken();
 
+      console.log("📌 studentId:", studentId);
+
       if (!studentId) {
         setError("No se pudo identificar al usuario");
         setLoading(false);
@@ -49,9 +52,10 @@ export function StudentEvaluationCard() {
 
       try {
         const data = await getStudentPendingEvaluations(studentId);
+        console.log("📦 Evaluaciones recibidas:", data);
         setPending(data);
       } catch (err) {
-        console.error("Error al cargar evaluaciones:", err);
+        console.error("❌ Error cargando evaluaciones:", err);
         setError("No se pudieron cargar las evaluaciones");
       } finally {
         setLoading(false);
@@ -64,11 +68,9 @@ export function StudentEvaluationCard() {
   // ⏳ Cargando
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 bg-white rounded-[2rem] border-2 border-[#e5e5e5] animate-pulse">
-        <div className="w-12 h-12 bg-slate-200 rounded-full mb-4"></div>
-        <p className="text-[#afafaf] font-black uppercase text-xs tracking-widest">
-          Cargando evaluaciones…
-        </p>
+      <div className="eval-loading">
+        <div className="loader-circle"></div>
+        <p>Cargando evaluaciones…</p>
       </div>
     );
   }
@@ -76,9 +78,9 @@ export function StudentEvaluationCard() {
   // ❌ Error
   if (error) {
     return (
-      <div className="p-8 bg-red-50 border-2 border-red-100 rounded-[2rem] text-center">
-        <IconAlert size={32} className="mx-auto text-red-400 mb-2" />
-        <p className="text-red-600 font-bold">{error}</p>
+      <div className="eval-error">
+        <IconAlert size={28} />
+        <p>{error}</p>
       </div>
     );
   }
@@ -86,60 +88,61 @@ export function StudentEvaluationCard() {
   // ✨ Sin tareas
   if (pending.length === 0) {
     return (
-      <div className="bg-white border-2 border-[#e5e5e5] rounded-[2rem] p-10 text-center">
-        <div className="text-5xl mb-4">✨</div>
-        <h3 className="text-xl font-black text-[#3c3c3c] uppercase">
-          ¡Estás al día!
-        </h3>
-        <p className="text-[#afafaf] font-bold mt-2">
-          No tienes evaluaciones pendientes.
-        </p>
+      <div className="eval-empty">
+        <span>✨</span>
+        <h3>¡Estás al día!</h3>
+        <p>No tienes evaluaciones pendientes.</p>
       </div>
     );
   }
 
-  // 📋 Lista de evaluaciones
   return (
-    <div className="mt-6 space-y-4">
-      <h3 className="text-xl font-black text-[#3c3c3c] uppercase ml-2 italic">
-        Mis tareas
-      </h3>
+    <div className="evaluations">
+      <h3>Mis Evaluaciones</h3>
 
-      {pending.map((assignment) => (
-        <div
-          key={assignment.assignmentId}
-          className="bg-white border-2 border-[#e5e5e5] rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between shadow-sm hover:border-[#1cb0f6] transition-all group"
-        >
-          <div className="flex items-center gap-4">
-            <div className="bg-[#ffc800] p-4 rounded-2xl text-white shadow-[0_4px_0_#e5a500] group-hover:scale-105 transition-transform">
-              <IconAward size={24} />
-            </div>
+      {pending.map((assignment) => {
+        // ✅ CONSOLE BIEN COLOCADOS
+        console.log("➡️ assignmentId:", assignment.assignmentId);
+        console.log("➡️ evaluationId:", assignment.evaluationId);
 
-            <div>
-              <p className="font-black text-[#4b4b4b] text-lg">
-                {assignment.title}
-              </p>
+        return (
+          <div
+            key={assignment.assignmentId}
+            className="evaluation-card"
+          >
+            <div className="evaluation-left">
+              <div className="evaluation-icon">
+                <IconAward />
+              </div>
 
-              <div className="flex items-center gap-2 text-[#afafaf] font-bold text-xs uppercase mt-1">
-                <IconClock size={14} />
-                <span>
-                  Vence:{" "}
-                  {new Date(assignment.dueDate).toLocaleDateString()}
-                </span>
+              <div>
+                <div className="evaluation-title">
+                  {assignment.title}
+                </div>
+
+                <div className="evaluation-date">
+                  <IconClock size={14} />
+                  <span>
+                    Vence:{" "}
+                    {new Date(assignment.dueDate).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <button
-            onClick={() =>
-              navigate(`/evaluation/${assignment.assignmentId}`)
-            }
-            className="mt-4 md:mt-0 bg-[#1cb0f6] text-white px-8 py-3 rounded-2xl font-black shadow-[0_4px_0_#1899d6] active:translate-y-1 active:shadow-none transition-all uppercase text-sm"
-          >
-            Empezar
-          </button>
-        </div>
-      ))}
+           <button
+  className="evaluation-btn"
+  onClick={() => {
+    console.log("🚀 Navegando con assignmentId:", assignment.assignmentId);
+    navigate(`/evaluation/${assignment.assignmentId}`);
+  }}
+>
+  Empezar
+</button>
+
+          </div>
+        );
+      })}
     </div>
   );
 }

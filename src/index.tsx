@@ -16,6 +16,7 @@ root.render(
 );
 
 // 🔥 REGISTRO DEL SERVICE WORKER
-serviceWorkerRegistration.register();
+serviceWorkerRegistration.unregister();
+
 
 reportWebVitals();

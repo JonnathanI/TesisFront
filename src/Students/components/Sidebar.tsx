@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
   const items = [
     { id: "learn", label: "Aprender", icon: <Home size={28} strokeWidth={2.5} /> },
     { id: "sounds", label: "Sonidos", icon: <Volume2 size={28} strokeWidth={2.5} /> },
-    { id: "evaluations", label: "Tareas", icon: <ClipboardList size={28} strokeWidth={2.5} /> },
+    { id: "evaluations", label: "Evaluacion", icon: <ClipboardList size={28} strokeWidth={2.5} /> },
     { id: "groups", label: "Grupos", icon: <Users size={28} strokeWidth={2.5} /> },
     { id: "shop", label: "Tienda", icon: <ShoppingBag size={28} strokeWidth={2.5} /> },
     { id: "profile", label: "Perfil", icon: <UserCircle size={28} strokeWidth={2.5} /> },
