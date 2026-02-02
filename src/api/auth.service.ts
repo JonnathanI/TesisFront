@@ -300,6 +300,16 @@ export interface EvaluationQuestion {
   };
 }
 
+export interface PendingEvaluationDTO {
+  assignmentId: string;
+  evaluationId: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  completed: boolean;
+  score: number | null;
+}
+
 // ==========================================
 // 2. MANEJO DEL TOKEN JWT Y ROL (¡ÚNICA DEFINICIÓN!)
 // ==========================================
@@ -901,31 +911,59 @@ export const assignEvaluationToStudent = async (evaluationId: string, studentId:
     return response.text(); 
 };
 
-// Obtener evaluaciones pendientes del alumno
-export const getStudentPendingEvaluations = async (userId: string): Promise<any[]> => {
-    const response = await apiFetch(`/student/evaluations/pending?studentId=${userId}`, { 
-        method: 'GET' 
-    });
-    if (!response.ok) throw new Error("Error al obtener evaluaciones pendientes");
-    return response.json();
-};
+// --- EVALUACIONES (ALUMNO) ---
 
 // Obtener los detalles de una asignación específica para empezar el examen
-export const getEvaluationAssignment = async (assignmentId: string): Promise<EvaluationAssignment> => {
-    const response = await apiFetch(`/student/evaluations/assign/${assignmentId}`, { 
-        method: 'GET' 
-    });
-    if (!response.ok) throw new Error("No se pudo cargar el examen");
-    return response.json();
+// IMPORTANTE: Cambié el nombre de getEvaluationAssignment a getEvaluationDetails para que coincida con el componente
+export const getEvaluationDetails = async (
+  assignmentId: string
+): Promise<EvaluationAssignment> => {
+  const response = await apiFetch(
+    `/student/evaluations/assignment/${assignmentId}`,
+    { method: 'GET' }
+  );
+
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la evaluación");
+  }
+
+  return response.json();
 };
 
+/*
+export const getMyPendingEvaluations = async (studentId: string) => {
+    // Coincidimos con @GetMapping("/student/pending") y @RequestParam studentId
+    const response = await apiFetch(`/teacher/evaluations/student/pending?studentId=${studentId}`, { 
+        method: 'GET' 
+    });
+    if (!response.ok) throw new Error("No se pudieron cargar las tareas");
+    return response.json();
+};*/
+
 // Guardar el resultado final del examen
-export const submitEvaluationResult = async (assignmentId: string, score: number): Promise<any> => {
+// Adaptamos para recibir un objeto con 'score' o 'status' según necesites
+export const submitEvaluationResult = async (assignmentId: string, payload: { score?: number; status: string }): Promise<any> => {
     const response = await apiFetch(`/student/evaluations/assign/${assignmentId}/complete`, {
         method: 'POST',
-        // Cambiamos a enviar el score como objeto JSON
-        body: JSON.stringify({ score })
+        body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error("Error al enviar resultados");
     return response.json();
+};
+
+// Obtener evaluaciones pendientes del alumno
+// En src/api/auth.service.ts
+export const getStudentPendingEvaluations = async (
+  studentId: string
+): Promise<PendingEvaluationDTO[]> => {
+  const response = await apiFetch(
+    `/student/evaluations/pending?studentId=${studentId}`,
+    { method: 'GET' }
+  );
+
+  if (!response.ok) {
+    throw new Error("Error al obtener evaluaciones pendientes");
+  }
+
+  return response.json();
 };

@@ -16,6 +16,7 @@ import { UserSearch } from "./components/UserSearch";
 import { SOUND_DATA } from "../data/soundData";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { EvaluationsSection } from "./sections/EvaluationsSection";
 
 // Importaciones del Service
 import {
@@ -157,6 +158,12 @@ const loadData = useCallback(
             {section === "learn" && (
               <LearnSection units={units} userProfile={userProfile!} heartTimer={heartTimer} onUpdateProfile={setUserProfile} onRefreshData={loadData} />
             )}
+
+            {/* --- NUEVA SECCIÓN AGREGADA --- */}
+   {section === "evaluations" && (
+  <EvaluationsSection />
+)}
+
 
             {section === "sounds" && <SoundsSection soundItems={SOUND_DATA} />}
 
