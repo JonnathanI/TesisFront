@@ -318,3 +318,15 @@ export interface CreateCoursePayload {
   targetLanguage: string;
   baseLanguage: string;
 }
+
+export interface StudentData {
+  id: string;
+  fullName: string;
+  email?: string;
+  username?: string;
+  xpTotal: number;
+  currentStreak: number;
+  isActive: boolean;
+  cedula?: string;      // ✅ nueva
+  role?: UserRole;      // ✅ nueva (STUDENT | TEACHER | ADMIN)
+}

@@ -667,14 +667,15 @@ export const getEvaluationDetails = async (
 // Guardar el resultado final del examen
 // Adaptamos para recibir un objeto con 'score' o 'status' según necesites
 // DESPUÉS: leemos texto en vez de JSON
+// Guardar el resultado final del examen
 export const submitEvaluationResult = async (
   assignmentId: string,
   payload: { score?: number; status: string }
 ): Promise<string> => {
   const response = await apiFetch(
-    `/student/evaluations/assignment/${assignmentId}/complete`,
+    `/student/evaluations/assign/${assignmentId}/complete`, // 👈 OJO: "assign", no "assignment"
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(payload),
     }
   );
@@ -683,10 +684,11 @@ export const submitEvaluationResult = async (
     throw new Error("Error al enviar resultados");
   }
 
-  // El backend responde con String ("Evaluación completada correctamente")
-  const message = await response.text();
-  return message;
+  // El backend devuelve un String: "Evaluación completada y respuestas guardadas"
+  const text = await response.text();
+  return text;
 };
+
 
 
 
@@ -760,3 +762,54 @@ export async function uploadEvaluationFile(
   return url;
 }
 
+export const getAllUsersAdmin = async (): Promise<StudentData[]> => {
+    try {
+        // CORRECCIÓN: La ruta debe ser /users/admin/all para coincidir con tu UserController.kt
+        const response = await apiFetch('/users/admin/all', { method: 'GET' });
+        
+        if (!response.ok) {
+            console.error("Error en respuesta admin/all:", response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        
+        // El backend de Kotlin envía List<UserEntity>, que llega como un Array directo [{}, {}]
+        if (Array.isArray(data)) return data;
+        
+        // Fallback por si lo envuelve en un objeto
+        if (data && Array.isArray(data.users)) return data.users;
+        
+        return [];
+    } catch (error) {
+        console.error("Error en API getAllUsersAdmin:", error);
+        return [];
+    }
+};
+
+export const updateUserRole = async (userId: string, newRole: string): Promise<void> => {
+   const response = await apiFetch(`/users/admin/role/${userId}`, {
+        method: 'PATCH', // En tu Kotlin pusiste @PatchMapping
+        body: JSON.stringify(newRole) // Tu Kotlin recibe
+        //  @RequestBody newRole: String directo
+
+        
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "No se pudo actualizar el rol del usuario");
+    }
+};
+
+export const updateUserStatus = async (userId: string, status: boolean): Promise<any> => {
+    // CAMBIO: /auth/admin/ -> /users/admin/
+    // Nota: Necesitas crear este @PatchMapping o @PutMapping en tu UserController de Kotlin
+    const response = await apiFetch(`/users/admin/status/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ active: status })
+    });
+
+    if (!response.ok) throw new Error("No se pudo cambiar el estado");
+    return response.json();
+};

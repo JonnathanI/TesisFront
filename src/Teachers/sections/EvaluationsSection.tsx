@@ -15,10 +15,9 @@ import {
   assignEvaluationToClassroom,
   assignEvaluationToStudent,
   getStudentList,
-  uploadEvaluationFile, // 👈 nuevo helper
+  uploadEvaluationFile,
 } from "../../api/auth.service";
 
-// Fix TS: casteo a any
 const IconPlus = FiPlus as any;
 const IconTrash = FiTrash2 as any;
 const IconFile = FiFileText as any;
@@ -117,7 +116,7 @@ export function EvaluationsSection() {
     return { typeName, usesOptions, isOrdering, isImageSelect, usesAudio };
   };
 
-  /** 🔊 Subir audio a Cloudinary y guardar URL en la pregunta */
+  // 🔊 Subir audio
   const handleAudioFileChange = async (file: File, qIndex: number) => {
     try {
       const url = await uploadEvaluationFile(file, "evaluations_audios");
@@ -136,7 +135,7 @@ export function EvaluationsSection() {
     }
   };
 
-  /** 🖼️ Subir imagen de opción y guardar URL en imageUrls */
+  // 🖼️ Subir imagen para IMAGE_SELECT
   const handleImageFileChange = async (
     file: File,
     qIndex: number,
@@ -167,9 +166,6 @@ export function EvaluationsSection() {
     if (questions.some((q) => !q.questionTypeId))
       return alert("Todas las preguntas deben tener un tipo");
 
-    // 🔧 Construimos el payload que espera el backend:
-    // - Para IMAGE_SELECT: combinamos texto + imageUrl en JSON (como en QuestionsSection)
-    // - Para el resto: options tal cual
     const payloadQuestions = questions.map((q) => {
       const { isImageSelect } = getTypeConfig(q.questionTypeId);
 
@@ -185,7 +181,6 @@ export function EvaluationsSection() {
         );
       }
 
-      // Nos quedamos solo con lo que el backend necesita (evitando mandar imageUrls extra)
       return {
         textSource: q.textSource,
         textTarget: q.textTarget,
@@ -259,13 +254,13 @@ export function EvaluationsSection() {
             <IconFile size={32} />
           </div>
           <div>
-            <h1 style={cardTitle}>Banco de Evaluaciones</h1>
-            <p style={cardSubtitle}>Preguntas sin lección obligatoria</p>
+            <h1 style={cardTitle}>Crear Evaluaciones</h1>
+           
           </div>
         </div>
 
         <div style={twoCols}>
-          {/* Columna izquierda (título / descripción / publicar) */}
+          {/* Columna izquierda */}
           <div style={leftCol}>
             <div style={stickyBox}>
               <label style={labelSm}>General</label>
@@ -295,7 +290,7 @@ export function EvaluationsSection() {
             </div>
           </div>
 
-          {/* Columna derecha (reactivos) */}
+          {/* Columna derecha: preguntas */}
           <div style={rightCol}>
             <label style={labelSm}>
               Lista de Reactivos ({questions.length})
@@ -313,23 +308,30 @@ export function EvaluationsSection() {
               return (
                 <div key={idx} style={questionCard}>
                   <div style={questionHeaderRow}>
-                    <span style={pillReactivo}>
-                      Reactivo #{idx + 1} {typeName && `| ${typeName}`}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={pillReactivo}>
+                        Reactivo #{idx + 1}
+                      </span>
+                      {typeName && (
+                        <span style={pillType}>
+                          {typeName.replace(/_/g, " ")}
+                        </span>
+                      )}
+                    </div>
                     <button
                       onClick={() =>
                         setQuestions(questions.filter((_, i) => i !== idx))
                       }
                       style={iconButton}
                     >
-                      <IconTrash size={20} />
+                      <IconTrash size={18} />
                     </button>
                   </div>
 
                   {/* Tipo + dificultad */}
                   <div style={twoColsQuestions}>
                     <div style={fieldGroup}>
-                      <label style={labelTiny}>Tipo de Dinámica</label>
+                      <label style={labelTiny}>Tipo de dinámica</label>
                       <select
                         style={selectBase}
                         value={q.questionTypeId}
@@ -349,7 +351,7 @@ export function EvaluationsSection() {
                     </div>
 
                     <div style={fieldGroup}>
-                      <label style={labelTiny}>Puntos / Dificultad</label>
+                      <label style={labelTiny}>Puntos / dificultad</label>
                       <input
                         type="number"
                         step="0.5"
@@ -367,47 +369,34 @@ export function EvaluationsSection() {
                     </div>
                   </div>
 
-                  {/* AUDIO (para LISTENING / AUDIO_SELECT / SPEAKING) */}
+                  {/* AUDIO */}
                   {usesAudio && (
-                    <div
-                      style={{
-                        marginBottom: 16,
-                        padding: 12,
-                        borderRadius: 16,
-                        background: "#f0f7ff",
-                        border: "1px dashed #2b70c9",
-                      }}
-                    >
-                      <label
-                        style={{
-                          ...labelTiny,
-                          color: "#2b70c9",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Audio de referencia
-                      </label>
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleAudioFileChange(file, idx);
-                          }
-                        }}
-                      />
-                      {q.audioUrl && (
-                        <p style={{ fontSize: 11, marginTop: 4 }}>
-                          Audio subido ✅
-                        </p>
-                      )}
+                    <div style={audioBox}>
+                      <label style={audioLabel}>Audio de referencia</label>
+                      <div style={fileInlineRow}>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleAudioFileChange(file, idx);
+                          }}
+                          style={nativeFileHidden}
+                          id={`audio-${idx}`}
+                        />
+                        <label htmlFor={`audio-${idx}`} style={fileButton}>
+                          Seleccionar audio
+                        </label>
+                        <span style={fileStatus}>
+                          {q.audioUrl ? "Audio subido ✅" : "Ningún archivo"}
+                        </span>
+                      </div>
                     </div>
                   )}
 
                   {/* Enunciado */}
                   <div style={{ marginBottom: 16 }}>
-                    <label style={labelTiny}>Pregunta o Instrucción</label>
+                    <label style={labelTiny}>Pregunta o instrucción</label>
                     <input
                       style={inputSentence}
                       placeholder="Escribe el enunciado aquí..."
@@ -421,8 +410,8 @@ export function EvaluationsSection() {
                   </div>
 
                   {/* Respuesta correcta */}
-                  <div style={{ marginBottom: 24 }}>
-                    <label style={labelTinyCorrect}>Respuesta Correcta</label>
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={labelTinyCorrect}>Respuesta correcta</label>
                     <input
                       style={inputCorrect}
                       placeholder="La respuesta válida"
@@ -435,7 +424,7 @@ export function EvaluationsSection() {
                     />
                   </div>
 
-                  {/* Opciones / Banco de palabras */}
+                  {/* Opciones */}
                   {usesOptions && (
                     <div style={optionsBox}>
                       <label style={labelTiny}>
@@ -444,12 +433,12 @@ export function EvaluationsSection() {
                           : "Opciones de respuesta"}
                       </label>
 
-                      <div style={optionsGrid}>
-                        {q.options.map((opt: string, oIdx: number) => (
+                      {q.options.map((opt: string, oIdx: number) => {
+                        const fileId = `q${idx}-opt${oIdx}-file`;
+                        return (
                           <div key={oIdx} style={optionRow}>
                             <span style={optionIndex}>{oIdx + 1}</span>
 
-                            {/* Texto de la opción */}
                             <input
                               style={optionInput}
                               placeholder={
@@ -465,40 +454,34 @@ export function EvaluationsSection() {
                               }}
                             />
 
-                            {/* Solo para IMAGE_SELECT: subir imagen */}
                             {isImageSelect && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <div style={fileInputWrapper}>
                                 <input
+                                  id={fileId}
                                   type="file"
                                   accept="image/*"
+                                  style={nativeFileHidden}
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
                                     if (file) {
-                                      handleImageFileChange(
-                                        file,
-                                        idx,
-                                        oIdx
-                                      );
+                                      handleImageFileChange(file, idx, oIdx);
                                     }
                                   }}
                                 />
-                                {q.imageUrls?.[oIdx] && (
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      color: "#4caf50",
-                                    }}
-                                  >
-                                    Imagen subida ✅
-                                  </span>
-                                )}
+                                <label htmlFor={fileId} style={fileButtonSm}>
+                                  Imagen
+                                </label>
+                                <span style={fileStatusSm}>
+                                  {q.imageUrls?.[oIdx]
+                                    ? "Subida ✅"
+                                    : "Sin archivo"}
+                                </span>
                               </div>
                             )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
 
-                      {/* Botón para añadir opción/palabra extra */}
                       <button
                         type="button"
                         style={addReactivoButton}
@@ -521,7 +504,7 @@ export function EvaluationsSection() {
               );
             })}
 
-            <button onClick={addQuestion} style={addReactivoButton}>
+            <button onClick={addQuestion} style={addReactivoButtonBig}>
               <IconPlus size={20} />
               <span>AÑADIR OTRO REACTIVO</span>
             </button>
@@ -529,11 +512,11 @@ export function EvaluationsSection() {
         </div>
       </div>
 
-      {/* CARD 2: LISTADO DE EVALUACIONES */}
+      {/* CARD 2: LISTADO */}
       <div style={cardWrapper}>
         <h2 style={listTitle}>
           <IconList style={{ color: "#1cb0f6" }} />
-          <span>Evaluaciones Disponibles</span>
+          <span>Evaluaciones disponibles</span>
         </h2>
 
         {savedEvaluations.length === 0 ? (
@@ -553,7 +536,7 @@ export function EvaluationsSection() {
                   }}
                   style={assignButton}
                 >
-                  Asignar a Alumnos
+                  Asignar a alumnos
                 </button>
               </div>
             ))}
@@ -561,7 +544,7 @@ export function EvaluationsSection() {
         )}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL ASIGNACIÓN */}
       {isModalOpen && (
         <div style={modalOverlay}>
           <div style={modalCard}>
@@ -572,9 +555,8 @@ export function EvaluationsSection() {
               <IconX size={22} />
             </button>
 
-            <h3 style={modalTitle}>Asignar Reto</h3>
+            <h3 style={modalTitle}>Asignar reto</h3>
 
-            {/* Tabs */}
             <div style={tabsContainer}>
               <button
                 onClick={() => setAssignmentMode("group")}
@@ -600,7 +582,6 @@ export function EvaluationsSection() {
               </button>
             </div>
 
-            {/* Select */}
             <div style={{ marginBottom: 24 }}>
               {assignmentMode === "group" ? (
                 <select
@@ -608,7 +589,7 @@ export function EvaluationsSection() {
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}
                 >
-                  <option value="">Selecciona Aula...</option>
+                  <option value="">Selecciona aula...</option>
                   {classrooms.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -621,7 +602,7 @@ export function EvaluationsSection() {
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
                 >
-                  <option value="">Selecciona Alumno...</option>
+                  <option value="">Selecciona alumno...</option>
                   {allStudents.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.fullName}
@@ -653,14 +634,15 @@ export function EvaluationsSection() {
 }
 
 /* ============================
-   ESTILOS INLINE (tus mismos)
+   ESTILOS
 ============================ */
 
 const pageWrapper: CSSProperties = {
   maxWidth: 1200,
   margin: "0 auto",
   padding: "32px 16px 64px",
-  background: "#f7f7f7",
+  background:
+    "linear-gradient(180deg, #f3f7ff 0%, #f7f7f7 32%, #f7f7f7 100%)",
   minHeight: "100vh",
   fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
 };
@@ -670,8 +652,8 @@ const cardWrapper: CSSProperties = {
   borderRadius: 32,
   padding: 32,
   marginBottom: 32,
-  border: "2px solid #e5e5e5",
-  boxShadow: "0 6px 16px rgba(0,0,0,0.03)",
+  border: "1px solid #e4e4e4",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
 };
 
 const headerRow: CSSProperties = {
@@ -707,7 +689,7 @@ const cardSubtitle: CSSProperties = {
 const twoCols: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
-  gap: 48,
+  gap: 40,
   alignItems: "flex-start",
   marginTop: 12,
 };
@@ -739,7 +721,7 @@ const inputMain: CSSProperties = {
   padding: 16,
   borderRadius: 18,
   border: "2px solid #e5e5e5",
-  background: "#f7f7f7",
+  background: "#fdfdfd",
   fontWeight: 700,
   marginBottom: 12,
   outline: "none",
@@ -747,7 +729,7 @@ const inputMain: CSSProperties = {
 
 const textareaMain: CSSProperties = {
   ...inputMain,
-  minHeight: 100,
+  minHeight: 110,
   fontWeight: 500,
   fontSize: 14,
 };
@@ -769,7 +751,7 @@ const labelTiny: CSSProperties = {
   fontWeight: 900,
   color: "#afafaf",
   textTransform: "uppercase",
-  marginLeft: 8,
+  marginLeft: 4,
   marginBottom: 4,
   display: "block",
 };
@@ -796,98 +778,135 @@ const selectBase: CSSProperties = {
   padding: 12,
   borderRadius: 14,
   border: "2px solid #e5e5e5",
-  background: "#f7f7f7",
+  background: "#fafafa",
   fontWeight: 700,
   fontSize: 14,
 };
 
 const inputSentence: CSSProperties = {
   ...selectBase,
-  padding: 16,
-  background: "#f7f7f7",
+  padding: 14,
 };
 
 const inputCorrect: CSSProperties = {
   ...selectBase,
-  padding: 16,
+  padding: 14,
   background: "#f0fff4",
   borderColor: "#58cc02",
   color: "#2b612b",
 };
 
 const questionCard: CSSProperties = {
-  background: "white",
-  borderRadius: 28,
-  padding: 24,
-  border: "2px solid #e5e5e5",
-  marginBottom: 20,
-  boxShadow: "0 4px 10px rgba(0,0,0,0.02)",
+  background: "#ffffff",
+  borderRadius: 26,
+  padding: 22,
+  border: "1px solid #e5e5e5",
+  marginBottom: 18,
+  boxShadow: "0 6px 16px rgba(0,0,0,0.02)",
 };
 
 const questionHeaderRow: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: 20,
+  marginBottom: 18,
 };
 
 const pillReactivo: CSSProperties = {
-  background: "#ddf4ff",
-  color: "#1cb0f6",
+  background: "#eef3ff",
+  color: "#4a67d8",
   borderRadius: 999,
-  padding: "6px 14px",
+  padding: "4px 10px",
   fontSize: 10,
   fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const pillType: CSSProperties = {
+  background: "#f8f8f8",
+  color: "#888",
+  borderRadius: 999,
+  padding: "4px 10px",
+  fontSize: 10,
+  fontWeight: 800,
   textTransform: "uppercase",
 };
 
 const iconButton: CSSProperties = {
   border: "none",
   background: "transparent",
-  color: "#afafaf",
+  color: "#c4c4c4",
   cursor: "pointer",
 };
 
+const audioBox: CSSProperties = {
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 18,
+  background: "#f4f8ff",
+  border: "1px dashed #2b70c9",
+};
+
+const audioLabel: CSSProperties = {
+  ...labelTiny,
+  color: "#2b70c9",
+  marginBottom: 6,
+};
+
 const optionsBox: CSSProperties = {
-  padding: 16,
+  marginTop: 8,
+  padding: 14,
   borderRadius: 20,
   background: "#fafafa",
-  border: "2px dashed #e5e5e5",
-};
-
-const optionsGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-  gap: 12,
-  marginTop: 8,
-};
-
-const optionRow: CSSProperties = {
+  border: "1px dashed #e0e0e0",
   display: "flex",
-  alignItems: "center",
+  flexDirection: "column",
   gap: 8,
 };
 
+const optionRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "24px minmax(0,1fr) auto",
+  gap: 8,
+  alignItems: "center",
+};
+
 const optionIndex: CSSProperties = {
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 900,
   color: "#cccccc",
+  textAlign: "center",
 };
 
 const optionInput: CSSProperties = {
-  flex: 1,
+  width: "100%",
   padding: 10,
   borderRadius: 14,
   border: "2px solid #e5e5e5",
   fontSize: 14,
-  fontWeight: 700,
+  fontWeight: 600,
 };
 
 const addReactivoButton: CSSProperties = {
+  marginTop: 10,
+  borderRadius: 18,
+  border: "2px dashed #d0d0d0",
+  background: "transparent",
+  color: "#999",
+  fontWeight: 800,
+  fontSize: 12,
+  padding: "8px 12px",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  cursor: "pointer",
+};
+
+const addReactivoButtonBig: CSSProperties = {
   width: "100%",
-  padding: 18,
-  borderRadius: 28,
-  border: "4px dashed #e5e5e5",
+  padding: 16,
+  borderRadius: 24,
+  border: "3px dashed #dedede",
   background: "transparent",
   color: "#afafaf",
   fontWeight: 900,
@@ -896,6 +915,7 @@ const addReactivoButton: CSSProperties = {
   alignItems: "center",
   gap: 10,
   cursor: "pointer",
+  marginTop: 8,
 };
 
 const listTitle: CSSProperties = {
@@ -925,10 +945,10 @@ const evaluationsGrid: CSSProperties = {
 
 const evaluationCard: CSSProperties = {
   padding: 20,
-  borderRadius: 28,
-  border: "2px solid #e5e5e5",
+  borderRadius: 24,
+  border: "1px solid #e5e5e5",
   background: "white",
-  boxShadow: "0 4px 10px rgba(0,0,0,0.02)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
 };
 
 const evaluationTitle: CSSProperties = {
@@ -946,7 +966,7 @@ const evaluationMeta: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 4,
-  marginBottom: 18,
+  marginBottom: 16,
 };
 
 const assignButton: CSSProperties = {
@@ -966,7 +986,7 @@ const assignButton: CSSProperties = {
 const modalOverlay: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(60,60,60,0.8)",
+  background: "rgba(60,60,60,0.75)",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
@@ -1007,7 +1027,7 @@ const tabsContainer: CSSProperties = {
   padding: 4,
   borderRadius: 24,
   background: "#f7f7f7",
-  border: "2px solid #e5e5e5",
+  border: "1px solid #e5e5e5",
   marginBottom: 20,
 };
 
@@ -1035,3 +1055,46 @@ const tabButtonActiveGreen: CSSProperties = {
   boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
 };
 
+const fileInputWrapper: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+};
+
+const nativeFileHidden: CSSProperties = {
+  display: "none",
+};
+
+const fileButton: CSSProperties = {
+  borderRadius: 16,
+  border: "none",
+  background: "#1cb0f6",
+  color: "white",
+  fontSize: 12,
+  fontWeight: 700,
+  padding: "6px 12px",
+  cursor: "pointer",
+  boxShadow: "0 2px 0 #1899d6",
+};
+
+const fileStatus: CSSProperties = {
+  fontSize: 11,
+  color: "#666",
+};
+
+const fileInlineRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+
+const fileButtonSm: CSSProperties = {
+  ...fileButton,
+  padding: "4px 10px",
+  fontSize: 11,
+};
+
+const fileStatusSm: CSSProperties = {
+  ...fileStatus,
+  fontSize: 10,
+};

@@ -1,5 +1,6 @@
+// src/Students/EvaluationPlayer.tsx
 import React, { useState, useEffect, CSSProperties } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { FiX, FiVolume2, FiCheck } from "react-icons/fi";
 import {
   getEvaluationDetails,
@@ -10,8 +11,18 @@ const IconX = FiX as any;
 const IconVolume = FiVolume2 as any;
 const IconCheck = FiCheck as any;
 
+type ParsedOption = {
+  value: string;
+  imageUrl?: string | null;
+};
+
+type LocalAnswer = {
+  questionId: string;
+  answerText: string;
+};
+
 // 👉 helper para parsear opciones (texto plano o JSON con imageUrl)
-function parseOption(raw: string): { value: string; imageUrl?: string | null } {
+function parseOption(raw: string): ParsedOption {
   try {
     const obj = JSON.parse(raw);
     return {
@@ -24,13 +35,8 @@ function parseOption(raw: string): { value: string; imageUrl?: string | null } {
 }
 
 export function EvaluationPlayer() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>(); // id = assignmentId
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // viene desde StudentEvaluationCard:
-  // navigate(`/evaluation/${assignmentId}`, { state: { readOnly: true } });
-  const readOnlyFromState = (location.state as any)?.readOnly === true;
 
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -50,8 +56,8 @@ export function EvaluationPlayer() {
   const [loading, setLoading] = useState(true);
   const [correctCount, setCorrectCount] = useState(0);
 
-  // estado derivado: ¿este intento es solo para ver?
-  const isReadOnly = readOnlyFromState;
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [answers, setAnswers] = useState<LocalAnswer[]>([]);
 
   const getTypeName = (q: any): string => {
     if (!q) return "";
@@ -72,7 +78,21 @@ export function EvaluationPlayer() {
       .then((data: any) => {
         if (data?.questions?.length > 0) {
           setQuestions(data.questions);
-          setupQuestion(data.questions[0]);
+          const completedFlag = !!data.completed;
+          setIsCompleted(completedFlag);
+
+          if (completedFlag) {
+            // rellenamos respuestas locales con lo que venga del backend
+            const existingAnswers: LocalAnswer[] = data.questions
+              .filter((q: any) => q.studentAnswer)
+              .map((q: any) => ({
+                questionId: q.id,
+                answerText: q.studentAnswer as string,
+              }));
+            setAnswers(existingAnswers);
+          }
+
+          setupQuestion(data.questions[0], completedFlag);
         }
       })
       .catch((err) => {
@@ -81,7 +101,7 @@ export function EvaluationPlayer() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const setupQuestion = (question: any) => {
+  const setupQuestion = (question: any, completedMode: boolean) => {
     if (!question) return;
 
     const typeName = getTypeName(question);
@@ -89,19 +109,57 @@ export function EvaluationPlayer() {
     if (typeName === "ORDERING") {
       const words = (question.textTarget || "")
         .split(" ")
-        .filter((w: string) => w.trim().length > 0)
-        .sort(() => Math.random() - 0.5);
+        .filter((w: string) => w.trim().length > 0);
 
       setAvailableWords(words);
-      setSelectedWords([]);
+
+      if (completedMode && question.studentAnswer) {
+        setSelectedWords(
+          (question.studentAnswer as string)
+            .split(" ")
+            .filter((w: string) => w.trim().length > 0)
+        );
+      } else {
+        setSelectedWords([]);
+      }
     } else {
       setAvailableWords([]);
       setSelectedWords([]);
     }
 
-    setUserInput("");
-    setSelectedOptionIndex(null);
-    setFeedback(null);
+    // Texto libre
+    if (completedMode && question.studentAnswer) {
+      setUserInput(question.studentAnswer as string);
+    } else {
+      setUserInput("");
+    }
+
+    // Selección (imagen / opción)
+    if (completedMode && question.studentAnswer && question.options) {
+      const parsedOptions: ParsedOption[] = (question.options || []).map(
+        (raw: string) => parseOption(raw)
+      );
+      const idx = parsedOptions.findIndex(
+        (opt: ParsedOption) =>
+          opt.value.trim().toLowerCase() ===
+          (question.studentAnswer as string).trim().toLowerCase()
+      );
+      setSelectedOptionIndex(idx >= 0 ? idx : null);
+    } else {
+      setSelectedOptionIndex(null);
+    }
+
+    // Feedback al reabrir evaluación completada
+    if (completedMode && typeof question.isCorrect === "boolean") {
+      setFeedback({
+        isCorrect: question.isCorrect,
+        message: question.isCorrect
+          ? "Respuesta correcta."
+          : `Tu respuesta: "${question.studentAnswer ?? ""}"`,
+      });
+    } else {
+      setFeedback(null);
+    }
   };
 
   const handlePlayAudio = () => {
@@ -114,13 +172,14 @@ export function EvaluationPlayer() {
   };
 
   const handleCheck = () => {
-    if (isReadOnly) return; // 🔒 en modo detalle no se comprueba nada
+    if (isCompleted) return; // en modo detalle no hacemos nada
 
     const currentQ = questions[currentIndex];
     const typeName = getTypeName(currentQ);
 
     const correctText = (currentQ.textTarget || "").trim().toLowerCase();
     let isCorrect = false;
+    let rawAnswer = "";
 
     const isOrdering = typeName === "ORDERING";
     const isSelectType =
@@ -129,7 +188,8 @@ export function EvaluationPlayer() {
       typeName === "MULTIPLE_CHOICE";
 
     if (isOrdering) {
-      isCorrect = selectedWords.join(" ").toLowerCase() === correctText;
+      rawAnswer = selectedWords.join(" ");
+      isCorrect = rawAnswer.trim().toLowerCase() === correctText;
     } else if (isSelectType) {
       if (selectedOptionIndex === null) {
         setFeedback({
@@ -138,26 +198,41 @@ export function EvaluationPlayer() {
         });
         return;
       }
-
-      const parsedOptions = (currentQ.options || []).map(parseOption);
-
-      // mismo filtro que en el render
-      const displayOptions = parsedOptions.filter(
-        (o: { value: string; imageUrl?: string | null }) =>
-          o.value.trim() !== "" ||
-          (o.imageUrl && o.imageUrl.trim() !== "")
+      const parsedOptions: ParsedOption[] = (currentQ.options || []).map(
+        (raw: string) => parseOption(raw)
       );
-
+      const displayOptions = parsedOptions.filter(
+        (opt: ParsedOption) =>
+          opt.value.trim() !== "" ||
+          (opt.imageUrl && opt.imageUrl.trim() !== "")
+      );
       const selected = displayOptions[selectedOptionIndex];
-      const selectedValue = (selected?.value || "").trim().toLowerCase();
+      rawAnswer = selected?.value || "";
+      const selectedValue = rawAnswer.trim().toLowerCase();
       isCorrect = selectedValue === correctText;
     } else {
-      isCorrect = userInput.trim().toLowerCase() === correctText;
+      rawAnswer = userInput;
+      isCorrect = rawAnswer.trim().toLowerCase() === correctText;
     }
 
     if (isCorrect) {
       setCorrectCount((prev) => prev + 1);
     }
+
+    // Guardamos en el estado local de respuestas
+    setAnswers((prev) => {
+      const withoutCurrent = prev.filter(
+        (a) => a.questionId !== currentQ.id
+      );
+      return [...withoutCurrent, { questionId: currentQ.id, answerText: rawAnswer }];
+    });
+
+    // Actualizamos también la pregunta actual con studentAnswer/isCorrect
+    setQuestions((prev) =>
+      prev.map((q, idx) =>
+        idx === currentIndex ? { ...q, studentAnswer: rawAnswer, isCorrect } : q
+      )
+    );
 
     setFeedback({
       isCorrect,
@@ -168,41 +243,36 @@ export function EvaluationPlayer() {
   };
 
   const handleNext = async () => {
-    if (isReadOnly) {
-      // en modo detalle simplemente volvemos al dashboard
-      navigate("/student/dashboard");
+    if (isCompleted) {
+      navigate(-1);
       return;
     }
 
     if (currentIndex + 1 < questions.length) {
       const next = currentIndex + 1;
       setCurrentIndex(next);
-      setupQuestion(questions[next]);
+      setupQuestion(questions[next], false);
       return;
     }
 
-    const score = Math.round((correctCount / questions.length) * 100);
+    const totalQuestions = questions.length || 1;
+    const score = Math.round((correctCount / totalQuestions) * 100);
 
     try {
       if (id) {
-        await submitEvaluationResult(id, { score, status: "COMPLETED" });
+        // 👇 Asegúrate de que tu backend acepte también "answers"
+        await submitEvaluationResult(id, {
+          score,
+          status: "COMPLETED",
+          // @ts-ignore -> agrega esto a tu tipo en auth.types
+          answers,
+        });
         alert(`¡Evaluación finalizada! Tu puntaje: ${score}%`);
         navigate("/student/dashboard");
       }
     } catch (err) {
       console.error("Error al enviar resultado:", err);
-    }
-  };
-
-  const handlePrimaryClick = () => {
-    if (isReadOnly) {
-      navigate("/student/dashboard");
-      return;
-    }
-    if (feedback) {
-      handleNext();
-    } else {
-      handleCheck();
+      alert("Error al enviar resultados de la evaluación");
     }
   };
 
@@ -237,10 +307,13 @@ export function EvaluationPlayer() {
 
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
-  const parsedOptions = (currentQ.options || []).map(parseOption);
+  const parsedOptions: ParsedOption[] = (currentQ.options || []).map(
+    (raw: string) => parseOption(raw)
+  );
   const displayOptions = parsedOptions.filter(
-    (o: { value: string; imageUrl?: string | null }) =>
-      o.value.trim() !== "" || (o.imageUrl && o.imageUrl.trim() !== "")
+    (opt: ParsedOption) =>
+      opt.value.trim() !== "" ||
+      (opt.imageUrl && opt.imageUrl.trim() !== "")
   );
 
   return (
@@ -252,7 +325,9 @@ export function EvaluationPlayer() {
         </button>
 
         <div style={progressBarOuter}>
-          <div style={{ ...progressBarInner, width: `${progress}%` }} />
+          <div
+            style={{ ...progressBarInner, width: `${progress}%` }}
+          />
         </div>
 
         <span style={progressText}>
@@ -274,7 +349,7 @@ export function EvaluationPlayer() {
         </div>
 
         <h2 style={questionTitle}>
-          {isReadOnly
+          {isCompleted
             ? "Detalle de la evaluación"
             : isListeningLike
             ? "Escribe lo que escuchas"
@@ -283,10 +358,9 @@ export function EvaluationPlayer() {
             : "Responde la siguiente pregunta"}
         </h2>
 
-        {isReadOnly && (
-          <p style={{ fontSize: 14, color: "#888", marginBottom: 8 }}>
-            Esta evaluación ya fue completada. (Por ahora solo se muestra la
-            pregunta, aún no se guardan tus respuestas anteriores).
+        {isCompleted && (
+          <p style={{ fontSize: 14, color: "#666", marginBottom: 8 }}>
+            Esta evaluación ya fue completada. Aquí puedes ver tus respuestas.
           </p>
         )}
 
@@ -303,18 +377,17 @@ export function EvaluationPlayer() {
                   Pulsa las palabras de abajo para armar la frase.
                 </span>
               ) : (
-                selectedWords.map((w, i) => (
+                selectedWords.map((w: string, i: number) => (
                   <button
                     key={i}
                     onClick={() => {
-                      if (isReadOnly) return;
+                      if (isCompleted) return;
                       setSelectedWords(
                         selectedWords.filter((_, idx) => idx !== i)
                       );
                       setAvailableWords([...availableWords, w]);
                     }}
                     style={wordSelected}
-                    disabled={isReadOnly}
                   >
                     {w}
                   </button>
@@ -331,7 +404,8 @@ export function EvaluationPlayer() {
                 }
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                readOnly={isReadOnly}
+                disabled={isCompleted}
+                readOnly={isCompleted}
               />
             )}
           </div>
@@ -340,18 +414,17 @@ export function EvaluationPlayer() {
         {/* Palabras disponibles para ORDERING */}
         {isOrdering && (
           <div style={wordsPool}>
-            {availableWords.map((w, i) => (
+            {availableWords.map((w: string, i: number) => (
               <button
                 key={i}
                 onClick={() => {
-                  if (isReadOnly) return;
+                  if (isCompleted) return;
                   setSelectedWords([...selectedWords, w]);
                   setAvailableWords(
                     availableWords.filter((_, idx) => idx !== i)
                   );
                 }}
                 style={wordOption}
-                disabled={isReadOnly}
               >
                 {w}
               </button>
@@ -363,10 +436,7 @@ export function EvaluationPlayer() {
         {isSelectType && (
           <div style={optionsGrid}>
             {displayOptions.map(
-              (
-                opt: { value: string; imageUrl?: string | null },
-                idx: number
-              ) => {
+              (opt: ParsedOption, idx: number) => {
                 const isSelected = selectedOptionIndex === idx;
 
                 return (
@@ -374,7 +444,7 @@ export function EvaluationPlayer() {
                     key={idx}
                     type="button"
                     onClick={() => {
-                      if (isReadOnly) return;
+                      if (isCompleted) return;
                       setSelectedOptionIndex(idx);
                     }}
                     style={{
@@ -386,9 +456,8 @@ export function EvaluationPlayer() {
                       transform: isSelected
                         ? "translateY(-2px)"
                         : "translateY(0)",
-                      cursor: isReadOnly ? "default" : "pointer",
                     }}
-                    disabled={isReadOnly}
+                    disabled={isCompleted}
                   >
                     {opt.imageUrl && (
                       <img
@@ -409,7 +478,7 @@ export function EvaluationPlayer() {
       {/* Barra inferior */}
       <div style={bottomBar}>
         <div style={feedbackBox}>
-          {feedback && !isReadOnly && (
+          {feedback && (
             <p
               style={{
                 ...feedbackTextBase,
@@ -419,23 +488,27 @@ export function EvaluationPlayer() {
               {feedback.message}
             </p>
           )}
-          {isReadOnly && (
-            <p style={{ ...feedbackTextBase, color: "#2f855a" }}>
-              Evaluación ya completada.
-            </p>
-          )}
         </div>
-        <button onClick={handlePrimaryClick} style={primaryButton}>
-          {isReadOnly
-            ? "Volver"
-            : feedback
-            ? "Continuar"
-            : (
-              <>
-                <IconCheck style={{ marginRight: 6 }} />
-                Comprobar
-              </>
-            )}
+        <button
+          onClick={
+            isCompleted
+              ? () => navigate(-1)
+              : feedback
+              ? handleNext
+              : handleCheck
+          }
+          style={primaryButton}
+        >
+          {isCompleted ? (
+            "Volver"
+          ) : feedback ? (
+            "Continuar"
+          ) : (
+            <>
+              <IconCheck style={{ marginRight: 6 }} />
+              Comprobar
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -626,7 +699,7 @@ const optionCard: CSSProperties = {
 
 const optionImage: CSSProperties = {
   width: "100%",
-  height: 260,            // ajustado para ver completa la imagen
+  height: 220,
   objectFit: "contain",
   borderRadius: 18,
 };
