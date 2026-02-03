@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { UserProfileData } from "../../api/auth.service";
+import { UserProfileData } from "../../api/auth.types";
 
 interface Props {
   profile: UserProfileData;

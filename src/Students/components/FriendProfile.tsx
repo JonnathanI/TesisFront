@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { FaFire, FaBolt, FaCrown, FaUser, FaMedal, FaArrowLeft } from 'react-icons/fa';
 
 // Imports de tu proyecto
-import { getStudentDetailProgress, DetailedStudentProgress } from '../../api/auth.service';
+import { getStudentDetailProgress } from '../../api/auth.service';
+import { DetailedStudentProgress } from '../../api/auth.types';
 import { AnimatedAvatarRenderer } from '../AvatarEditor';
 
 // --- ICONOS ---

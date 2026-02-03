@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
-  QuestionDTO,
+  //QuestionDTO,
   completeLesson,
   subtractHeart,
-  UserProfileData,
+  //UserProfileData,
 } from "../api/auth.service";
+import { QuestionDTO,  UserProfileData} from "../api/auth.types";
 
 /* ================== PROPS ================== */
 interface QuizModalProps {

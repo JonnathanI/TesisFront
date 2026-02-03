@@ -19,20 +19,21 @@ import { EvaluationsSection } from "./sections/EvaluationsSection";
 
 // Importaciones del Service
 import {
-  UserProfileData,
+  //UserProfileData,
   getUserProfile,
   getCourseStatus,
-  UnitWithLessons,
+  //UnitWithLessons,
   getCourses,
   getGlobalLeaderboard,
-  LeaderboardEntry,
+  //LeaderboardEntry,
   buyShopItem,
   removeToken,
   getFriendsList,
-  StudentData,
+  //StudentData,
   getStudentClassrooms,
   getClassroomDetails // <-- Asegúrate de que esté exportado en tu service
 } from "../api/auth.service";
+import { StudentData, LeaderboardEntry , UnitWithLessons, UserProfileData} from "../api/auth.types";
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -143,15 +144,93 @@ const StudentDashboard = () => {
     .section-card { padding: 20px; border-radius: 18px; border: 2px solid #E5E5E5; margin-bottom: 20px; background-color: white; }
   `;
 
-  if (isLoading) {
-    return (
-      <div className="loader-container">
-        <style>{dashboardStyles}</style>
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ fontSize: "40px" }}>🌀</motion.div>
-        <p style={{ marginTop: "20px", color: "#666", fontWeight: "bold" }}>Sincronizando progreso...</p>
-      </div>
-    );
-  }
+if (isLoading) {
+  const rainbowColors = [
+    "#FF4B4B", // rojo
+    "#FF9600", // naranja
+    "#FFD800", // amarillo
+    "#58CC02", // verde
+    "#1CB0F6", // celeste
+    "#906CFF", // violeta
+    "#FF6F9F", // rosa
+  ];
+
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "white",
+      }}
+    >
+      {/* BIENVENIDO ARCOIRIS LETRA POR LETRA */}
+      <motion.h1
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        style={{
+          fontSize: "3.5rem",        // 🔥 más grande
+          fontWeight: 900,
+          marginBottom: 24,
+          letterSpacing: "0.08em",
+        }}
+      >
+        {"Bienvenido".split("").map((char, index) => (
+          <motion.span
+            key={index}
+            animate={{ color: rainbowColors }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              repeatType: "reverse",
+              delay: index * 0.15,   // 👉 cada letra empieza un poquito después
+            }}
+            style={{
+              display: "inline-block",
+            }}
+          >
+            {char}
+          </motion.span>
+        ))}
+      </motion.h1>
+
+      {/* Video grande del búho */}
+      <video
+        src="/caminando.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        style={{
+          width: 320,
+          height: "auto",
+          objectFit: "contain",
+          marginBottom: 28,
+        }}
+      />
+
+      {/* Texto Cargando… */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, repeat: Infinity, repeatType: "reverse" }}
+        style={{
+          color: "#1CB0F6",
+          fontWeight: 900,
+          fontSize: "1.2rem",
+        }}
+      >
+        Cargando...
+      </motion.p>
+    </div>
+  );
+}
+
+
+
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "white", fontFamily: "'Poppins', sans-serif" }}>

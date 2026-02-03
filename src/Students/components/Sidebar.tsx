@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
     { id: "shop", label: "Tienda", icon: <ShoppingBag size={28} strokeWidth={2.5} /> },
     { id: "profile", label: "Perfil", icon: <UserCircle size={28} strokeWidth={2.5} /> },
     { id: "challenges", label: "Desafíos", icon: <Trophy size={28} strokeWidth={2.5} /> },
-    { id: "settings", label: "Configuración", icon: <Settings size={28} strokeWidth={2.5} /> },
+   
   ];
 
   // Lógica para obtener los atributos del avatar desde el JSON de la DB

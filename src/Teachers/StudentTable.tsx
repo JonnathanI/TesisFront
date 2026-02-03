@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'; // <-- ¡Añade useState y u
 import { motion } from 'framer-motion';
 // --- ¡AÑADE ESTOS IMPORTS! ---
 // (Ajusta la ruta a tu archivo api)
-import { getStudentList, StudentData } from '../api/auth.service';
+import { getStudentList } from '../api/auth.service';
+import { StudentData } from '../api/auth.types';
 
 // (Tu interfaz 'Student' ahora es 'StudentData' y se importa de la API)
 

@@ -6,11 +6,9 @@ import {
   createQuestion,
   updateQuestion,
   deleteQuestion,
-  getQuestionTypes,
-  QuestionData,
-  QuestionType,
+  getQuestionTypes, 
 } from "../../api/auth.service";
-
+import { QuestionType, QuestionData } from "../../api/auth.types";
 import {
   FiEdit2,
   FiTrash2,

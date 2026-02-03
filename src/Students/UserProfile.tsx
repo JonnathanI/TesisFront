@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaFire, FaBolt, FaCrown, FaUser, FaPen, FaSearch, FaEnvelope, FaMedal } from 'react-icons/fa';
 
 // Imports de tu proyecto
-import { getUserProfile, updateUserAvatar, UserProfileData } from "../api/auth.service";
+import { getUserProfile, updateUserAvatar } from "../api/auth.service";
 import AvatarEditor, { AvatarAttributes, AnimatedAvatarRenderer } from './AvatarEditor';
+import { UserProfileData } from "../api/auth.types";
 
 // --- SOLUCIÓN DE TIPOS ---
 const FireIcon = FaFire as any;

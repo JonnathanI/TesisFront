@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getPendingRequests, acceptFriendRequest, StudentData } from '../../api/auth.service';
+import { getPendingRequests, acceptFriendRequest } from '../../api/auth.service';
+import { StudentData } from '../../api/auth.types';
 
 export const FriendRequests = () => {
   const [requests, setRequests] = useState<StudentData[]>([]);

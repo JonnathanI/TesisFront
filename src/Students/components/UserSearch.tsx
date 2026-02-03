@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { searchUsers, followUser, StudentData } from '../../api/auth.service';
+import { searchUsers, followUser } from '../../api/auth.service';
+import { StudentData } from '../../api/auth.types';
 
 export const UserSearch = () => {
   const [query, setQuery] = useState('');

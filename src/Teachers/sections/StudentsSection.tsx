@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   getStudentList, 
-  getStudentDetailProgress, 
-  StudentData, 
-  DetailedStudentProgress 
+  getStudentDetailProgress 
 } from '../../api/auth.service';
 
+import { StudentData,  DetailedStudentProgress} from '../../api/auth.types';
 export const StudentsSection = () => {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,43 @@
 // src/api/auth.service.ts
+// src/api/auth.service.ts
+
+import {
+  UserRole,
+  AuthResponse,
+  LoginCredentials,
+  RegisterCredentials,
+  Course,
+  UnitData,
+  UnitWithLessons,
+  UserProgress,
+  LessonProgressDTO,
+  QuestionDTO,
+  AnswerSubmissionDTO,
+  AnswerResultDTO,
+  UserProfileData,
+  DetailedStudentProgress,
+  StudentData,
+  QuestionData,
+  Lesson,
+  ClassroomData,
+  AssignmentData,
+  LessonData,
+  NewUnitPayload,
+  NewLessonPayload,
+  NewQuestionPayload,
+  LeaderboardEntry,
+  BulkUserItem,
+  BulkRegisterResponse,
+  QuestionType,
+  UserChallengesDTO,
+  EvaluationRequest,
+  EvaluationAssignment,
+  EvaluationQuestion,
+  PendingEvaluationDTO,
+  StudentEvaluation,
+  BulkRegisterRequest,
+  CreateCoursePayload,
+} from "./auth.types";
 
 // --- CONFIGURACIÓN BASE ---
 const BASE_URL = 'http://localhost:8081/api';
@@ -10,312 +49,6 @@ const BASE_URL = 'http://localhost:8081/api';
 // 1. INTERFACES DE DATOS (DTOs)
 // ==========================================
 
-export type UserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
-
-export interface AuthResponse {
-    token: string;
-    userId: string;
-    role: UserRole;
-    fullName: string;
-}
-
-export interface LoginCredentials {
-    username: string;
-    password: string;
-}
-
-export interface RegisterCredentials {
-  email: string;
-   // username: string;
-    password: string;
-    fullName: string;
-cedula: string;              // ✅ NUEVO
-  registrationCode?: string;
-    adminCode?: string; 
-}
-
-// --- CURSOS Y UNIDADES ---
-export interface Course {
-    id: number;
-    title: string;
-    description: string;
-}
-
-export interface UnitData {
-  id: string;
-  title: string;
-  unitOrder: number;
-  description?: string;
-}
-
-export interface UnitWithLessons {
-  id: string;
-  title: string;
-  unitOrder: number;
-  isLocked: boolean;
-  isCompleted: boolean;
-  lessons: Lesson[];
-}
-// --- PROGRESO ---
-export interface UserProgress {
-    totalPoints: number;
-    lastLessonId: number;
-}
-
-export interface LessonProgressDTO {
-    id: string; 
-    title: string;
-    lessonOrder: number;
-    requiredXp: number;
-    isCompleted: boolean;
-    masteryLevel: number;
-    lastPracticed: string | null; 
-    xpEarned: number;
-}
-export interface QuestionDTO {
-  id: string;
-  textSource: string;
-  textTarget: string;
-  questionType: {
-    id: string;
-    typeName: string;
-  };
-  options: any[];
-  audioUrl?: string;
-  feedback?: string;
-}
-
-
-export interface AnswerSubmissionDTO {
-    questionId: string;
-    userAnswer: string; 
-}
-
-export interface AnswerResultDTO {
-    questionId: string;
-    userAnswer: string;
-    isCorrect: boolean;
-}
-
-export interface UserProfileData {
-  userId?: string;
-    fullName: string;
-    username: string;
-    joinedAt: string; 
-    totalXp: number;
-    currentStreak: number;
-    lingots: number;
-    heartsCount: number;
-nextHeartRegenTime: string | null;
-    league: string;
-    avatarData?: string; 
-}
-export interface DetailedStudentProgress {
-    fullName: String;
-    username: string;
-    avatarData: string | null;
-    totalXp: number;
-    currentStreak: number;
-    units: {
-        id: string;
-        title: string;
-        lessons: {
-            id: string;
-            title: string;
-            isCompleted: boolean;
-            mistakesCount: number;
-            correctAnswers: number;
-            lastPracticed: string | null;
-            xpEarned: number;
-        }[];
-    }[];
-}
-// --- TEACHER / ADMIN ---
-export interface StudentData {
-    id: string;
-    fullName: string;
-    email?: string;
-    username?: string;
-    xpTotal: number;
-    currentStreak: number;
-isActive: boolean; 
-}
-
-export interface QuestionData {
-  id: string;
-  textSource: string;
-  textTarget: string | null;
-  options: string[];
-  audioUrl?: string;
-  active?: boolean;
-  questionType: {
-    id: string;
-    typeName: string;
-  };
-}
-
-export interface Lesson {
-  id: string;
-  title: string;
-  lessonOrder: number;
-  requiredXp: number;
-  isCompleted: boolean;
-  unitId?: string; // 👈 opcional
-}
-
-export interface ClassroomData {
-    id: string;
-    name: string;
-    code: string;
-}
-
-export interface AssignmentData {
-    id: string;
-    title: string;
-    description: string;
-    xpReward: number;
-    dueDate?: string;
-}
-
-export interface LessonData {
-    id: string;
-    title: string;
-    lessonOrder: number;
-}
-// Payloads
-export interface NewUnitPayload {
-    courseId: string;
-    title: string;
-    unitOrder: number;
-}
-
-export interface NewLessonPayload {
-    unitId: string;
-    title: string;
-    lessonOrder: number;
-    requiredXp: number;
-}
-
-export interface NewQuestionPayload {
-  lessonId: string;
-  questionTypeId: string; // UUID
-  textSource: string;
-  textTarget?: string;
-  options: string[];
-  audioUrl?: string;
-  active?: boolean;
-}
-
-
-export interface LeaderboardEntry {
-    userId: string;
-    fullName: string;
-    xpTotal: number;
-    position: number;
-}
-
-// --- TIPOS PARA REGISTRO MASIVO ---
-export interface BulkUserItem {
-    fullName: string;
-    email: string;
-    password?: string;
-}
-
-export interface BulkRegisterResponse {
-    totalProcessed: number;
-    successCount: number;
-    failureCount: number;
-    errors: { email: string; message: string }[];
-}
-
-export interface QuestionType {
-  id: string;
-  typeName: string;
-  description?: string;
-}
-
-// --- AGREGAR A LAS INTERFACES DE DATOS (Sección 1) ---
-export interface UserChallengesDTO {
-    dailyExpProgress: number;
-    dailyExpGoal: number;
-    minutesLearned: number;
-    minutesGoal: number;
-    perfectLessonsCount: number;
-    perfectLessonsGoal: number;
-    challengesCompleted: number;
-}
-
-// --- PROGRESO DETALLADO ACTUALIZADO ---
-export interface DetailedStudentProgress {
-  currentStreak: number; // 🔥 Agregado para solucionar error TS2339
-  xpTotal: number;       // ⚡ Agregado para mostrar en el perfil
-  units: {
-    id: string;
-    title: string;
-    lessons: {
-      id: string;
-      title: string;
-      isCompleted: boolean;
-      mistakesCount: number; 
-      correctAnswers: number;
-      lastPracticed: string | null;
-      xpEarned: number;
-    }[];
-  }[];
-}
-
-export interface EvaluationRequest {
-  title: string;
-  description?: string;
-  questions: {
-    textSource: string;
-    textTarget?: string;
-    questionTypeId: string;
-    options: string[];
-  }[];
-}
-
-// Para cuando el estudiante recibe el examen
-export interface EvaluationAssignment {
-  id: string;
-  evaluation: {
-    id: string;
-    title: string;
-    description: string;
-    questions: EvaluationQuestion[];
-  };
-  dueDate: string;
-  completed: boolean;
-  score?: number;
-}
-
-export interface EvaluationQuestion {
-  id: string;
-  textSource: string;
-  textTarget: string;
-  options: string[];
-  questionType: {
-    id: string;
-    typeName: string;
-  };
-}
-
-export interface PendingEvaluationDTO {
-  assignmentId: string;
-  evaluationId: string;
-  title: string;
-  description: string;
-  dueDate: string;
-  completed: boolean;
-  score: number | null;
-}
-
-export interface StudentEvaluation {
-  id: string;
-  title: string;
-  description: string;
-  questions: EvaluationQuestion[];
-}
 
 
 // ==========================================
@@ -688,11 +421,6 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
 };
 
 // --- MODIFICA ESTA INTERFAZ ---
-export interface BulkRegisterRequest {
-    users: BulkUserItem[];      // Coincide con tu lista en Kotlin
-    registrationCode: string;     // Añadido para que TS no dé error
-    roleToAssign: UserRole;       // Añadido para enviar el rol dinámico
-}
 
 // --- MODIFICA ESTA FUNCIÓN ---
 export const registerBulk = async (data: BulkRegisterRequest): Promise<BulkRegisterResponse> => {
@@ -709,11 +437,7 @@ export const registerBulk = async (data: BulkRegisterRequest): Promise<BulkRegis
     return response.json();
 };
 
-export interface CreateCoursePayload {
-  title: string;
-  targetLanguage: string;
-  baseLanguage: string;
-}
+
 
 export const createCourse = async (
   payload: CreateCoursePayload
@@ -942,14 +666,29 @@ export const getEvaluationDetails = async (
 
 // Guardar el resultado final del examen
 // Adaptamos para recibir un objeto con 'score' o 'status' según necesites
-export const submitEvaluationResult = async (assignmentId: string, payload: { score?: number; status: string }): Promise<any> => {
-    const response = await apiFetch(`/student/evaluations/assign/${assignmentId}/complete`, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-    });
-    if (!response.ok) throw new Error("Error al enviar resultados");
-    return response.json();
+// DESPUÉS: leemos texto en vez de JSON
+export const submitEvaluationResult = async (
+  assignmentId: string,
+  payload: { score?: number; status: string }
+): Promise<string> => {
+  const response = await apiFetch(
+    `/student/evaluations/assignment/${assignmentId}/complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Error al enviar resultados");
+  }
+
+  // El backend responde con String ("Evaluación completada correctamente")
+  const message = await response.text();
+  return message;
 };
+
+
 
 // Obtener evaluaciones pendientes del alumno
 // En src/api/auth.service.ts
@@ -968,6 +707,23 @@ export const getStudentPendingEvaluations = async (
   return response.json();
 };
 
+// Todas (pendientes + completadas)
+export const getStudentAllEvaluations = async (
+  studentId: string
+): Promise<PendingEvaluationDTO[]> => {
+  const response = await apiFetch(
+    `/student/evaluations/all?studentId=${studentId}`,
+    { method: "GET" }
+  );
+
+  if (!response.ok) {
+    throw new Error("Error al obtener evaluaciones");
+  }
+
+  return response.json();
+};
+
+
 export const searchUsersByQuery = async (query: string) => {
   // Según tu UserController, el parámetro se llama 'query'
   const response = await apiFetch(`/users/search?query=${query}`, { 
@@ -976,3 +732,31 @@ export const searchUsersByQuery = async (query: string) => {
   if (!response.ok) return [];
   return response.json();
 };
+
+// 🔹 Subir archivo (audio / imagen) para evaluaciones
+// 🔹 Subir archivo (audio / imagen) para evaluaciones
+export async function uploadEvaluationFile(
+  file: File,
+  folder: string = "misc"
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("folder", folder);
+
+  // 👇 Usamos apiFetch para que agregue BASE_URL (http://localhost:8081/api)
+  const res = await apiFetch("/teacher/evaluations/upload", {
+    method: "POST",
+    body: formData, // NO se pone Content-Type a mano
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error("Error subiendo archivo:", res.status, text);
+    throw new Error("Error al subir archivo");
+  }
+
+  // Tu endpoint devuelve solo la URL como texto plano
+  const url = await res.text();
+  return url;
+}
+

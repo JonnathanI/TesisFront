@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { registerBulk, BulkRegisterRequest, UserRole } from '../api/auth.service';
+import { registerBulk, 
+  //BulkRegisterRequest, 
+  //UserRole 
+  } from '../api/auth.service';
+import { BulkRegisterRequest,  UserRole} from '../api/auth.types';
 
 export const BulkUpload = () => {
   const [role, setRole] = useState<UserRole>('STUDENT');

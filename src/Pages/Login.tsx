@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState, CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 // Importamos las funciones necesarias de tu service
-import { login, forgotPassword, AuthResponse } from "../api/auth.service";
+import { login, forgotPassword } from "../api/auth.service";
+import { AuthResponse } from "../api/auth.types";
 
 const COLOR_PRIMARY_BLUE = "#278DCE";
 const COLOR_SECONDARY_YELLOW = "#FFD700";

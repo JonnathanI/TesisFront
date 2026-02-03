@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaBolt, FaClock, FaCheckCircle } from 'react-icons/fa';
 // Importamos el servicio y la interfaz desde tu archivo de servicios
-import { getUserChallenges, UserChallengesDTO } from '../api/auth.service';
+import { getUserChallenges } from '../api/auth.service';
+import { UserChallengesDTO } from '../api/auth.types';
 
 // Casting de iconos para evitar errores de TS2786
 const BoltIcon = FaBolt as any;

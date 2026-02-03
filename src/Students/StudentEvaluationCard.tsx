@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { FiClock, FiAward, FiAlertCircle } from "react-icons/fi";
-import { getStudentPendingEvaluations } from "../api/auth.service";
+import { FiClock, FiAward, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
+import { getStudentAllEvaluations } from "../api/auth.service";
 import { useNavigate } from "react-router-dom";
 import "./StudentEvaluationCard.css";
 
@@ -8,6 +8,7 @@ import "./StudentEvaluationCard.css";
 const IconAward = FiAward as any;
 const IconClock = FiClock as any;
 const IconAlert = FiAlertCircle as any;
+const IconCheckCircle = FiCheckCircle as any;
 
 // 🔐 Obtener studentId desde el JWT
 const getStudentIdFromToken = (): string | null => {
@@ -22,7 +23,7 @@ const getStudentIdFromToken = (): string | null => {
   }
 };
 
-interface PendingEvaluation {
+interface StudentEvaluation {
   assignmentId: string;
   evaluationId: string;
   title: string;
@@ -33,7 +34,7 @@ interface PendingEvaluation {
 }
 
 export function StudentEvaluationCard() {
-  const [pending, setPending] = useState<PendingEvaluation[]>([]);
+  const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -42,8 +43,6 @@ export function StudentEvaluationCard() {
     const fetchEvaluations = async () => {
       const studentId = getStudentIdFromToken();
 
-      console.log("📌 studentId:", studentId);
-
       if (!studentId) {
         setError("No se pudo identificar al usuario");
         setLoading(false);
@@ -51,9 +50,9 @@ export function StudentEvaluationCard() {
       }
 
       try {
-        const data = await getStudentPendingEvaluations(studentId);
+        const data = await getStudentAllEvaluations(studentId);
         console.log("📦 Evaluaciones recibidas:", data);
-        setPending(data);
+        setEvaluations(data);
       } catch (err) {
         console.error("❌ Error cargando evaluaciones:", err);
         setError("No se pudieron cargar las evaluaciones");
@@ -85,13 +84,16 @@ export function StudentEvaluationCard() {
     );
   }
 
-  // ✨ Sin tareas
-  if (pending.length === 0) {
+  const pendingList = evaluations.filter((e) => !e.completed);
+  const completedList = evaluations.filter((e) => e.completed);
+
+  // Si no hay nada de nada
+  if (pendingList.length === 0 && completedList.length === 0) {
     return (
       <div className="eval-empty">
         <span>✨</span>
         <h3>¡Estás al día!</h3>
-        <p>No tienes evaluaciones pendientes.</p>
+        <p>No tienes evaluaciones asignadas.</p>
       </div>
     );
   }
@@ -100,49 +102,109 @@ export function StudentEvaluationCard() {
     <div className="evaluations">
       <h3>Mis Evaluaciones</h3>
 
-      {pending.map((assignment) => {
-        // ✅ CONSOLE BIEN COLOCADOS
-        console.log("➡️ assignmentId:", assignment.assignmentId);
-        console.log("➡️ evaluationId:", assignment.evaluationId);
+      {/* PENDIENTES */}
+      <section className="eval-section">
+        <h4 className="eval-section-title">Pendientes</h4>
 
-        return (
-          <div
-            key={assignment.assignmentId}
-            className="evaluation-card"
-          >
-            <div className="evaluation-left">
-              <div className="evaluation-icon">
-                <IconAward />
-              </div>
-
-              <div>
-                <div className="evaluation-title">
-                  {assignment.title}
-                </div>
-
-                <div className="evaluation-date">
-                  <IconClock size={14} />
-                  <span>
-                    Vence:{" "}
-                    {new Date(assignment.dueDate).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-           <button
-  className="evaluation-btn"
-  onClick={() => {
-    console.log("🚀 Navegando con assignmentId:", assignment.assignmentId);
-    navigate(`/evaluation/${assignment.assignmentId}`);
-  }}
->
-  Empezar
-</button>
-
+        {pendingList.length === 0 ? (
+          <div className="eval-empty-inline">
+            <span>✔</span>
+            <p>No tienes evaluaciones pendientes.</p>
           </div>
-        );
-      })}
+        ) : (
+          pendingList.map((assignment) => (
+            <div
+              key={assignment.assignmentId}
+              className="evaluation-card"
+            >
+              <div className="evaluation-left">
+                <div className="evaluation-icon">
+                  <IconAward />
+                </div>
+
+                <div>
+                  <div className="evaluation-title">
+                    {assignment.title}
+                  </div>
+
+                  <div className="evaluation-date">
+                    <IconClock size={14} />
+                    <span>
+                      Vence:{" "}
+                      {new Date(assignment.dueDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                className="evaluation-btn"
+                onClick={() => {
+                  console.log(
+                    "🚀 Navegando (pendiente) con assignmentId:",
+                    assignment.assignmentId
+                  );
+                  navigate(`/evaluation/${assignment.assignmentId}`);
+                }}
+              >
+                Empezar
+              </button>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* COMPLETADAS */}
+      <section className="eval-section">
+        <h4 className="eval-section-title">Completadas</h4>
+
+        {completedList.length === 0 ? (
+          <div className="eval-empty-inline">
+            <p>Todavía no has completado ninguna evaluación.</p>
+          </div>
+        ) : (
+          completedList.map((assignment) => (
+            <div
+              key={assignment.assignmentId}
+              className="evaluation-card evaluation-card-completed"
+            >
+              <div className="evaluation-left">
+                <div className="evaluation-icon completed">
+                  <IconCheckCircle />
+                </div>
+
+                <div>
+                  <div className="evaluation-title">
+                    {assignment.title}
+                  </div>
+
+                  <div className="evaluation-date">
+                    <span>
+                      ✅ Completada – Puntaje:{" "}
+                      {assignment.score ?? 0}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                className="evaluation-btn evaluation-btn-secondary"
+                onClick={() => {
+                  console.log(
+                    "👀 Ver detalle (completada) assignmentId:",
+                    assignment.assignmentId
+                  );
+                  navigate(`/evaluation/${assignment.assignmentId}`, {
+                    state: { readOnly: true },
+                  });
+                }}
+              >
+                Ver detalle
+              </button>
+            </div>
+          ))
+        )}
+      </section>
     </div>
   );
 }

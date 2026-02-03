@@ -1,45 +1,48 @@
-import React, { useState, useEffect } from "react";
-import { 
-  FiPlus, FiTrash2, FiFileText, FiX, 
-  FiUser, FiLayers, FiList, FiType, FiMic 
-} from 'react-icons/fi';
-import { 
-  getQuestionTypes, 
-  createFullEvaluation, 
+import React, { useState, useEffect, CSSProperties } from "react";
+import {
+  FiPlus,
+  FiTrash2,
+  FiFileText,
+  FiX,
+  FiLayers,
+  FiList,
+} from "react-icons/fi";
+import {
+  getQuestionTypes,
+  createFullEvaluation,
   getTeacherEvaluations,
-  getTeacherClassrooms, 
+  getTeacherClassrooms,
   assignEvaluationToClassroom,
   assignEvaluationToStudent,
-  getStudentList 
+  getStudentList,
+  uploadEvaluationFile, // 👈 nuevo helper
 } from "../../api/auth.service";
 
-// --- CORRECCIÓN TS2786: Casteo de iconos a 'any' ---
+// Fix TS: casteo a any
 const IconPlus = FiPlus as any;
 const IconTrash = FiTrash2 as any;
 const IconFile = FiFileText as any;
-const IconUser = FiUser as any;
 const IconLayers = FiLayers as any;
 const IconX = FiX as any;
 const IconList = FiList as any;
-const IconType = FiType as any;
-const IconMic = FiMic as any;
 
 export function EvaluationsSection() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [questionTypes, setQuestionTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // Estado de preguntas inicializado con campos de evaluación
+
   const [questions, setQuestions] = useState<any[]>([
-    { 
-      textSource: "", 
-      textTarget: "", 
-      questionTypeId: "", 
+    {
+      textSource: "",
+      textTarget: "",
+      questionTypeId: "",
       options: ["", "", "", ""],
       category: "GRAMMAR",
-      difficultyScore: 1.0
-    }
+      difficultyScore: 1.0,
+      audioUrl: "",
+      imageUrls: ["", "", "", ""],
+    },
   ]);
 
   const [savedEvaluations, setSavedEvaluations] = useState<any[]>([]);
@@ -47,7 +50,9 @@ export function EvaluationsSection() {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEval, setSelectedEval] = useState<any>(null);
-  const [assignmentMode, setAssignmentMode] = useState<"group" | "student">("group");
+  const [assignmentMode, setAssignmentMode] = useState<"group" | "student">(
+    "group"
+  );
   const [selectedClassroom, setSelectedClassroom] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
 
@@ -61,7 +66,7 @@ export function EvaluationsSection() {
         getQuestionTypes(),
         getTeacherEvaluations(),
         getTeacherClassrooms(),
-        getStudentList()
+        getStudentList(),
       ]);
       setQuestionTypes(types);
       setSavedEvaluations(evals);
@@ -73,29 +78,154 @@ export function EvaluationsSection() {
   };
 
   const addQuestion = () => {
-    setQuestions([...questions, { 
-      textSource: "", 
-      textTarget: "", 
-      questionTypeId: "", 
-      options: ["", "", "", ""],
-      category: "GRAMMAR",
-      difficultyScore: 1.0
-    }]);
+    setQuestions((prev) => [
+      ...prev,
+      {
+        textSource: "",
+        textTarget: "",
+        questionTypeId: "",
+        options: ["", "", "", ""],
+        category: "GRAMMAR",
+        difficultyScore: 1.0,
+        audioUrl: "",
+        imageUrls: ["", "", "", ""],
+      },
+    ]);
+  };
+
+  const getTypeConfig = (questionTypeId: string) => {
+    const t = questionTypes.find((tt) => tt.id === questionTypeId);
+    const typeName = (t?.typeName || "").toUpperCase();
+
+    const usesOptions = [
+      "IMAGE_SELECT",
+      "TRANSLATION_TO_TARGET",
+      "TRANSLATION_TO_SOURCE",
+      "MATCHING",
+      "MULTIPLE_CHOICE",
+      "LISTENING",
+      "AUDIO_SELECT",
+      "ORDERING",
+    ].includes(typeName);
+
+    const isOrdering = typeName === "ORDERING";
+    const isImageSelect = typeName === "IMAGE_SELECT";
+    const usesAudio = ["LISTENING", "AUDIO_SELECT", "SPEAKING"].includes(
+      typeName
+    );
+
+    return { typeName, usesOptions, isOrdering, isImageSelect, usesAudio };
+  };
+
+  /** 🔊 Subir audio a Cloudinary y guardar URL en la pregunta */
+  const handleAudioFileChange = async (file: File, qIndex: number) => {
+    try {
+      const url = await uploadEvaluationFile(file, "evaluations_audios");
+      setQuestions((prev) => {
+        const copy = [...prev];
+        copy[qIndex] = {
+          ...copy[qIndex],
+          audioUrl: url,
+        };
+        return copy;
+      });
+      alert("Audio subido correctamente");
+    } catch (err) {
+      console.error(err);
+      alert("Error al subir el audio");
+    }
+  };
+
+  /** 🖼️ Subir imagen de opción y guardar URL en imageUrls */
+  const handleImageFileChange = async (
+    file: File,
+    qIndex: number,
+    optIndex: number
+  ) => {
+    try {
+      const url = await uploadEvaluationFile(file, "evaluations_images");
+      setQuestions((prev) => {
+        const copy = [...prev];
+        const current = copy[qIndex];
+        const imageUrls = [...(current.imageUrls || [])];
+        imageUrls[optIndex] = url;
+        copy[qIndex] = {
+          ...current,
+          imageUrls,
+        };
+        return copy;
+      });
+      alert("Imagen subida correctamente");
+    } catch (err) {
+      console.error(err);
+      alert("Error al subir la imagen");
+    }
   };
 
   const handleSaveAll = async () => {
     if (!title) return alert("El título es obligatorio");
-    if (questions.some(q => !q.questionTypeId)) return alert("Todas las preguntas deben tener un tipo");
-    
+    if (questions.some((q) => !q.questionTypeId))
+      return alert("Todas las preguntas deben tener un tipo");
+
+    // 🔧 Construimos el payload que espera el backend:
+    // - Para IMAGE_SELECT: combinamos texto + imageUrl en JSON (como en QuestionsSection)
+    // - Para el resto: options tal cual
+    const payloadQuestions = questions.map((q) => {
+      const { isImageSelect } = getTypeConfig(q.questionTypeId);
+
+      let optionsToSend: string[] = q.options || [];
+
+      if (isImageSelect) {
+        const imageUrls = q.imageUrls || [];
+        optionsToSend = (q.options || []).map((text: string, idx: number) =>
+          JSON.stringify({
+            value: text,
+            imageUrl: imageUrls[idx] || null,
+          })
+        );
+      }
+
+      // Nos quedamos solo con lo que el backend necesita (evitando mandar imageUrls extra)
+      return {
+        textSource: q.textSource,
+        textTarget: q.textTarget,
+        questionTypeId: q.questionTypeId,
+        options: optionsToSend,
+        audioUrl: q.audioUrl,
+        category: q.category || "EVALUATION",
+        difficultyScore:
+          typeof q.difficultyScore === "string"
+            ? parseFloat(q.difficultyScore) || 1.0
+            : q.difficultyScore || 1.0,
+        active: true,
+      };
+    });
+
     setLoading(true);
     try {
-      await createFullEvaluation({ title, description, questions });
+      await createFullEvaluation({
+        title,
+        description,
+        questions: payloadQuestions,
+      });
       alert("¡Evaluación creada con éxito!");
       setTitle("");
       setDescription("");
-      setQuestions([{ textSource: "", textTarget: "", questionTypeId: "", options: ["", "", "", ""], category: "GRAMMAR", difficultyScore: 1.0 }]);
+      setQuestions([
+        {
+          textSource: "",
+          textTarget: "",
+          questionTypeId: "",
+          options: ["", "", "", ""],
+          category: "GRAMMAR",
+          difficultyScore: 1.0,
+          audioUrl: "",
+          imageUrls: ["", "", "", ""],
+        },
+      ]);
       fetchInitialData();
     } catch (err) {
+      console.error(err);
       alert("Error al guardar la evaluación.");
     } finally {
       setLoading(false);
@@ -115,205 +245,793 @@ export function EvaluationsSection() {
       alert("Asignación completada");
       setIsModalOpen(false);
     } catch (err) {
+      console.error(err);
       alert("Error en la asignación");
     }
   };
 
-  const getTypeName = (id: string) => {
-    return questionTypes.find(t => t.id === id)?.typeName || "";
-  };
-
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 bg-[#f7f7f7] min-h-screen font-sans">
-      
-      {/* SECCIÓN 1: CREADOR DE EXÁMENES */}
-      <div className="bg-white rounded-[2rem] shadow-sm p-8 mb-12 border-2 border-[#e5e5e5]">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="bg-[#1cb0f6] p-4 rounded-2xl text-white shadow-[0_4px_0_#1899d6]">
+    <div style={pageWrapper}>
+      {/* CARD 1: CREACIÓN */}
+      <div style={cardWrapper}>
+        <div style={headerRow}>
+          <div style={headerIconBox}>
             <IconFile size={32} />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-[#3c3c3c] uppercase">Banco de Evaluaciones</h1>
-            <p className="text-[#afafaf] font-bold text-xs uppercase tracking-widest">Preguntas sin lección obligatoria</p>
+            <h1 style={cardTitle}>Banco de Evaluaciones</h1>
+            <p style={cardSubtitle}>Preguntas sin lección obligatoria</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-4">
-            <div className="sticky top-8">
-                <label className="block text-xs font-black text-[#afafaf] uppercase ml-2 mb-2">General</label>
-                <input
-                className="w-full p-4 bg-[#f7f7f7] rounded-2xl border-2 border-[#e5e5e5] focus:border-[#1cb0f6] outline-none font-bold mb-4"
+        <div style={twoCols}>
+          {/* Columna izquierda (título / descripción / publicar) */}
+          <div style={leftCol}>
+            <div style={stickyBox}>
+              <label style={labelSm}>General</label>
+              <input
+                style={inputMain}
                 placeholder="Nombre del Examen"
                 value={title}
-                onChange={e => setTitle(e.target.value)}
-                />
-                <textarea
-                className="w-full p-4 bg-[#f7f7f7] rounded-2xl border-2 border-[#e5e5e5] focus:border-[#1cb0f6] outline-none font-medium text-sm min-h-[100px] mb-6"
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <textarea
+                style={textareaMain}
                 placeholder="Descripción o instrucciones..."
                 value={description}
-                onChange={e => setDescription(e.target.value)}
-                />
-                <button
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <button
                 onClick={handleSaveAll}
                 disabled={loading}
-                className="w-full py-4 bg-[#58cc02] hover:bg-[#61e002] text-white font-black rounded-2xl shadow-[0_4px_0_#46a302] active:translate-y-1 active:shadow-none transition-all uppercase"
-                >
+                style={{
+                  ...primaryButton,
+                  opacity: loading ? 0.7 : 1,
+                  cursor: loading ? "wait" : "pointer",
+                }}
+              >
                 {loading ? "PROCESANDO..." : "PUBLICAR EVALUACIÓN"}
-                </button>
+              </button>
             </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
-             <label className="block text-xs font-black text-[#afafaf] uppercase ml-2">Lista de Reactivos ({questions.length})</label>
-             {questions.map((q, idx) => {
-               const currentType = getTypeName(q.questionTypeId);
-               return (
-                <div key={idx} className="bg-white border-2 border-[#e5e5e5] rounded-3xl p-6 relative shadow-sm hover:border-[#1cb0f6] transition-colors">
-                   <div className="flex justify-between items-center mb-6">
-                     <span className="bg-[#ddf4ff] text-[#1cb0f6] px-4 py-1 rounded-full font-black text-xs uppercase">
-                        Reactivo #{idx+1} {currentType && `| ${currentType}`}
-                     </span>
-                     <button onClick={() => setQuestions(questions.filter((_, i) => i !== idx))} className="text-[#afafaf] hover:text-[#ff4b4b] transition-colors">
-                        <IconTrash size={20}/>
-                     </button>
-                   </div>
+          {/* Columna derecha (reactivos) */}
+          <div style={rightCol}>
+            <label style={labelSm}>
+              Lista de Reactivos ({questions.length})
+            </label>
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-[#afafaf] ml-2 uppercase">Tipo de Dinámica</label>
-                        <select 
-                            className="w-full p-3 bg-[#f7f7f7] rounded-xl border-2 border-[#e5e5e5] focus:border-[#1cb0f6] outline-none font-bold text-sm"
-                            value={q.questionTypeId}
-                            onChange={e => { const n = [...questions]; n[idx].questionTypeId = e.target.value; setQuestions(n); }}
-                        >
-                            <option value="">Seleccionar tipo...</option>
-                            {questionTypes.map(t => <option key={t.id} value={t.id}>{t.typeName}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-[#afafaf] ml-2 uppercase">Puntos / Dificultad</label>
-                        <input 
-                            type="number"
-                            step="0.5"
-                            className="w-full p-3 bg-[#f7f7f7] rounded-xl border-2 border-[#e5e5e5] focus:border-[#1cb0f6] outline-none font-bold text-sm"
-                            value={q.difficultyScore}
-                            onChange={e => { const n = [...questions]; n[idx].difficultyScore = e.target.value; setQuestions(n); }}
-                        />
-                      </div>
-                   </div>
+            {questions.map((q, idx) => {
+              const {
+                typeName,
+                usesOptions,
+                isOrdering,
+                isImageSelect,
+                usesAudio,
+              } = getTypeConfig(q.questionTypeId);
 
-                   <div className="mb-4">
-                    <label className="text-[10px] font-black text-[#afafaf] ml-2 uppercase">Pregunta o Instrucción</label>
-                    <input 
-                      className="w-full p-4 bg-[#f7f7f7] rounded-xl border-2 border-[#e5e5e5] focus:border-[#1cb0f6] outline-none font-bold text-md" 
+              return (
+                <div key={idx} style={questionCard}>
+                  <div style={questionHeaderRow}>
+                    <span style={pillReactivo}>
+                      Reactivo #{idx + 1} {typeName && `| ${typeName}`}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setQuestions(questions.filter((_, i) => i !== idx))
+                      }
+                      style={iconButton}
+                    >
+                      <IconTrash size={20} />
+                    </button>
+                  </div>
+
+                  {/* Tipo + dificultad */}
+                  <div style={twoColsQuestions}>
+                    <div style={fieldGroup}>
+                      <label style={labelTiny}>Tipo de Dinámica</label>
+                      <select
+                        style={selectBase}
+                        value={q.questionTypeId}
+                        onChange={(e) => {
+                          const n = [...questions];
+                          n[idx].questionTypeId = e.target.value;
+                          setQuestions(n);
+                        }}
+                      >
+                        <option value="">Seleccionar tipo...</option>
+                        {questionTypes.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.typeName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={fieldGroup}>
+                      <label style={labelTiny}>Puntos / Dificultad</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        style={selectBase}
+                        value={q.difficultyScore}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          const n = [...questions];
+                          n[idx].difficultyScore = isNaN(value)
+                            ? 1.0
+                            : value;
+                          setQuestions(n);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* AUDIO (para LISTENING / AUDIO_SELECT / SPEAKING) */}
+                  {usesAudio && (
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        padding: 12,
+                        borderRadius: 16,
+                        background: "#f0f7ff",
+                        border: "1px dashed #2b70c9",
+                      }}
+                    >
+                      <label
+                        style={{
+                          ...labelTiny,
+                          color: "#2b70c9",
+                          marginBottom: 6,
+                        }}
+                      >
+                        Audio de referencia
+                      </label>
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleAudioFileChange(file, idx);
+                          }
+                        }}
+                      />
+                      {q.audioUrl && (
+                        <p style={{ fontSize: 11, marginTop: 4 }}>
+                          Audio subido ✅
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Enunciado */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={labelTiny}>Pregunta o Instrucción</label>
+                    <input
+                      style={inputSentence}
                       placeholder="Escribe el enunciado aquí..."
                       value={q.textSource}
-                      onChange={e => { const n = [...questions]; n[idx].textSource = e.target.value; setQuestions(n); }}
+                      onChange={(e) => {
+                        const n = [...questions];
+                        n[idx].textSource = e.target.value;
+                        setQuestions(n);
+                      }}
                     />
-                   </div>
+                  </div>
 
-                   <div className="mb-6">
-                    <label className="text-[10px] font-black text-[#58cc02] ml-2 uppercase">Respuesta Correcta</label>
-                    <input 
-                        className="w-full p-4 bg-[#f0fff4] rounded-xl border-2 border-[#58cc02] focus:border-[#58cc02] outline-none font-black text-md text-[#2b612b]" 
-                        placeholder="La respuesta válida"
-                        value={q.textTarget}
-                        onChange={e => { const n = [...questions]; n[idx].textTarget = e.target.value; setQuestions(n); }}
+                  {/* Respuesta correcta */}
+                  <div style={{ marginBottom: 24 }}>
+                    <label style={labelTinyCorrect}>Respuesta Correcta</label>
+                    <input
+                      style={inputCorrect}
+                      placeholder="La respuesta válida"
+                      value={q.textTarget}
+                      onChange={(e) => {
+                        const n = [...questions];
+                        n[idx].textTarget = e.target.value;
+                        setQuestions(n);
+                      }}
                     />
-                   </div>
+                  </div>
 
-                   {(currentType === "SELECT_ONE" || currentType === "IMAGE_SELECT") && (
-                     <div className="space-y-3 p-4 bg-[#fafafa] rounded-2xl border-2 border-dashed border-[#e5e5e5]">
-                        <label className="text-[10px] font-black text-[#afafaf] uppercase">Opciones Incorrectas</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {q.options.map((opt:string, oIdx:number) => (
-                            <div key={oIdx} className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-[#ccc]">{oIdx + 1}</span>
-                                <input 
-                                    className="flex-1 p-3 bg-white border-2 border-[#e5e5e5] rounded-xl text-sm font-bold focus:border-[#1cb0f6] outline-none"
-                                    placeholder={`Opción ${oIdx+1}`}
-                                    value={opt}
-                                    onChange={e => { const n = [...questions]; n[idx].options[oIdx] = e.target.value; setQuestions(n); }}
+                  {/* Opciones / Banco de palabras */}
+                  {usesOptions && (
+                    <div style={optionsBox}>
+                      <label style={labelTiny}>
+                        {isOrdering
+                          ? "Banco de palabras (en orden correcto)"
+                          : "Opciones de respuesta"}
+                      </label>
+
+                      <div style={optionsGrid}>
+                        {q.options.map((opt: string, oIdx: number) => (
+                          <div key={oIdx} style={optionRow}>
+                            <span style={optionIndex}>{oIdx + 1}</span>
+
+                            {/* Texto de la opción */}
+                            <input
+                              style={optionInput}
+                              placeholder={
+                                isOrdering
+                                  ? `Palabra ${oIdx + 1}`
+                                  : `Opción ${oIdx + 1}`
+                              }
+                              value={opt}
+                              onChange={(e) => {
+                                const n = [...questions];
+                                n[idx].options[oIdx] = e.target.value;
+                                setQuestions(n);
+                              }}
+                            />
+
+                            {/* Solo para IMAGE_SELECT: subir imagen */}
+                            {isImageSelect && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      handleImageFileChange(
+                                        file,
+                                        idx,
+                                        oIdx
+                                      );
+                                    }
+                                  }}
                                 />
-                            </div>
-                            ))}
-                        </div>
-                     </div>
-                   )}
-                </div>
-               );
-             })}
+                                {q.imageUrls?.[oIdx] && (
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#4caf50",
+                                    }}
+                                  >
+                                    Imagen subida ✅
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
 
-             <button 
-               onClick={addQuestion} 
-               className="w-full py-6 border-4 border-dashed border-[#e5e5e5] rounded-[2rem] text-[#afafaf] font-black hover:text-[#1cb0f6] hover:border-[#1cb0f6] hover:bg-[#f0f9ff] transition-all flex items-center justify-center gap-3"
-             >
-               <IconPlus size={24} /> AÑADIR OTRO REACTIVO
-             </button>
+                      {/* Botón para añadir opción/palabra extra */}
+                      <button
+                        type="button"
+                        style={addReactivoButton}
+                        onClick={() => {
+                          const n = [...questions];
+                          n[idx].options = [...n[idx].options, ""];
+                          n[idx].imageUrls = [
+                            ...(n[idx].imageUrls || []),
+                            "",
+                          ];
+                          setQuestions(n);
+                        }}
+                      >
+                        <IconPlus size={18} /> Añadir{" "}
+                        {isOrdering ? "palabra" : "opción"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <button onClick={addQuestion} style={addReactivoButton}>
+              <IconPlus size={20} />
+              <span>AÑADIR OTRO REACTIVO</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN 2: LISTADO */}
-      <div className="bg-white rounded-[2rem] shadow-sm p-8 border-2 border-[#e5e5e5]">
-        <h2 className="text-xl font-black text-[#3c3c3c] mb-6 uppercase flex items-center gap-2">
-            <IconList className="text-[#1cb0f6]"/> Evaluaciones Disponibles
+      {/* CARD 2: LISTADO DE EVALUACIONES */}
+      <div style={cardWrapper}>
+        <h2 style={listTitle}>
+          <IconList style={{ color: "#1cb0f6" }} />
+          <span>Evaluaciones Disponibles</span>
         </h2>
+
         {savedEvaluations.length === 0 ? (
-            <div className="text-center py-12 text-[#afafaf] font-bold italic">No hay evaluaciones.</div>
+          <div style={emptyState}>No hay evaluaciones.</div>
         ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div style={evaluationsGrid}>
             {savedEvaluations.map((ev) => (
-                <div key={ev.id} className="p-6 border-2 border-[#e5e5e5] rounded-[2rem] hover:border-[#1cb0f6] transition-all bg-white shadow-sm">
-                <h4 className="font-black text-[#3c3c3c] mb-1 truncate text-lg">{ev.title}</h4>
-                <p className="text-[#afafaf] text-xs font-bold uppercase mb-6 flex items-center gap-1">
-                    <IconLayers /> {ev.questions?.length || 0} Preguntas
+              <div key={ev.id} style={evaluationCard}>
+                <h4 style={evaluationTitle}>{ev.title}</h4>
+                <p style={evaluationMeta}>
+                  <IconLayers /> {ev.questions?.length || 0} Preguntas
                 </p>
-                <button 
-                    onClick={() => { setSelectedEval(ev); setIsModalOpen(true); }}
-                    className="w-full py-3 bg-[#1cb0f6] rounded-2xl text-white font-black text-xs uppercase shadow-[0_4px_0_#1899d6] active:translate-y-1 active:shadow-none"
+                <button
+                  onClick={() => {
+                    setSelectedEval(ev);
+                    setIsModalOpen(true);
+                  }}
+                  style={assignButton}
                 >
-                    Asignar a Alumnos
+                  Asignar a Alumnos
                 </button>
-                </div>
+              </div>
             ))}
-            </div>
+          </div>
         )}
       </div>
 
-      {/* MODAL DE ASIGNACIÓN */}
+      {/* MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-[#3c3c3ccb] backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
-           <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl relative">
-              <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-[#afafaf] hover:text-[#3c3c3c]"><IconX size={24}/></button>
-              <h3 className="text-2xl font-black text-[#3c3c3c] mb-6">Asignar Reto</h3>
-              
-              <div className="flex gap-2 mb-6 p-1 bg-[#f7f7f7] rounded-2xl border-2 border-[#e5e5e5]">
-                <button onClick={() => setAssignmentMode("group")} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${assignmentMode === "group" ? "bg-white shadow-md text-[#1cb0f6]" : "text-[#afafaf]"}`}>POR AULA</button>
-                <button onClick={() => setAssignmentMode("student")} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${assignmentMode === "student" ? "bg-white shadow-md text-[#58cc02]" : "text-[#afafaf]"}`}>POR ALUMNO</button>
-              </div>
+        <div style={modalOverlay}>
+          <div style={modalCard}>
+            <button
+              onClick={() => setIsModalOpen(false)}
+              style={modalClose}
+            >
+              <IconX size={22} />
+            </button>
 
-              <div className="space-y-4 mb-8">
-                {assignmentMode === "group" ? (
-                    <select className="w-full p-4 bg-[#f7f7f7] border-2 border-[#e5e5e5] rounded-2xl font-bold outline-none" value={selectedClassroom} onChange={e => setSelectedClassroom(e.target.value)}>
-                        <option value="">Selecciona Aula...</option>
-                        {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                ) : (
-                    <select className="w-full p-4 bg-[#f7f7f7] border-2 border-[#e5e5e5] rounded-2xl font-bold outline-none" value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
-                        <option value="">Selecciona Alumno...</option>
-                        {allStudents.map(s => <option key={s.id} value={s.id}>{s.fullName}</option>)}
-                    </select>
-                )}
-              </div>
+            <h3 style={modalTitle}>Asignar Reto</h3>
 
-              <button onClick={handleAssign} className={`w-full py-4 text-white font-black rounded-2xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none transition-all ${assignmentMode === 'group' ? 'bg-[#1cb0f6]' : 'bg-[#58cc02]'}`}>
-                ENVIAR EXAMEN
+            {/* Tabs */}
+            <div style={tabsContainer}>
+              <button
+                onClick={() => setAssignmentMode("group")}
+                style={{
+                  ...tabButton,
+                  ...(assignmentMode === "group"
+                    ? tabButtonActiveBlue
+                    : {}),
+                }}
+              >
+                POR AULA
               </button>
-           </div>
+              <button
+                onClick={() => setAssignmentMode("student")}
+                style={{
+                  ...tabButton,
+                  ...(assignmentMode === "student"
+                    ? tabButtonActiveGreen
+                    : {}),
+                }}
+              >
+                POR ALUMNO
+              </button>
+            </div>
+
+            {/* Select */}
+            <div style={{ marginBottom: 24 }}>
+              {assignmentMode === "group" ? (
+                <select
+                  style={selectBase}
+                  value={selectedClassroom}
+                  onChange={(e) => setSelectedClassroom(e.target.value)}
+                >
+                  <option value="">Selecciona Aula...</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  style={selectBase}
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                >
+                  <option value="">Selecciona Alumno...</option>
+                  {allStudents.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.fullName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <button
+              onClick={handleAssign}
+              style={{
+                ...primaryButton,
+                background:
+                  assignmentMode === "group" ? "#1cb0f6" : "#58cc02",
+                boxShadow:
+                  assignmentMode === "group"
+                    ? "0 4px 0 #1899d6"
+                    : "0 4px 0 #46a302",
+              }}
+            >
+              ENVIAR EXAMEN
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
+
+/* ============================
+   ESTILOS INLINE (tus mismos)
+============================ */
+
+const pageWrapper: CSSProperties = {
+  maxWidth: 1200,
+  margin: "0 auto",
+  padding: "32px 16px 64px",
+  background: "#f7f7f7",
+  minHeight: "100vh",
+  fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+};
+
+const cardWrapper: CSSProperties = {
+  background: "white",
+  borderRadius: 32,
+  padding: 32,
+  marginBottom: 32,
+  border: "2px solid #e5e5e5",
+  boxShadow: "0 6px 16px rgba(0,0,0,0.03)",
+};
+
+const headerRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 16,
+  marginBottom: 32,
+};
+
+const headerIconBox: CSSProperties = {
+  background: "#1cb0f6",
+  padding: 16,
+  borderRadius: 24,
+  color: "white",
+  boxShadow: "0 4px 0 #1899d6",
+};
+
+const cardTitle: CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+  color: "#3c3c3c",
+  textTransform: "uppercase",
+};
+
+const cardSubtitle: CSSProperties = {
+  fontSize: 10,
+  textTransform: "uppercase",
+  letterSpacing: 2,
+  color: "#afafaf",
+  fontWeight: 700,
+};
+
+const twoCols: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
+  gap: 48,
+  alignItems: "flex-start",
+  marginTop: 12,
+};
+
+const leftCol: CSSProperties = {
+  paddingRight: 8,
+};
+
+const rightCol: CSSProperties = {};
+
+const stickyBox: CSSProperties = {
+  position: "sticky",
+  top: 24,
+  paddingBottom: 16,
+};
+
+const labelSm: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  color: "#afafaf",
+  textTransform: "uppercase",
+  marginLeft: 8,
+  marginBottom: 8,
+  display: "block",
+};
+
+const inputMain: CSSProperties = {
+  width: "100%",
+  padding: 16,
+  borderRadius: 18,
+  border: "2px solid #e5e5e5",
+  background: "#f7f7f7",
+  fontWeight: 700,
+  marginBottom: 12,
+  outline: "none",
+};
+
+const textareaMain: CSSProperties = {
+  ...inputMain,
+  minHeight: 100,
+  fontWeight: 500,
+  fontSize: 14,
+};
+
+const primaryButton: CSSProperties = {
+  width: "100%",
+  padding: 16,
+  borderRadius: 18,
+  border: "none",
+  background: "#58cc02",
+  color: "white",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  boxShadow: "0 4px 0 #46a302",
+};
+
+const labelTiny: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  color: "#afafaf",
+  textTransform: "uppercase",
+  marginLeft: 8,
+  marginBottom: 4,
+  display: "block",
+};
+
+const labelTinyCorrect: CSSProperties = {
+  ...labelTiny,
+  color: "#58cc02",
+};
+
+const twoColsQuestions: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+  gap: 16,
+  marginBottom: 16,
+};
+
+const fieldGroup: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+};
+
+const selectBase: CSSProperties = {
+  width: "100%",
+  padding: 12,
+  borderRadius: 14,
+  border: "2px solid #e5e5e5",
+  background: "#f7f7f7",
+  fontWeight: 700,
+  fontSize: 14,
+};
+
+const inputSentence: CSSProperties = {
+  ...selectBase,
+  padding: 16,
+  background: "#f7f7f7",
+};
+
+const inputCorrect: CSSProperties = {
+  ...selectBase,
+  padding: 16,
+  background: "#f0fff4",
+  borderColor: "#58cc02",
+  color: "#2b612b",
+};
+
+const questionCard: CSSProperties = {
+  background: "white",
+  borderRadius: 28,
+  padding: 24,
+  border: "2px solid #e5e5e5",
+  marginBottom: 20,
+  boxShadow: "0 4px 10px rgba(0,0,0,0.02)",
+};
+
+const questionHeaderRow: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 20,
+};
+
+const pillReactivo: CSSProperties = {
+  background: "#ddf4ff",
+  color: "#1cb0f6",
+  borderRadius: 999,
+  padding: "6px 14px",
+  fontSize: 10,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const iconButton: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "#afafaf",
+  cursor: "pointer",
+};
+
+const optionsBox: CSSProperties = {
+  padding: 16,
+  borderRadius: 20,
+  background: "#fafafa",
+  border: "2px dashed #e5e5e5",
+};
+
+const optionsGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+  gap: 12,
+  marginTop: 8,
+};
+
+const optionRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const optionIndex: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  color: "#cccccc",
+};
+
+const optionInput: CSSProperties = {
+  flex: 1,
+  padding: 10,
+  borderRadius: 14,
+  border: "2px solid #e5e5e5",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const addReactivoButton: CSSProperties = {
+  width: "100%",
+  padding: 18,
+  borderRadius: 28,
+  border: "4px dashed #e5e5e5",
+  background: "transparent",
+  color: "#afafaf",
+  fontWeight: 900,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: 10,
+  cursor: "pointer",
+};
+
+const listTitle: CSSProperties = {
+  fontSize: 20,
+  fontWeight: 900,
+  color: "#3c3c3c",
+  textTransform: "uppercase",
+  marginBottom: 20,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const emptyState: CSSProperties = {
+  textAlign: "center",
+  padding: "40px 0",
+  color: "#afafaf",
+  fontWeight: 700,
+  fontStyle: "italic",
+};
+
+const evaluationsGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+  gap: 16,
+};
+
+const evaluationCard: CSSProperties = {
+  padding: 20,
+  borderRadius: 28,
+  border: "2px solid #e5e5e5",
+  background: "white",
+  boxShadow: "0 4px 10px rgba(0,0,0,0.02)",
+};
+
+const evaluationTitle: CSSProperties = {
+  fontWeight: 900,
+  fontSize: 18,
+  color: "#3c3c3c",
+  marginBottom: 4,
+};
+
+const evaluationMeta: CSSProperties = {
+  fontSize: 12,
+  color: "#afafaf",
+  fontWeight: 700,
+  textTransform: "uppercase",
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  marginBottom: 18,
+};
+
+const assignButton: CSSProperties = {
+  width: "100%",
+  padding: 12,
+  borderRadius: 18,
+  border: "none",
+  background: "#1cb0f6",
+  color: "white",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  fontSize: 12,
+  boxShadow: "0 4px 0 #1899d6",
+  cursor: "pointer",
+};
+
+const modalOverlay: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(60,60,60,0.8)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 16,
+  zIndex: 9999,
+};
+
+const modalCard: CSSProperties = {
+  position: "relative",
+  background: "white",
+  borderRadius: 32,
+  width: "100%",
+  maxWidth: 420,
+  padding: 28,
+  boxShadow: "0 18px 40px rgba(0,0,0,0.25)",
+};
+
+const modalClose: CSSProperties = {
+  position: "absolute",
+  top: 16,
+  right: 16,
+  border: "none",
+  background: "transparent",
+  color: "#afafaf",
+  cursor: "pointer",
+};
+
+const modalTitle: CSSProperties = {
+  fontSize: 22,
+  fontWeight: 900,
+  color: "#3c3c3c",
+  marginBottom: 20,
+};
+
+const tabsContainer: CSSProperties = {
+  display: "flex",
+  gap: 6,
+  padding: 4,
+  borderRadius: 24,
+  background: "#f7f7f7",
+  border: "2px solid #e5e5e5",
+  marginBottom: 20,
+};
+
+const tabButton: CSSProperties = {
+  flex: 1,
+  padding: 10,
+  borderRadius: 18,
+  border: "none",
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: "pointer",
+  background: "transparent",
+  color: "#afafaf",
+};
+
+const tabButtonActiveBlue: CSSProperties = {
+  background: "white",
+  color: "#1cb0f6",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+};
+
+const tabButtonActiveGreen: CSSProperties = {
+  background: "white",
+  color: "#58cc02",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+};
+

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import {
-  UnitWithLessons,
-  UserProfileData,
+  //UnitWithLessons,
+  //UserProfileData,
   getLessonQuestions,
-  QuestionDTO,
+  //QuestionDTO,
 } from "../../api/auth.service";
+import { QuestionDTO ,UserProfileData , UnitWithLessons} from "../../api/auth.types";
 import { QuizModal } from "../../Components/QuizModal";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
