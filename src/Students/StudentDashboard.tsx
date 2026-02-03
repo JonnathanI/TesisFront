@@ -9,7 +9,6 @@ import ProfileSection from "./sections/ProfileSection";
 import Challenges from "./Challenges";
 
 // --- CORRECCIÓN DE IMPORTACIONES ---
-// Usamos llaves { } porque los definimos como "export const"
 import { FriendRequests } from "./components/FriendRequests"; 
 import { UserSearch } from "./components/UserSearch"; 
 
@@ -30,7 +29,9 @@ import {
   buyShopItem,
   removeToken,
   getFriendsList,
-  StudentData
+  StudentData,
+  getStudentClassrooms,
+  getClassroomDetails // <-- Asegúrate de que esté exportado en tu service
 } from "../api/auth.service";
 
 const StudentDashboard = () => {
@@ -49,59 +50,69 @@ const StudentDashboard = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- ESTADOS PARA GRUPOS ---
-  const [joinCode, setJoinCode] = useState("");
-  const [myGroups, setMyGroups] = useState([
-    { id: "1", name: "Inglés Técnico I", teacherName: "Dra. Smith" }
-  ]);
+  const [myGroups, setMyGroups] = useState<any[]>([]);
   const [viewingGroupId, setViewingGroupId] = useState<string | null>(null);
-  const [groupTab, setGroupTab] = useState<"TAREAS" | "LIGA">("TAREAS");
+  const [fullGroupDetails, setFullGroupDetails] = useState<any>(null); // Nuevo estado para detalle extendido
+  const [groupTab, setGroupTab] = useState<"TAREAS" | "COMPAÑEROS">("TAREAS");
 
-const loadData = useCallback(
-  async (isSilent = false): Promise<UserProfileData> => {
-    try {
-      if (!isSilent) setIsLoading(true);
-      setErrorMsg(null);
+  const loadData = useCallback(
+    async (isSilent = false): Promise<UserProfileData> => {
+      try {
+        if (!isSilent) setIsLoading(true);
+        setErrorMsg(null);
 
-      // 1. Perfil
-      const profile = await getUserProfile();
-      setUserProfile(profile);
-      setHeartTimer(profile.nextHeartRegenTime ?? "");
+        const profile = await getUserProfile();
+        setUserProfile(profile);
+        setHeartTimer(profile.nextHeartRegenTime ?? "");
 
-      // 2. Ranking
-      const topUsers = await getGlobalLeaderboard();
-      setLeaderboard(topUsers);
+        const topUsers = await getGlobalLeaderboard();
+        setLeaderboard(topUsers);
 
-      // 3. Amigos
-      const friendsData = await getFriendsList();
-      setFriends(friendsData);
+        const friendsData = await getFriendsList();
+        setFriends(friendsData);
 
-      // 4. Cursos
-      const courses = await getCourses();
-      if (courses?.length > 0) {
-        const unitsData = await getCourseStatus(String(courses[0].id));
-        setUnits(unitsData);
+        const courses = await getCourses();
+        if (courses?.length > 0) {
+          const unitsData = await getCourseStatus(String(courses[0].id));
+          setUnits(unitsData);
+        }
+
+        const groupsData = await getStudentClassrooms(); 
+        setMyGroups(groupsData); 
+
+        return profile;
+      } catch (error) {
+        console.error("Error al sincronizar dashboard:", error);
+        if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
+        throw error;
+      } finally {
+        if (!isSilent) setIsLoading(false);
       }
-
-      // 🔥 ESTO ES LO QUE FALTABA
-      return profile;
-
-    } catch (error) {
-      console.error("Error al sincronizar dashboard:", error);
-      if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
-      throw error;
-    } finally {
-      if (!isSilent) setIsLoading(false);
-    }
-  },
-  []
-);
-
+    },
+    []
+  );
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // --- ACCIONES ---
+  // 🔥 NUEVA FUNCIÓN: Carga el detalle real (alumnos/compañeros) al hacer clic
+  const handleViewClass = async (id: string | null) => {
+    setViewingGroupId(id);
+    if (id) {
+      try {
+        const details = await getClassroomDetails(id);
+        setFullGroupDetails(details);
+      } catch (error) {
+        console.error("Error al obtener detalle del grupo:", error);
+        // Fallback: Si falla la API, mostramos al menos lo básico que ya teníamos
+        setFullGroupDetails(myGroups.find(g => String(g.id) === String(id)));
+      }
+    } else {
+      setFullGroupDetails(null);
+    }
+  };
+
   const handlePurchase = async (type: string, cost: number) => {
     if (userProfile && userProfile.lingots >= cost) {
       try {
@@ -123,7 +134,6 @@ const loadData = useCallback(
     window.location.href = "/login";
   };
 
-  // --- ESTILOS DINÁMICOS ---
   const dashboardStyles = `
     .leaderboard-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; position: relative; transition: all 0.2s; cursor: pointer; }
     .leaderboard-row:hover { background-color: #f7f7f7; }
@@ -150,8 +160,6 @@ const loadData = useCallback(
       <Sidebar active={section} onChange={setSection} onLogout={handleLogout} userProfile={userProfile!} />
       
       <div style={{ flex: 1, marginLeft: 260, display: "flex" }}>
-        
-        {/* PANEL CENTRAL DINÁMICO */}
         <main style={{ flex: 1, padding: "40px 20px", display: "flex", justifyContent: "center" }}>
           <div style={{ width: "100%", maxWidth: "700px" }}>
             
@@ -159,28 +167,24 @@ const loadData = useCallback(
               <LearnSection units={units} userProfile={userProfile!} heartTimer={heartTimer} onUpdateProfile={setUserProfile} onRefreshData={loadData} />
             )}
 
-            {/* --- NUEVA SECCIÓN AGREGADA --- */}
-   {section === "evaluations" && (
-  <EvaluationsSection />
-)}
-
+            {section === "evaluations" && <EvaluationsSection />}
 
             {section === "sounds" && <SoundsSection soundItems={SOUND_DATA} />}
 
             {section === "groups" && (
               <GroupsSection 
-                theme={{}} joinCode={joinCode} setJoinCode={setJoinCode}
-                myGroups={myGroups} viewingGroupId={viewingGroupId}
-                setViewingGroupId={setViewingGroupId} groupDetails={null}
-                groupTab={groupTab} setGroupTab={setGroupTab}
-                leaderboard={leaderboard} handleJoinGroup={() => {}}
+                theme={{}} 
+                myGroups={myGroups} 
+                viewingGroupId={viewingGroupId}
+                setViewingGroupId={handleViewClass} // Usamos la nueva función
+                groupDetails={fullGroupDetails}    // Usamos el detalle enriquecido
+                groupTab={groupTab} 
+                setGroupTab={setGroupTab}
               />
             )}
 
             {section === "shop" && <ShopSection userProfile={userProfile!} handlePurchase={handlePurchase} />}
-
             {section === "profile" && <ProfileSection />}
-
             {section === "challenges" && (
               <div style={{ backgroundColor: "#131f24", borderRadius: "24px", padding: "10px" }}>
                 <Challenges />
@@ -189,38 +193,25 @@ const loadData = useCallback(
           </div>
         </main>
 
-        {/* BARRA LATERAL DERECHA */}
         <aside style={{ 
           width: 380, padding: "30px 20px", borderLeft: "2px solid #E5E5E5",
           position: "sticky", top: 0, height: "100vh", overflowY: "auto",
           display: "flex", flexDirection: "column", gap: "20px"
         }}>
-          
           <StatsBar profile={userProfile!} />
-
-          {/* 1. BUSCADOR DE USUARIOS */}
           <UserSearch />
-
-          {/* 2. SOLICITUDES PENDIENTES */}
           <FriendRequests />
 
-          {/* 3. LISTA DE AMIGOS */}
           <div className="section-card">
             <h4 style={{ margin: "0 0 15px 0", fontSize: "18px", fontWeight: "800", color: "#4b4b4b" }}>Amigos</h4>
             {friends.length > 0 ? (
               friends.map(friend => (
-                <div 
-                  key={friend.id} 
-                  className="leaderboard-row" 
-                  onClick={() => navigate(`/friend-profile/${friend.id}`)}
-                >
+                <div key={friend.id} className="leaderboard-row" onClick={() => navigate(`/friend-profile/${friend.id}`)}>
                   <div style={{ 
                     width: "35px", height: "35px", borderRadius: "50%", 
                     backgroundColor: "#1cb0f6", color: "white",
                     display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "bold" 
-                  }}>
-                    {friend.fullName.charAt(0)}
-                  </div>
+                  }}>{friend.fullName.charAt(0)}</div>
                   <span style={{ flex: 1, fontWeight: "700", color: "#4b4b4b" }}>{friend.fullName}</span>
                   <span style={{ color: "#777", fontSize: "13px" }}>{friend.xpTotal} XP</span>
                 </div>
@@ -230,7 +221,6 @@ const loadData = useCallback(
             )}
           </div>
 
-          {/* 4. RANKING GLOBAL */}
           <div className="section-card">
             <h4 style={{ margin: "0 0 15px 0", fontSize: "18px", fontWeight: "800", color: "#4b4b4b" }}>Ranking Global</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -246,7 +236,6 @@ const loadData = useCallback(
               })}
             </div>
           </div>
-
         </aside>
       </div>
     </div>

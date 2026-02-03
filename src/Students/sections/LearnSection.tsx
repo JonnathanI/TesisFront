@@ -30,9 +30,8 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   userProfile,
   heartTimer,
   onUpdateProfile,
-  onRefreshData
+  onRefreshData,
 }) => {
-
   const [selectedUnit, setSelectedUnit] = useState<UnitWithLessons | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
@@ -45,6 +44,9 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   // Resumen unidad
   const [showUnitSummary, setShowUnitSummary] = useState(false);
   const [unitSummary, setUnitSummary] = useState<UnitLessonSummary[]>([]);
+
+  // Video al completar unidad
+  const [showUnitVideo, setShowUnitVideo] = useState(false);
 
   /* ===========================
         UTILIDADES
@@ -66,7 +68,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   };
 
   /* ===========================
-        CIERRE DEL QUIZ (FIX)
+        CIERRE DEL QUIZ
      =========================== */
   const handleCloseQuiz = async (
     completed: boolean,
@@ -81,46 +83,53 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
       return;
     }
 
-    const wasUnitAlreadyDone = selectedUnit.lessons.every(l => l.isCompleted);
+    // Antes mirábamos si la unidad ya estaba hecha y bloqueábamos el video
+    // const wasUnitAlreadyDone = selectedUnit.lessons.every((l) => l.isCompleted);
 
-    const updatedLessons = selectedUnit.lessons.map(lesson =>
+    const updatedLessons = selectedUnit.lessons.map((lesson) =>
       lesson.id === selectedLessonId
         ? { ...lesson, isCompleted: true }
         : lesson
     );
 
-    const isUnitDoneNow = updatedLessons.every(l => l.isCompleted);
-    const shouldShowUnitSummary = isUnitDoneNow && !wasUnitAlreadyDone;
+    const isUnitDoneNow = updatedLessons.every((l) => l.isCompleted);
 
-    // Guardar resumen de la lección
-    setUnitSummary(prev => [
+    // ✅ AHORA: si DESPUÉS de esta lección la unidad está al 100%, mostramos video + resumen
+    const shouldShowUnitSummary = isUnitDoneNow;
+
+    // Guardar resumen de la lección actual
+    setUnitSummary((prev) => [
       ...prev,
       {
         title:
-          selectedUnit.lessons.find(l => l.id === selectedLessonId)?.title || "",
+          selectedUnit.lessons.find((l) => l.id === selectedLessonId)?.title ||
+          "",
         correct: score,
         total,
         xp: score * 10,
-        gems: 10
-      }
+        gems: 10,
+      },
     ]);
 
     setSummaryData({ score, total });
     setShowSummary(true);
 
     if (shouldShowUnitSummary) {
+      // 🎊 Confetti de unidad completada
       confetti({
         particleCount: 180,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ["#58CC02", "#1CB0F6", "#FFC800"]
+        colors: ["#58CC02", "#1CB0F6", "#FFC800"],
       });
 
+      // Cerrar resumen de lección y luego mostrar VIDEO
       setTimeout(() => {
         setShowSummary(false);
-        setShowUnitSummary(true);
+        setShowUnitVideo(true); // video antes del resumen de la unidad
       }, 2200);
     } else {
+      // Solo cierre de resumen de lección
       setTimeout(() => {
         setShowSummary(false);
       }, 1800);
@@ -137,49 +146,65 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   if (!selectedUnit) {
     return (
       <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
-        {[...units].sort((a, b) => a.unitOrder - b.unitOrder).map((unit, i, arr) => {
-          const isLocked = i !== 0 && !arr[i - 1].lessons.every(l => l.isCompleted);
-          const completed = unit.lessons.filter(l => l.isCompleted).length;
-          const progress = Math.round((completed / unit.lessons.length) * 100);
+        {[...units]
+          .sort((a, b) => a.unitOrder - b.unitOrder)
+          .map((unit, i, arr) => {
+            const isLocked =
+              i !== 0 && !arr[i - 1].lessons.every((l) => l.isCompleted);
+            const completed = unit.lessons.filter((l) => l.isCompleted).length;
+            const progress = Math.round(
+              (completed / unit.lessons.length) * 100
+            );
 
-          return (
-            <motion.div
-              key={unit.id}
-              whileHover={!isLocked ? { scale: 1.02 } : {}}
-              onClick={() => !isLocked && setSelectedUnit(unit)}
-              style={{
-                background: isLocked ? "#F5F5F5" : "white",
-                padding: 25,
-                borderRadius: 24,
-                border: "2px solid #E5E5E5",
-                borderBottomWidth: 6,
-                marginBottom: 24,
-                cursor: isLocked ? "not-allowed" : "pointer"
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <h3>{isLocked ? "🔒 " : ""}{unit.title}</h3>
-                {!isLocked && (
-                  <strong style={{ color: getBarColor(progress) }}>
-                    {progress}%
-                  </strong>
-                )}
-              </div>
+            return (
+              <motion.div
+                key={unit.id}
+                whileHover={!isLocked ? { scale: 1.02 } : {}}
+                onClick={() => !isLocked && setSelectedUnit(unit)}
+                style={{
+                  background: isLocked ? "#F5F5F5" : "white",
+                  padding: 25,
+                  borderRadius: 24,
+                  border: "2px solid #E5E5E5",
+                  borderBottomWidth: 6,
+                  marginBottom: 24,
+                  cursor: isLocked ? "not-allowed" : "pointer",
+                }}
+              >
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <h3>
+                    {isLocked ? "🔒 " : ""}
+                    {unit.title}
+                  </h3>
+                  {!isLocked && (
+                    <strong style={{ color: getBarColor(progress) }}>
+                      {progress}%
+                    </strong>
+                  )}
+                </div>
 
-              <div style={{ height: 18, background: "#E5E5E5", borderRadius: 12 }}>
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
+                <div
                   style={{
-                    height: "100%",
-                    background: getBarColor(progress),
-                    borderRadius: 12
+                    height: 18,
+                    background: "#E5E5E5",
+                    borderRadius: 12,
                   }}
-                />
-              </div>
-            </motion.div>
-          );
-        })}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    style={{
+                      height: "100%",
+                      background: getBarColor(progress),
+                      borderRadius: 12,
+                    }}
+                  />
+                </div>
+              </motion.div>
+            );
+          })}
       </div>
     );
   }
@@ -189,15 +214,18 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
      =========================== */
   return (
     <div>
-      <div style={{
-        padding: "60px 0",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 50
-      }}>
+      <div
+        style={{
+          padding: "60px 0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 50,
+        }}
+      >
         {selectedUnit.lessons.map((lesson, idx) => {
-          const isLocked = idx !== 0 && !selectedUnit.lessons[idx - 1].isCompleted;
+          const isLocked =
+            idx !== 0 && !selectedUnit.lessons[idx - 1].isCompleted;
           const offset = Math.sin(idx * 1.3) * 75;
           const bg = isLocked
             ? "#E5E5E5"
@@ -219,7 +247,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
                   fontSize: 28,
                   fontWeight: "bold",
                   border: "none",
-                  cursor: isLocked ? "not-allowed" : "pointer"
+                  cursor: isLocked ? "not-allowed" : "pointer",
                 }}
               >
                 {isLocked ? "🔒" : lesson.isCompleted ? "✓" : idx + 1}
@@ -248,8 +276,75 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         {showSummary && (
           <motion.div style={overlayStyle}>
             <motion.div style={summaryCardStyle}>
-              <h1>Resumen de Leccion</h1>
-              <p>✅ {summaryData.score} / {summaryData.total}</p>
+              <h1>Resumen de Lección</h1>
+              <p>
+                ✅ {summaryData.score} / {summaryData.total}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VIDEO: UNIDAD COMPLETADA */}
+      <AnimatePresence>
+        {showUnitVideo && (
+          <motion.div style={overlayStyle}>
+            <motion.div style={videoModalCard}>
+              <h1
+                style={{
+                  marginBottom: 8,
+                  fontSize: "2.2rem",
+                  fontWeight: 900,
+                  color: "#3c3c3c",
+                }}
+              >
+                🎉 ¡Unidad completada!
+              </h1>
+              <p
+                style={{
+                  marginBottom: 20,
+                  color: "#555",
+                  fontWeight: 600,
+                  fontSize: "1.05rem",
+                }}
+              >
+                ¡Sigue así, estás avanzando increíble!
+              </p>
+
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: 460,
+                  margin: "0 auto 24px",
+                  borderRadius: 28,
+                  overflow: "hidden",
+                  background: "#f7f7f7",
+                }}
+              >
+                <video
+                  src="/pajaro.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+
+              <button
+                style={continueBtnStyle}
+                onClick={() => {
+                  setShowUnitVideo(false);
+                  setShowUnitSummary(true);
+                }}
+              >
+                Ver resumen de la unidad
+              </button>
             </motion.div>
           </motion.div>
         )}
@@ -265,8 +360,12 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
               {unitSummary.map((l, i) => (
                 <div key={i} style={unitRowStyle}>
                   <strong>{l.title}</strong>
-                  <div>⭐ {l.xp} &nbsp; 💎 {l.gems}</div>
-                  <small>✅ {l.correct} ❌ {l.total - l.correct}</small>
+                  <div>
+                    ⭐ {l.xp} &nbsp; 💎 {l.gems}
+                  </div>
+                  <small>
+                    ✅ {l.correct} ❌ {l.total - l.correct}
+                  </small>
                 </div>
               ))}
 
@@ -298,7 +397,7 @@ const overlayStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  zIndex: 9999
+  zIndex: 9999,
 };
 
 const summaryCardStyle: React.CSSProperties = {
@@ -306,7 +405,19 @@ const summaryCardStyle: React.CSSProperties = {
   padding: 30,
   borderRadius: 24,
   border: "2px solid #E5E5E5",
-  textAlign: "center"
+  textAlign: "center",
+  minWidth: 260,
+};
+
+const videoModalCard: React.CSSProperties = {
+  background: "white",
+  padding: 32,
+  borderRadius: 32,
+  border: "2px solid #E5E5E5",
+  textAlign: "center",
+  maxWidth: 620,
+  width: "92%",
+  boxShadow: "0 18px 40px rgba(0,0,0,0.08)",
 };
 
 const unitSummaryStyle: React.CSSProperties = {
@@ -315,7 +426,7 @@ const unitSummaryStyle: React.CSSProperties = {
   borderRadius: 26,
   maxWidth: 480,
   width: "90%",
-  border: "2px solid #E5E5E5"
+  border: "2px solid #E5E5E5",
 };
 
 const unitRowStyle: React.CSSProperties = {
@@ -323,7 +434,7 @@ const unitRowStyle: React.CSSProperties = {
   padding: 14,
   borderRadius: 18,
   marginBottom: 12,
-  border: "2px solid #E5E5E5"
+  border: "2px solid #E5E5E5",
 };
 
 const continueBtnStyle: React.CSSProperties = {
@@ -335,5 +446,6 @@ const continueBtnStyle: React.CSSProperties = {
   fontWeight: 900,
   borderRadius: 16,
   border: "none",
-  cursor: "pointer"
+  cursor: "pointer",
+  fontSize: "1rem",
 };

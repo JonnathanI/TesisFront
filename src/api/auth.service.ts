@@ -967,3 +967,12 @@ export const getStudentPendingEvaluations = async (
 
   return response.json();
 };
+
+export const searchUsersByQuery = async (query: string) => {
+  // Según tu UserController, el parámetro se llama 'query'
+  const response = await apiFetch(`/users/search?query=${query}`, { 
+    method: 'GET' 
+  });
+  if (!response.ok) return [];
+  return response.json();
+};

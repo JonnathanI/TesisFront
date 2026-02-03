@@ -1,32 +1,23 @@
 import React from "react";
-import { LeaderboardEntry } from "../../api/auth.service";
-import { ChevronLeft, BookOpen, Trophy, Users as UsersIcon } from "lucide-react";
+import { ChevronLeft, BookOpen, Users as UsersIcon } from "lucide-react";
 
 interface Props {
   theme: any;
-  joinCode: string;
-  setJoinCode: (v: string) => void;
   myGroups: any[];
   viewingGroupId: string | null;
   setViewingGroupId: (id: string | null) => void;
   groupDetails: any;
-  groupTab: "TAREAS" | "LIGA";
-  setGroupTab: (t: "TAREAS" | "LIGA") => void;
-  leaderboard: LeaderboardEntry[];
-  handleJoinGroup: () => void;
+  groupTab: "TAREAS" | "COMPAÑEROS"; // Cambiado de LIGA a COMPAÑEROS
+  setGroupTab: (t: "TAREAS" | "COMPAÑEROS") => void;
 }
 
 export default function GroupsSection({
-  joinCode,
-  setJoinCode,
   myGroups,
   viewingGroupId,
   setViewingGroupId,
   groupDetails,
   groupTab,
   setGroupTab,
-  leaderboard,
-  handleJoinGroup,
 }: Props) {
   
   const styles = `
@@ -34,21 +25,21 @@ export default function GroupsSection({
       background: white;
       border: 2px solid #E5E5E5;
       border-bottom: 5px solid #E5E5E5;
-      border-radius: 16px;
-      padding: 20px;
+      border-radius: 20px;
+      padding: 24px;
       margin-bottom: 15px;
       cursor: pointer;
       transition: all 0.1s;
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 20px;
     }
-    .group-card:hover { background-color: #F7F7F7; transform: translateY(-2px); }
+    .group-card:hover { background-color: #F7F7F7; transform: translateY(-2px); border-color: #1CB0F6; }
     .group-card:active { transform: translateY(2px); border-bottom-width: 2px; }
 
     .tab-button {
       flex: 1;
-      padding: 12px;
+      padding: 15px;
       border: none;
       background: none;
       font-weight: 800;
@@ -57,169 +48,171 @@ export default function GroupsSection({
       border-bottom: 3px solid #E5E5E5;
       text-transform: uppercase;
       letter-spacing: 1px;
+      transition: all 0.2s;
     }
     .tab-button.active {
       color: #1CB0F6;
       border-bottom: 3px solid #1CB0F6;
     }
 
-    .join-input {
-      width: 100%;
-      padding: 12px 15px;
-      border: 2px solid #E5E5E5;
-      border-radius: 12px;
-      background: #F7F7F7;
-      font-weight: bold;
-      margin-bottom: 15px;
-      outline: none;
-    }
-    .join-input:focus { border-color: #1CB0F6; }
-
-    .btn-primary {
-      width: 100%;
-      padding: 12px;
-      background: #1CB0F6;
-      color: white;
-      border: none;
-      border-bottom: 4px solid #1899D6;
-      border-radius: 12px;
+    .badge-status {
+      padding: 4px 12px;
+      border-radius: 10px;
+      font-size: 12px;
       font-weight: 800;
-      cursor: pointer;
       text-transform: uppercase;
     }
-    .btn-primary:active { transform: translateY(2px); border-bottom-width: 0; }
   `;
 
-  // VISTA: LISTA DE MIS CLASES
+  // VISTA 1: LISTA DE MIS CLASES
   if (!viewingGroupId) {
     return (
       <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "50px" }}>
         <style>{styles}</style>
         
-        <h2 style={{ fontWeight: 900, color: "#3C3C3C", marginBottom: "20px" }}>Mis Clases</h2>
-
-        {/* Formulario para unirse */}
-        <div style={{ background: "#FFF", border: "2px solid #E5E5E5", padding: "20px", borderRadius: "18px", marginBottom: "30px" }}>
-          <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", fontWeight: 800 }}>¿Tienes un código?</h3>
-          <input
-            className="join-input"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="EJ: ABC123"
-          />
-          <button className="btn-primary" onClick={handleJoinGroup}>Unirse a la clase</button>
+        <div style={{ marginBottom: "30px" }}>
+          <h2 style={{ fontWeight: 900, color: "#3C3C3C", fontSize: "32px", margin: "0 0 8px 0" }}>Mis Clases</h2>
+          <p style={{ color: "#AFAFAF", fontWeight: "bold" }}>Aquí aparecen los grupos donde estás inscrito.</p>
         </div>
 
-        {/* Listado de grupos */}
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {myGroups.length > 0 ? (
+          {myGroups && myGroups.length > 0 ? (
             myGroups.map((g) => (
               <div key={g.id} className="group-card" onClick={() => setViewingGroupId(g.id)}>
-                <div style={{ background: "#CEF3FF", padding: "10px", borderRadius: "12px" }}>
-                  <UsersIcon color="#1CB0F6" size={30} />
+                <div style={{ 
+                  background: "#DDF4FF", 
+                  width: "60px", 
+                  height: "60px", 
+                  borderRadius: "16px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center" 
+                }}>
+                  <UsersIcon color="#1CB0F6" size={32} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#4B4B4B" }}>{g.name}</h4>
-                  <p style={{ margin: 0, color: "#AFAFAF", fontSize: "14px", fontWeight: "bold" }}>
-                    Profesor: {g.teacherName || "Sin asignar"}
+                  <h4 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: "#4B4B4B" }}>{g.name}</h4>
+                  <p style={{ margin: "4px 0 0 0", color: "#AFAFAF", fontSize: "14px", fontWeight: "bold" }}>
+                    Profesor: <span style={{ color: "#777" }}>{g.teacherName || "Tu profesor"}</span>
                   </p>
                 </div>
+                <div style={{ color: "#1CB0F6", fontWeight: "900" }}>→</div>
               </div>
             ))
           ) : (
-            <div style={{ textAlign: "center", padding: "40px", color: "#AFAFAF" }}>
-              <UsersIcon size={48} style={{ marginBottom: "10px", opacity: 0.5 }} />
-              <p style={{ fontWeight: "bold" }}>Aún no perteneces a ninguna clase.</p>
+            <div style={{ textAlign: "center", padding: "60px 20px", background: "#F7F7F7", borderRadius: "24px" }}>
+              <p style={{ color: "#AFAFAF", fontWeight: "bold" }}>No tienes grupos registrados.</p>
             </div>
           )}
         </div>
       </div>
     );
   }
+  console.log("DEBUG: Mi grupo actual es:", groupDetails);
 
-  // VISTA: DETALLE DEL GRUPO (TAREAS O LIGA)
+  // VISTA 2: DETALLE DEL GRUPO (TAREAS O COMPAÑEROS)
   return (
+    
     <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+      
       <style>{styles}</style>
       
-      {/* Header del Grupo */}
       <button 
         onClick={() => setViewingGroupId(null)}
-        style={{ background: "none", border: "none", color: "#AFAFAF", display: "flex", alignItems: "center", cursor: "pointer", fontWeight: "bold", marginBottom: "15px" }}
+        style={{ background: "none", border: "none", color: "#AFAFAF", display: "flex", alignItems: "center", cursor: "pointer", fontWeight: "800", marginBottom: "20px", fontSize: "14px" }}
       >
-        <ChevronLeft size={20} /> VOLVER A CLASES
+        <ChevronLeft size={18} /> VOLVER A MIS CLASES
       </button>
 
-      <div style={{ marginBottom: "25px" }}>
-        <h2 style={{ margin: "0 0 5px 0", fontWeight: 900, color: "#3C3C3C", fontSize: "28px" }}>
+      <div style={{ marginBottom: "30px" }}>
+        <h2 style={{ margin: "0 0 5px 0", fontWeight: 900, color: "#3C3C3C", fontSize: "32px" }}>
           {groupDetails?.name}
         </h2>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#AFAFAF", fontWeight: "bold" }}>
-          <UsersIcon size={16} />
-          <span>{leaderboard.length} estudiantes</span>
+        <div style={{ color: "#1CB0F6", fontWeight: "bold", fontSize: "14px", textTransform: "uppercase" }}>
+           Detalle de la Clase
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", marginBottom: "25px" }}>
+      {/* Tabs Actualizados */}
+      <div style={{ display: "flex", marginBottom: "30px", gap: "10px" }}>
         <button 
           className={`tab-button ${groupTab === "TAREAS" ? "active" : ""}`}
           onClick={() => setGroupTab("TAREAS")}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-            <BookOpen size={18} /> Tareas
+            <BookOpen size={20} /> Tareas
           </div>
         </button>
         <button 
-          className={`tab-button ${groupTab === "LIGA" ? "active" : ""}`}
-          onClick={() => setGroupTab("LIGA")}
+          className={`tab-button ${groupTab === "COMPAÑEROS" ? "active" : ""}`}
+          onClick={() => setGroupTab("COMPAÑEROS")}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-            <Trophy size={18} /> Liga de clase
+            <UsersIcon size={20} /> Compañeros
           </div>
         </button>
       </div>
 
-      {/* Contenido de Tareas */}
       {groupTab === "TAREAS" ? (
+        /* LISTADO DE TAREAS */
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           {groupDetails?.assignments?.length > 0 ? (
             groupDetails.assignments.map((a: any) => (
-              <div key={a.id} className="group-card" style={{ cursor: "default" }}>
+              <div key={a.id} className="group-card" style={{ cursor: "default", borderBottomWidth: "4px" }}>
                 <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: "0 0 5px 0", color: "#4B4B4B", fontWeight: 800 }}>{a.title}</h4>
-                  <p style={{ margin: 0, color: "#777", fontSize: "14px" }}>{a.description}</p>
+                  <h4 style={{ margin: "0 0 5px 0", color: "#4B4B4B", fontWeight: 900, fontSize: "18px" }}>{a.title}</h4>
+                  <p style={{ margin: 0, color: "#777", fontSize: "14px", fontWeight: "bold" }}>{a.description}</p>
                 </div>
-                <div style={{ color: "#58CC02", fontWeight: "bold", fontSize: "14px" }}>
-                  PENDIENTE
+                <div className="badge-status" style={{ background: "#E5FFD1", color: "#58CC02" }}>
+                  Activa
                 </div>
               </div>
             ))
           ) : (
-            <p style={{ textAlign: "center", color: "#AFAFAF", fontWeight: "bold", marginTop: "20px" }}>
-              No tienes tareas pendientes en esta clase. 🙌
-            </p>
+            <div style={{ textAlign: "center", padding: "40px" }}>
+              <p style={{ color: "#AFAFAF", fontWeight: "bold" }}>No hay tareas asignadas.</p>
+            </div>
           )}
         </div>
       ) : (
-        /* Contenido de la Liga (Ranking del Grupo) */
-        <div style={{ background: "white", border: "2px solid #E5E5E5", borderRadius: "18px", overflow: "hidden" }}>
-          {leaderboard.map((u, i) => (
-            <div key={u.userId} style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              padding: "15px 20px", 
-              borderBottom: i === leaderboard.length - 1 ? "none" : "2px solid #E5E5E5",
-              gap: "15px"
-            }}>
-              <span style={{ width: "25px", fontWeight: "900", color: i < 3 ? "#1CB0F6" : "#AFAFAF" }}>{i + 1}</span>
-              <div style={{ width: "35px", height: "35px", borderRadius: "50%", background: "#E5E5E5", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#777" }}>
-                {u.fullName.charAt(0)}
+        /* LISTADO DE COMPAÑEROS DE CLASE */
+        <div style={{ background: "white", border: "2px solid #E5E5E5", borderRadius: "24px", overflow: "hidden", borderBottomWidth: "5px" }}>
+          {groupDetails?.students && groupDetails.students.length > 0 ? (
+            groupDetails.students.map((student: any, i: number) => (
+              <div key={student.userId || i} style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                padding: "20px", 
+                borderBottom: i === groupDetails.students.length - 1 ? "none" : "2px solid #E5E5E5",
+                gap: "15px"
+              }}>
+                <div style={{ 
+                  width: "40px", 
+                  height: "40px", 
+                  borderRadius: "50%", 
+                  background: "#E5E5E5", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  fontWeight: "900", 
+                  color: "#777" 
+                }}>
+                  {student.fullName?.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: "800", color: "#4B4B4B", display: "block" }}>{student.fullName}</span>
+                  <span style={{ fontSize: "12px", color: "#AFAFAF", fontWeight: "bold" }}>Estudiante</span>
+                </div>
+                <div style={{ fontWeight: "900", color: "#1CB0F6" }}>
+                  {student.xpTotal || 0} <span style={{fontSize: "10px"}}>XP</span>
+                </div>
               </div>
-              <span style={{ flex: 1, fontWeight: "bold", color: "#4B4B4B" }}>{u.fullName}</span>
-              <span style={{ fontWeight: "800", color: "#777" }}>{u.xpTotal} XP</span>
+            ))
+          ) : (
+            <div style={{ padding: "40px", textAlign: "center", color: "#AFAFAF" }}>
+              <p style={{ fontWeight: "bold" }}>No hay otros alumnos en esta clase.</p>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
