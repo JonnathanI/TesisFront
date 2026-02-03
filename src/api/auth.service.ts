@@ -219,6 +219,7 @@ export interface BulkUserItem {
     fullName: string;
     email: string;
     password?: string;
+    cedula: string; // ✅ Asegúrate de que esta línea esté presente
 }
 
 export interface BulkRegisterResponse {
@@ -315,13 +316,23 @@ export const apiFetch = async ( // ✅ Añadido 'export' aquí
 
 export const getAllUsersAdmin = async (): Promise<StudentData[]> => {
     try {
-        const response = await apiFetch('/auth/admin/users', { method: 'GET' });
+        // CORRECCIÓN: La ruta debe ser /users/admin/all para coincidir con tu UserController.kt
+        const response = await apiFetch('/users/admin/all', { method: 'GET' });
+        
         if (!response.ok) {
-            // Fallback en caso de que la ruta de admin no esté lista
-            const fallback = await apiFetch('/users/search?query=', { method: 'GET' });
-            return fallback.json();
+            console.error("Error en respuesta admin/all:", response.status);
+            return [];
         }
-        return response.json();
+
+        const data = await response.json();
+        
+        // El backend de Kotlin envía List<UserEntity>, que llega como un Array directo [{}, {}]
+        if (Array.isArray(data)) return data;
+        
+        // Fallback por si lo envuelve en un objeto
+        if (data && Array.isArray(data.users)) return data.users;
+        
+        return [];
     } catch (error) {
         console.error("Error en API getAllUsersAdmin:", error);
         return [];
@@ -340,9 +351,12 @@ export const getAllUsersAdmin = async (): Promise<StudentData[]> => {
  * @param newRole Nuevo rol: 'STUDENT', 'TEACHER', o 'ADMIN'
  */
 export const updateUserRole = async (userId: string, newRole: string): Promise<void> => {
-    const response = await apiFetch(`/auth/admin/users/${userId}/role`, {
-        method: 'PUT',
-        body: JSON.stringify({ role: newRole })
+   const response = await apiFetch(`/users/admin/role/${userId}`, {
+        method: 'PATCH', // En tu Kotlin pusiste @PatchMapping
+        body: JSON.stringify(newRole) // Tu Kotlin recibe
+        //  @RequestBody newRole: String directo
+
+        
     });
 
     if (!response.ok) {
@@ -357,14 +371,14 @@ export const updateUserRole = async (userId: string, newRole: string): Promise<v
  * @param status true para activar, false para bloquear
  */
 export const updateUserStatus = async (userId: string, status: boolean): Promise<any> => {
-    const response = await apiFetch(`/auth/admin/users/${userId}/status`, {
+    // CAMBIO: /auth/admin/ -> /users/admin/
+    // Nota: Necesitas crear este @PatchMapping o @PutMapping en tu UserController de Kotlin
+    const response = await apiFetch(`/users/admin/status/${userId}`, {
         method: 'PUT',
         body: JSON.stringify({ active: status })
     });
 
-    if (!response.ok) {
-        throw new Error("No se pudo cambiar el estado del usuario");
-    }
+    if (!response.ok) throw new Error("No se pudo cambiar el estado");
     return response.json();
 };
 
@@ -418,9 +432,9 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
 
 export const getCourses = async (): Promise<Course[]> => {
     const response = await apiFetch('/courses', { method: 'GET' }, false);
+    if (!response.ok) return [];
     return response.json();
 };
-
 export const getUserProgress = async (): Promise<UserProgress> => {
     const response = await apiFetch('/progress/me', { method: 'GET' });
     return response.json();
@@ -690,42 +704,49 @@ export const buyShopItem = async (itemType: string): Promise<void> => {
 };
 
 // --- MODIFICA ESTA INTERFAZ ---
+// ✅ Esta debe quedar así para que coincida con el backend de Kotlin
 export interface BulkRegisterRequest {
-    students: BulkUserItem[];      // Coincide con tu lista en Kotlin
-    registrationCode: string;     // Añadido para que TS no dé error
-    roleToAssign: UserRole;       // Añadido para enviar el rol dinámico
+    users: BulkUserItem[];
+    registrationCode: string;
+    roleToAssign: string; // Se enviará como 'STUDENT' o 'TEACHER'
 }
 
-// --- MODIFICA ESTA FUNCIÓN ---
-export const registerBulk = async (data: BulkRegisterRequest): Promise<BulkRegisterResponse> => {
+// Función corregida para el registro masivo
+export const registerBulk = async (data: BulkRegisterRequest): Promise<any> => {
     const response = await apiFetch('/auth/register-bulk', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+            users: data.users,
+            roleToAssign: data.roleToAssign.toUpperCase(),
+            registrationCode: data.registrationCode || ""
+        }),
     });
     
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Error en la carga masiva");
+        throw new Error(errorData.message || "Error en el registro masivo");
     }
-    
     return response.json();
 };
-
 export interface CreateCoursePayload {
   title: string;
   targetLanguage: string;
   baseLanguage: string;
 }
 
-export const createCourse = async (
-  payload: CreateCoursePayload
-): Promise<any> => {
-  const response = await apiFetch('/teacher/content/courses', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  return response.json();
+export const createCourse = async (payload: CreateCoursePayload): Promise<any> => {
+    const response = await apiFetch('/teacher/content/courses', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Error al crear el curso");
+    }
+    return response.json();
 };
+
+
 
 
 
@@ -765,22 +786,20 @@ export const resetPasswordConfirm = async (token: string, newPassword: string): 
     return response.json();
 };
 
-export const updateCourse = async (
-  id: string,
-  payload: any
-): Promise<any> => {
-  const response = await apiFetch(`/courses/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-  return response.json();
+export const updateCourse = async (id: string, payload: any): Promise<any> => {
+    const response = await apiFetch(`/teacher/content/courses/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Error al actualizar curso");
+    return response.json();
 };
 
-
 export const deleteCourse = async (id: string): Promise<void> => {
-  await apiFetch(`/courses/${id}`, {
-    method: "DELETE",
-  });
+    const response = await apiFetch(`/teacher/content/courses/${id}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) throw new Error("Error al eliminar curso");
 };
 
 
