@@ -27,60 +27,106 @@ interface ManualUser {
 
 interface CoursesProps {
   courses: any[];
+  allUsers: StudentData[];
   onSelectCourse: (id: string) => void;
   onRefresh: () => void;
 }
 
 // ==========================================
-// 2. SUB-COMPONENTE: GESTIÓN DE CURSOS
+// 2. SUB-COMPONENTE: GESTIÓN DE CURSOS (ACTUALIZADO)
 // ==========================================
-const CoursesSection = ({ courses, onSelectCourse, onRefresh }: CoursesProps) => {
-  const [form, setForm] = useState({ title: "", baseLanguage: "ES", targetLanguage: "EN" });
+const CoursesSection = ({ courses, allUsers, onSelectCourse, onRefresh }: CoursesProps) => {
+  const [form, setForm] = useState({ 
+    title: "", 
+    baseLanguage: "ES", 
+    targetLanguage: "EN",
+    teachers: [] as string[],
+    students: [] as string[]
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const availableTeachers = allUsers.filter(u => u.role === 'TEACHER' || u.role === 'ADMIN');
+  const availableStudents = allUsers.filter(u => u.role === 'STUDENT');
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
     try {
       if (editingId) await updateCourse(editingId, form);
       else await createCourse(form);
-      setForm({ title: "", baseLanguage: "ES", targetLanguage: "EN" });
+      setForm({ title: "", baseLanguage: "ES", targetLanguage: "EN", teachers: [], students: [] });
       setEditingId(null);
       onRefresh();
     } catch (e) { alert("Error al procesar curso"); }
   };
 
-  const handleEdit = (course: any) => {
-    setEditingId(course.id);
-    setForm({ title: course.title, baseLanguage: course.baseLanguage || "ES", targetLanguage: course.targetLanguage || "EN" });
+  const toggleSelection = (id: string, listName: 'teachers' | 'students') => {
+    setForm(prev => ({
+      ...prev,
+      [listName]: prev[listName].includes(id) 
+        ? prev[listName].filter(item => item !== id) 
+        : [...prev[listName], id]
+    }));
   };
 
   return (
     <div style={{ maxWidth: "900px" }}>
       <h2 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "1rem" }}>📘 Gestión de Cursos</h2>
-      
-      {/* Formulario de Creación/Edición */}
       <div style={{ background: "#ffffff", padding: "20px", borderRadius: "16px", border: '2px solid #E5E5E5', marginBottom: "2rem" }}>
         <h3 style={{ marginBottom: "1rem" }}>{editingId ? "✏️ Editar curso" : "➕ Nuevo curso"}</h3>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          <input placeholder="Nombre del curso" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-            style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "2px solid #E5E5E5", fontWeight: 600 }} />
-          <button onClick={handleSubmit} style={{ padding: "12px 20px", borderRadius: "10px", border: "none", background: "#1cb0f6", color: "white", fontWeight: 700, cursor: "pointer" }}>
-            {editingId ? "Actualizar" : "Crear"}
+        
+        <input placeholder="Nombre del curso" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+          style={{ width: '100%', padding: "12px", borderRadius: "10px", border: "2px solid #E5E5E5", fontWeight: 600, marginBottom: '15px' }} />
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+          <div style={selectorBoxStyle}>
+            <label style={labelStyle}>PROFESORES</label>
+            <div style={scrollListStyle}>
+              {availableTeachers.map(u => (
+                <div key={u.id} onClick={() => toggleSelection(u.id!, 'teachers')} style={itemSelectStyle(form.teachers.includes(u.id!))}>
+                  {u.fullName} {form.teachers.includes(u.id!) && "✅"}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={selectorBoxStyle}>
+            <label style={labelStyle}>ESTUDIANTES</label>
+            <div style={scrollListStyle}>
+              {availableStudents.map(u => (
+                <div key={u.id} onClick={() => toggleSelection(u.id!, 'students')} style={itemSelectStyle(form.students.includes(u.id!))}>
+                  {u.fullName} {form.students.includes(u.id!) && "✅"}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleSubmit} style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", background: "#1cb0f6", color: "white", fontWeight: 700, cursor: "pointer" }}>
+            {editingId ? "Actualizar Curso" : "Crear Curso"}
           </button>
+          {editingId && <button onClick={() => setEditingId(null)} style={{ padding: '12px', borderRadius: '10px', border: '2px solid #E5E5E5', background: 'white', fontWeight: 700 }}>Cancelar</button>}
         </div>
       </div>
 
-      {/* Lista de Cursos Card */}
       <div style={{ display: "grid", gap: "16px" }}>
         {courses.map((course) => (
           <div key={course.id} style={{ background: "#fff", padding: "18px", borderRadius: "16px", border: '2px solid #E5E5E5', display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <strong style={{ fontSize: "16px" }}>{course.title}</strong>
-              <div style={{ fontSize: "13px", color: "#666" }}>{course.baseLanguage} → {course.targetLanguage}</div>
+              <div style={{ fontSize: "12px", color: "#666" }}>👥 {course.students?.length || 0} alumnos | 👨‍🏫 {course.teachers?.length || 0} prof.</div>
             </div>
             <div style={{ display: "flex", gap: "8px" }}>
               <button onClick={() => onSelectCourse(course.id)} style={btnCourseAction}>Unidades</button>
-              <button onClick={() => handleEdit(course)} style={{...btnCourseAction, background: '#FFF3CD', color: '#856404'}}>Editar</button>
+              <button onClick={() => {
+                setEditingId(course.id);
+                setForm({ 
+                  title: course.title, 
+                  baseLanguage: course.baseLanguage || "ES", 
+                  targetLanguage: course.targetLanguage || "EN",
+                  teachers: course.teachers || [],
+                  students: course.students || []
+                });
+              }} style={{...btnCourseAction, background: '#FFF3CD', color: '#856404'}}>Editar</button>
             </div>
           </div>
         ))}
@@ -93,7 +139,6 @@ const CoursesSection = ({ courses, onSelectCourse, onRefresh }: CoursesProps) =>
 // 3. COMPONENTE PRINCIPAL (ADMIN DASHBOARD)
 // ==========================================
 export const AdminDashboard = () => {
-  // --- Estados Globales ---
   const [activeSection, setActiveSection] = useState('roles');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,18 +146,13 @@ export const AdminDashboard = () => {
   const [filterType, setFilterType] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [notification, setNotification] = useState<{show: boolean, msg: string, type?: 'success' | 'error'}>({ show: false, msg: '' });
   
-  // --- Estados de Códigos ---
   const [studentCode, setStudentCode] = useState('');
   const [teacherRegCode, setTeacherRegCode] = useState('');
-
-  // --- Estados de Carga Masiva ---
-  const [manualUsers, setManualUsers] = useState<ManualUser[]>([
-    { fullName: '', email: '', password: '', cedula: '', role: 'STUDENT' }
-  ]);
+  const [manualUsers, setManualUsers] = useState<ManualUser[]>([{ fullName: '', email: '', password: '', cedula: '', role: 'STUDENT' }]);
+  const [editingUser, setEditingUser] = useState<StudentData | null>(null);
 
   useEffect(() => { fetchUsers(); }, []);
 
-  // --- Utilidades ---
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setNotification({ show: true, msg, type });
     setTimeout(() => setNotification({ show: false, msg: '' }), 3000);
@@ -128,38 +168,29 @@ export const AdminDashboard = () => {
     } finally { setLoading(false); }
   };
 
- // ==========================================
-  // 4. LÓGICA DE USUARIOS Y ROLES (CON EDICIÓN)
-  // ==========================================
-  const [editingUser, setEditingUser] = useState<StudentData | null>(null);
-
   const handleUserUpdate = async (userId: string, field: string, value: string | boolean) => {
     try {
-      // Actualización optimista en UI
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, [field]: value } : u));
-      
       if (field === 'role') await updateUserRole(userId, value as string);
       else if (field === 'isActive') await updateUserStatus(userId, value as boolean);
-      // Si necesitas actualizar fullName o cedula, llamarías a otra función de tu API aquí
-      
-      showToast("✨ Cambios guardados");
+      showToast("✨ Estado actualizado");
     } catch (error) {
       showToast("❌ Error al actualizar", 'error');
       fetchUsers();
     }
   };
 
-  // Función para guardar cambios manuales (Nombre, Cédula, etc.)
   const saveFullEdit = async () => {
-    if (!editingUser) return;
+    if (!editingUser || !editingUser.id) return;
+    setLoading(true);
     try {
-      // Aquí llamarías a un endpoint tipo updateUserInfo(editingUser.id, editingUser)
-      // Por ahora, lo actualizamos localmente:
       setUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
       showToast("👤 Perfil actualizado con éxito");
       setEditingUser(null);
     } catch (e) {
       showToast("❌ Error al guardar cambios", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,15 +199,14 @@ export const AdminDashboard = () => {
     return users.filter(u => {
       const name = (u.fullName || u.username || "").toLowerCase();
       const email = (u.email || "").toLowerCase();
-      const matchesSearch = name.includes(term) || email.includes(term);
+      const cedula = (u.cedula || "").toLowerCase();
+      const matchesSearch = name.includes(term) || email.includes(term) || cedula.includes(term);
       const roleRaw = (u.role || "STUDENT").toUpperCase();
       if (filterType === 'TEACHER') return matchesSearch && (roleRaw.includes('TEACH') || roleRaw.includes('ADMIN'));
-      return matchesSearch && (roleRaw.includes('STUDENT') || roleRaw === "");
+      return matchesSearch && roleRaw.includes('STUDENT');
     });
   }, [users, searchTerm, filterType]);
-  // ==========================================
-  // 5. LÓGICA DE GENERACIÓN DE CÓDIGOS
-  // ==========================================
+
   const handleGenCode = async (type: 'student' | 'teacher') => {
     try {
       const code = type === 'student' ? await generateClassroomCode() : await generateTeacherRegistrationCode();
@@ -186,9 +216,6 @@ export const AdminDashboard = () => {
     } catch (e) { showToast("❌ Error al generar código", 'error'); }
   };
 
-  // ==========================================
-  // 6. LÓGICA DE CARGA MASIVA
-  // ==========================================
   const addRow = () => setManualUsers([...manualUsers, { fullName: '', email: '', password: '', cedula: '', role: 'STUDENT' }]);
   const removeRow = (index: number) => manualUsers.length > 1 && setManualUsers(manualUsers.filter((_, i) => i !== index));
   
@@ -217,12 +244,8 @@ export const AdminDashboard = () => {
     } catch (error) { showToast("❌ Error en el registro", 'error'); } finally { setLoading(false); }
   };
 
-  // ==========================================
-  // 7. RENDERIZADO DE LA VISTA
-  // ==========================================
   return (
     <div style={layoutStyle}>
-      {/* Notificaciones flotantes */}
       <AnimatePresence>
         {notification.show && (
           <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 20 }} exit={{ opacity: 0 }} 
@@ -230,97 +253,102 @@ export const AdminDashboard = () => {
             {notification.msg}
           </motion.div>
         )}
+
+        {editingUser && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={overlayStyle}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} style={modalEditStyle}>
+              <h2 style={{ marginBottom: '20px', fontWeight: 900 }}>✏️ Editar Usuario</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={inputGroup}><label style={labelStyle}>NOMBRE</label><input style={inputStyle} value={editingUser.fullName} onChange={e => setEditingUser({...editingUser, fullName: e.target.value})} /></div>
+                <div style={inputGroup}><label style={labelStyle}>EMAIL</label><input style={inputStyle} value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} /></div>
+                <div style={inputGroup}><label style={labelStyle}>CÉDULA</label><input style={inputStyle} value={editingUser.cedula} onChange={e => setEditingUser({...editingUser, cedula: e.target.value})} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '30px' }}>
+                <button onClick={saveFullEdit} style={btnMainStyle}>Guardar</button>
+                <button onClick={() => setEditingUser(null)} style={{ ...btnSecondary, width: '100%' }}>Cancelar</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <AdminSidebarDashboard activeSection={activeSection} setActiveSection={setActiveSection} />
       
       <main style={mainContainerStyle}>
-        
-        {/* SECCIÓN: USUARIOS Y ROLES */}
         {activeSection === 'roles' && (
           <div style={cardStyle}>
             <div style={headerFlexStyle}>
-              <h2 style={titleStyle}>Gestión de Usuarios</h2>
+              <h2 style={titleStyle}>Usuarios</h2>
               <div style={{display: 'flex', gap: '10px'}}>
-                <button onClick={fetchUsers} style={btnSecondary}>{loading ? "..." : "🔄 Actualizar"}</button>
+                <button onClick={fetchUsers} style={btnSecondary}>{loading ? "..." : "🔄"}</button>
                 <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={searchBarStyle} />
               </div>
             </div>
             <div style={tabContainerStyle}>
               <button onClick={() => setFilterType('STUDENT')} style={tabButtonStyle(filterType === 'STUDENT')}>ESTUDIANTES</button>
-              <button onClick={() => setFilterType('TEACHER')} style={tabButtonStyle(filterType === 'TEACHER')}>PROFESORES / ADMIN</button>
+              <button onClick={() => setFilterType('TEACHER')} style={tabButtonStyle(filterType === 'TEACHER')}>PROFESORES</button>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>USUARIO</th>
-                    <th style={thStyle}>CÉDULA</th>
-                    <th style={thStyle}>ROL</th>
-                    <th style={thStyle}>ESTADO</th>
+            <table style={tableStyle}>
+              <thead>
+                <tr><th style={thStyle}>USUARIO</th><th style={thStyle}>CÉDULA</th><th style={thStyle}>ROL</th><th style={thStyle}>ESTADO</th></tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td style={tdStyleFirst}>
+                      <div style={{ fontWeight: 800 }}>{u.fullName || 'Sin nombre'}</div>
+                      <div style={{ fontSize: '11px', color: '#AFAFAF' }}>{u.email}</div>
+                    </td>
+                    <td style={tdStyle}>{u.cedula || '---'}</td>
+                    <td style={tdStyle}>
+                      <select value={u.role || 'STUDENT'} onChange={(e) => handleUserUpdate(u.id!, 'role', e.target.value)} style={selectRoleStyle}>
+                        <option value="STUDENT">STUDENT</option>
+                        <option value="TEACHER">TEACHER</option>
+                        <option value="ADMIN">ADMIN</option>
+                      </select>
+                    </td>
+                    <td style={tdStyleLast}>
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingUser(u)} style={btnEditMini}>✏️</button>
+                        <button onClick={() => handleUserUpdate(u.id!, 'isActive', !u.isActive)} 
+                          style={{...btnStatusStyle, color: u.isActive ? '#58CC02' : '#FF4B4B', backgroundColor: u.isActive ? '#E8FDF0' : '#FFF0F0'}}>
+                          {u.isActive ? 'ACTIVO' : 'BLOQUEADO'}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((u) => (
-                      <tr key={u.id}>
-                        <td style={tdStyleFirst}>
-                          <div style={{ fontWeight: 800 }}>{u.fullName || 'Sin nombre'}</div>
-                          <div style={{ fontSize: '11px', color: '#AFAFAF' }}>{u.email} • <span style={{color: '#1CB0F6'}}>⚡ {u.xpTotal || 0} XP</span></div>
-                        </td>
-                        <td style={tdStyle}>{u.cedula || '---'}</td>
-                        <td style={tdStyle}>
-                          <select value={u.role || 'STUDENT'} onChange={(e) => handleUserUpdate(u.id!, 'role', e.target.value)} style={selectRoleStyle}>
-                            <option value="STUDENT">STUDENT</option>
-                            <option value="TEACHER">TEACHER</option>
-                            <option value="ADMIN">ADMIN</option>
-                          </select>
-                        </td>
-                        <td style={tdStyleLast}>
-                    
-                          <button onClick={() => handleUserUpdate(u.id!, 'isActive', !u.isActive)} 
-                            style={{...btnStatusStyle, color: u.isActive ? '#58CC02' : '#FF4B4B', backgroundColor: u.isActive ? '#E8FDF0' : '#FFF0F0'}}>
-                            {u.isActive ? '● ACTIVO' : '○ BLOQUEADO'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '60px', color: '#AFAFAF' }}>{loading ? "Sincronizando..." : "No hay usuarios"}</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {/* SECCIÓN: CURSOS */}
         {activeSection === 'cursos' && (
           <div style={cardStyle}>
             <CoursesSection 
-              courses={[]} // Conectar con el estado de cursos real si existe
-              onSelectCourse={(id) => console.log("Seleccionado:", id)} 
+              courses={[]} // Reemplazar con tu estado real de cursos si tienes uno
+              allUsers={users} 
+              onSelectCourse={() => {}} 
               onRefresh={fetchUsers} 
             />
           </div>
         )}
 
-        {/* SECCIÓN: GENERAR CÓDIGOS */}
         {activeSection === 'generar' && (
           <div style={{ width: '100%' }}>
-            <h2 style={titleStyle}>Códigos de Acceso</h2>
+            <h2 style={titleStyle}>Códigos</h2>
             <div style={horizontalGrid}>
               <div style={modernCodeCard}>
-                <p style={smallLabel}>CÓDIGO AULA (ESTUDIANTES)</p>
+                <p style={smallLabel}>AULA ESTUDIANTES</p>
                 <div style={codeRowFlex}>
-                  <span style={{ ...digitalCode, color: '#1cb0f6' }}>{studentCode || '•••• ••••'}</span>
+                  <span style={{ ...digitalCode, color: '#1cb0f6' }}>{studentCode || '••••'}</span>
                   <button onClick={() => handleGenCode('student')} style={btnActionSmall}>Generar</button>
                 </div>
               </div>
               <div style={modernCodeCard}>
-                <p style={smallLabel}>CÓDIGO REGISTRO PROFESORES</p>
+                <p style={smallLabel}>REGISTRO PROFESORES</p>
                 <div style={codeRowFlex}>
-                  <span style={{ ...digitalCode, color: '#AF85FF' }}>{teacherRegCode || '•••• ••••'}</span>
+                  <span style={{ ...digitalCode, color: '#AF85FF' }}>{teacherRegCode || '••••'}</span>
                   <button onClick={() => handleGenCode('teacher')} style={btnActionSmall}>Generar</button>
                 </div>
               </div>
@@ -328,29 +356,21 @@ export const AdminDashboard = () => {
           </div>
         )}
 
-        {/* SECCIÓN: CARGA MASIVA */}
         {activeSection === 'carga' && (
           <div style={cardStyle}>
             <h2 style={titleStyle}>Registro Masivo</h2>
             <button onClick={addRow} style={btnAddRowStyle}>+ Añadir Fila</button>
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
               {manualUsers.map((user, index) => (
                 <div key={index} style={rowInputStyle}>
                   <input style={inputStyle} placeholder="Nombre" value={user.fullName} onChange={(e) => handleManualChange(index, 'fullName', e.target.value)} />
                   <input style={inputStyle} placeholder="Email" value={user.email} onChange={(e) => handleManualChange(index, 'email', e.target.value)} />
                   <input style={inputStyle} placeholder="Cédula" value={user.cedula} onChange={(e) => handleManualChange(index, 'cedula', e.target.value)} />
-                  <input style={inputStyle} type="password" placeholder="Pass" value={user.password} onChange={(e) => handleManualChange(index, 'password', e.target.value)} />
-                  <select style={{...inputStyle, flex: 0.6}} value={user.role} onChange={(e) => handleManualChange(index, 'role', e.target.value)}>
-                    <option value="STUDENT">ESTUDIANTE</option>
-                    <option value="TEACHER">PROFESOR</option>
-                  </select>
                   <button onClick={() => removeRow(index)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px' }}>🗑️</button>
                 </div>
               ))}
             </div>
-            <button onClick={handleBulkSubmit} style={btnMainStyle} disabled={loading}>
-              {loading ? 'Procesando...' : 'Registrar Lista Completa'}
-            </button>
+            <button onClick={handleBulkSubmit} style={btnMainStyle} disabled={loading}>{loading ? 'Procesando...' : 'Registrar Lista Completa'}</button>
           </div>
         )}
       </main>
@@ -359,29 +379,19 @@ export const AdminDashboard = () => {
 };
 
 // ==========================================
-// 8. ESTILOS (CSS-in-JS)
+// ESTILOS ADICIONALES Y EXISTENTES
 // ==========================================
-const layoutStyle: React.CSSProperties = {
-  display: 'flex',
-  backgroundColor: '#F7F9FA',
-  minHeight: '100vh',
-  fontFamily: '"Nunito", sans-serif',
-};
-const mainContainerStyle: React.CSSProperties = {
-  marginLeft: 260,
-  padding: '10px 20px 10px 10px', // casi pegado
-  width: 'calc(100% - 260px)',
-  boxSizing: 'border-box',
-};
+const selectorBoxStyle: React.CSSProperties = { border: '2px solid #F0F0F0', borderRadius: '12px', padding: '10px', background: '#FAFAFA' };
+const scrollListStyle: React.CSSProperties = { maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '8px' };
+const itemSelectStyle = (selected: boolean): React.CSSProperties => ({
+  padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+  backgroundColor: selected ? '#E1F5FE' : 'white', border: selected ? '2px solid #1CB0F6' : '2px solid #EEE',
+  color: selected ? '#1CB0F6' : '#4B4B4B', display: 'flex', justifyContent: 'space-between'
+});
 
-const cardStyle: React.CSSProperties = {
-  backgroundColor: 'white',
-  borderRadius: '24px',
-  padding: '20px',        // antes estaba 32px
-  border: '2px solid #E5E5E5',
-  boxShadow: '0 4px 0 #E5E5E5'
-};
-
+const layoutStyle: React.CSSProperties = { display: 'flex', backgroundColor: '#F7F9FA', minHeight: '100vh', fontFamily: '"Nunito", sans-serif' };
+const mainContainerStyle: React.CSSProperties = { marginLeft: 260, padding: '10px 20px 10px 10px', width: 'calc(100% - 260px)', boxSizing: 'border-box' };
+const cardStyle: React.CSSProperties = { backgroundColor: 'white', borderRadius: '24px', padding: '20px', border: '2px solid #E5E5E5', boxShadow: '0 4px 0 #E5E5E5' };
 const titleStyle: React.CSSProperties = { fontSize: '28px', fontWeight: 900, color: '#3C3C3C', marginBottom: '25px' };
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'separate', borderSpacing: '0 10px' };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '0 20px', fontSize: '12px', fontWeight: 900, color: '#BDBDBD', textTransform: 'uppercase' };
@@ -392,7 +402,7 @@ const searchBarStyle: React.CSSProperties = { padding: '12px 20px', borderRadius
 const btnSecondary: React.CSSProperties = { padding: '12px 20px', borderRadius: '15px', border: '2px solid #E5E5E5', backgroundColor: 'white', fontWeight: 800, cursor: 'pointer', color: '#4B4B4B' };
 const headerFlexStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
 const tabContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', marginBottom: '25px', borderBottom: '2px solid #E5E5E5', paddingBottom: '10px' };
-const tabButtonStyle = (active: boolean): React.CSSProperties => ({ padding: '10px 5px', border: 'none', borderBottom: active ? '4px solid #1cb0f6' : '4px solid transparent', backgroundColor: 'transparent', color: active ? '#1cb0f6' : '#AFAFAF', fontWeight: 900, cursor: 'pointer', transition: 'all 0.2s' });
+const tabButtonStyle = (active: boolean): React.CSSProperties => ({ padding: '10px 5px', border: 'none', borderBottom: active ? '4px solid #1cb0f6' : '4px solid transparent', backgroundColor: 'transparent', color: active ? '#1cb0f6' : '#AFAFAF', fontWeight: 900, cursor: 'pointer' });
 const btnStatusStyle: React.CSSProperties = { border: 'none', padding: '8px 15px', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', fontSize: '11px' };
 const selectRoleStyle: React.CSSProperties = { padding: '8px', borderRadius: '12px', border: '2px solid #F0F0F0', fontWeight: 700, color: '#777', cursor: 'pointer' };
 const horizontalGrid: React.CSSProperties = { display: 'flex', gap: '20px' };
@@ -402,8 +412,13 @@ const smallLabel: React.CSSProperties = { fontSize: '11px', fontWeight: 900, col
 const digitalCode: React.CSSProperties = { fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '2px' };
 const btnActionSmall: React.CSSProperties = { backgroundColor: '#AF85FF', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '15px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 0 #9366E4' };
 const rowInputStyle: React.CSSProperties = { display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' };
-const inputStyle: React.CSSProperties = { padding: '12px', borderRadius: '12px', border: '2px solid #E5E5E5', flex: 1, fontWeight: 600 };
+const inputStyle: React.CSSProperties = { padding: '12px', borderRadius: '12px', border: '2px solid #E5E5E5', flex: 1, fontWeight: 600, outline: 'none' };
 const btnAddRowStyle: React.CSSProperties = { marginBottom: '20px', padding: '10px 20px', borderRadius: '12px', border: 'none', backgroundColor: '#E1F5FE', color: '#1CB0F6', fontWeight: 800, cursor: 'pointer' };
 const btnMainStyle: React.CSSProperties = { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#58CC02', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: '0 5px 0 #46A302', fontSize: '16px' };
-const toastStyle: React.CSSProperties = { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', padding: '15px 30px', borderRadius: '16px', fontWeight: 900, zIndex: 1000, boxShadow: '0 8px 16px rgba(0,0,0,0.1)' };
+const toastStyle: React.CSSProperties = { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', padding: '15px 30px', borderRadius: '16px', fontWeight: 900, zIndex: 3000 };
 const btnCourseAction: React.CSSProperties = { padding: "8px 14px", borderRadius: "8px", border: "none", background: "#e8f5fe", color: "#1cb0f6", fontWeight: 600, cursor: "pointer" };
+const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
+const modalEditStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '28px', width: '400px', boxShadow: '0 15px 30px rgba(0,0,0,0.2)' };
+const inputGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '5px' };
+const labelStyle: React.CSSProperties = { fontSize: '11px', fontWeight: 900, color: '#AFAFAF', marginLeft: '5px' };
+const btnEditMini: React.CSSProperties = { background: '#F0F0F0', border: 'none', borderRadius: '10px', padding: '8px', cursor: 'pointer' };
