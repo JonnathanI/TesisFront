@@ -333,3 +333,16 @@ export interface StudentData {
   cedula?: string;      // ✅ nueva
   role?: UserRole;      // ✅ nueva (STUDENT | TEACHER | ADMIN)
 }
+
+// auth.types.ts
+export interface ChatMessage {
+  id: number;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  createdAt: string;
+
+  // 👇 AGREGAR ESTO
+  fromMe?: boolean;
+}
+

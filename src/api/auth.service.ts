@@ -37,6 +37,7 @@ import {
   StudentEvaluation,
   BulkRegisterRequest,
   CreateCoursePayload,
+  ChatMessage,
 } from "./auth.types";
 
 // --- CONFIGURACIÓN BASE ---
@@ -837,3 +838,33 @@ export async function updateUserStatus(userId: string, active: boolean) {
   }).then((res) => res.json());
 }
 
+export async function getChatMessages(friendId: string): Promise<ChatMessage[]> {
+  // 👈 OJO: sin /api porque BASE_URL ya lo trae
+  const res = await apiFetch(`/chat/${friendId}`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    throw new Error("Error al cargar mensajes de chat");
+  }
+
+  const data = await res.json();
+  return data as ChatMessage[];
+}
+
+export async function sendChatMessage(
+  friendId: string,
+  content: string
+): Promise<ChatMessage> {
+  const res = await apiFetch(`/chat/${friendId}`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Error al enviar mensaje");
+  }
+
+  const data = await res.json();
+  return data as ChatMessage;
+}

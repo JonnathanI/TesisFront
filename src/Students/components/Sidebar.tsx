@@ -1,26 +1,31 @@
+// src/Students/components/Sidebar.tsx
 import React from "react";
-import { 
-  Home, 
-  Volume2, 
-  Users, 
-  ShoppingBag, 
-  UserCircle, 
-  Trophy, 
+import {
+  Home,
+  Volume2,
+  Users,
+  ShoppingBag,
+  UserCircle,
+  Trophy,
   Settings,
-  LogOut ,
-  ClipboardList
+  LogOut,
+  ClipboardList,
 } from "lucide-react";
-// Asegúrate de que la ruta a AvatarEditor sea la correcta en tu proyecto
-import { AnimatedAvatarRenderer } from "../AvatarEditor";
+import { AnimatedAvatarRenderer, AvatarAttributes } from "../AvatarEditor";
 
 interface SidebarProps {
   active: string;
   onChange: (section: string) => void;
   onLogout: () => void;
-  userProfile?: any; 
+  userProfile?: any;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfile }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  active,
+  onChange,
+  onLogout,
+  userProfile,
+}) => {
   const items = [
     { id: "learn", label: "Aprender", icon: <Home size={28} strokeWidth={2.5} /> },
     { id: "sounds", label: "Sonidos", icon: <Volume2 size={28} strokeWidth={2.5} /> },
@@ -29,16 +34,18 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
     { id: "shop", label: "Tienda", icon: <ShoppingBag size={28} strokeWidth={2.5} /> },
     { id: "profile", label: "Perfil", icon: <UserCircle size={28} strokeWidth={2.5} /> },
     { id: "challenges", label: "Desafíos", icon: <Trophy size={28} strokeWidth={2.5} /> },
-   
   ];
 
-  // Lógica para obtener los atributos del avatar desde el JSON de la DB
-  const avatarAttrs = React.useMemo(() => {
+  // Avatar desde el JSON (ignorando la mascota para este mini avatar)
+  const avatarAttrs: AvatarAttributes | null = React.useMemo(() => {
     try {
       if (userProfile?.avatarData) {
-        return typeof userProfile.avatarData === 'string' 
-          ? JSON.parse(userProfile.avatarData) 
-          : userProfile.avatarData;
+        const raw =
+          typeof userProfile.avatarData === "string"
+            ? JSON.parse(userProfile.avatarData)
+            : userProfile.avatarData;
+        const { pet: _pet, ...rest } = raw;
+        return rest as AvatarAttributes;
       }
     } catch (e) {
       console.error("Error al procesar avatarData en Sidebar", e);
@@ -109,7 +116,6 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
       background: #F0F9FF;
     }
 
-    /* Contenedor circular para el avatar animado */
     .avatar-mini-circle {
       width: 46px;
       height: 46px;
@@ -123,9 +129,8 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
       position: relative;
     }
 
-    /* Escalado para centrar la cara del avatar animado */
     .avatar-scaler {
-      transform: scale(0.45) translateY(25px); 
+      transform: scale(0.45) translateY(25px);
       transform-origin: center;
     }
 
@@ -177,17 +182,35 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
   `;
 
   return (
-    <aside style={{ 
-      width: 260, borderRight: `2px solid #E5E5E5`, padding: "25px 15px", 
-      height: "100vh", position: "fixed", left: 0, top: 0,
-      backgroundColor: "white", zIndex: 100, display: "flex",
-      flexDirection: "column", animation: "slideIn 0.5s ease-out"
-    }}>
+    <aside
+      style={{
+        width: 260,
+        borderRight: `2px solid #E5E5E5`,
+        padding: "25px 15px",
+        height: "100vh",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        backgroundColor: "white",
+        zIndex: 100,
+        display: "flex",
+        flexDirection: "column",
+        animation: "slideIn 0.5s ease-out",
+      }}
+    >
       <style>{sideStyles}</style>
 
       {/* Logo */}
       <div style={{ padding: "0 15px 25px" }}>
-        <h1 style={{ color: "#1CB0F6", fontSize: "30px", fontWeight: 900, margin: 0, letterSpacing: "-1.5px" }}>
+        <h1
+          style={{
+            color: "#1CB0F6",
+            fontSize: "30px",
+            fontWeight: 900,
+            margin: 0,
+            letterSpacing: "-1.5px",
+          }}
+        >
           EuroPeek
         </h1>
       </div>
@@ -198,27 +221,42 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
           <div className="avatar-mini-circle">
             {avatarAttrs ? (
               <div className="avatar-scaler">
-                <AnimatedAvatarRenderer attrs={avatarAttrs} size={100} />
+                <AnimatedAvatarRenderer avatar={avatarAttrs} size={100} />
               </div>
             ) : (
-              <div style={{ fontWeight: 800, color: "#1CB0F6", fontSize: "18px" }}>
-                {userProfile?.fullName?.[0].toUpperCase() || "U"}
+              <div
+                style={{
+                  fontWeight: 800,
+                  color: "#1CB0F6",
+                  fontSize: "18px",
+                }}
+              >
+                {userProfile?.fullName?.[0]?.toUpperCase() || "U"}
               </div>
             )}
           </div>
-          
+
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <div style={{ 
-              fontSize: "14px", 
-              fontWeight: 800, 
-              color: "#4B4B4B", 
-              whiteSpace: "nowrap", 
-              overflow: "hidden", 
-              textOverflow: "ellipsis" 
-            }}>
+            <div
+              style={{
+                fontSize: "14px",
+                fontWeight: 800,
+                color: "#4B4B4B",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               {userProfile?.fullName || "Usuario"}
             </div>
-            <div style={{ fontSize: "11px", color: "#AFB4B8", fontWeight: 700, textTransform: "uppercase" }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#AFB4B8",
+                fontWeight: 700,
+                textTransform: "uppercase",
+              }}
+            >
               Estudiante
             </div>
           </div>
@@ -226,18 +264,56 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
 
         {/* TOOLTIP DE PROGRESO */}
         <div className="profile-tooltip">
-          <div style={{ fontWeight: 900, fontSize: "15px", marginBottom: "8px", color: "#1CB0F6", textTransform: "uppercase" }}>
-             Mi Progreso
+          <div
+            style={{
+              fontWeight: 900,
+              fontSize: "15px",
+              marginBottom: "8px",
+              color: "#1CB0F6",
+              textTransform: "uppercase",
+            }}
+          >
+            Mi Progreso
           </div>
-          <div style={{ fontSize: "13px", marginBottom: "6px", color: "#DDD" }}>
-            📅 Se unió en: <br/> 
-            <span style={{ color: "white", fontWeight: "bold" }}>
-              {userProfile?.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : "Reciente"}
+          <div
+            style={{
+              fontSize: "13px",
+              marginBottom: "6px",
+              color: "#DDD",
+            }}
+          >
+            📅 Se unió en: <br />
+            <span
+              style={{
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              {userProfile?.joinedAt
+                ? new Date(userProfile.joinedAt).toLocaleDateString("es-ES", {
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "Reciente"}
             </span>
           </div>
-          <div style={{ fontSize: "13px", color: "#DDD", borderTop: "1px solid #666", paddingTop: "8px", marginTop: "4px" }}>
-            ⭐ Experiencia Total: <br/>
-            <span style={{ color: "#FFC800", fontWeight: "900", fontSize: "16px" }}>
+          <div
+            style={{
+              fontSize: "13px",
+              color: "#DDD",
+              borderTop: "1px solid #666",
+              paddingTop: "8px",
+              marginTop: "4px",
+            }}
+          >
+            ⭐ Experiencia Total: <br />
+            <span
+              style={{
+                color: "#FFC800",
+                fontWeight: "900",
+                fontSize: "16px",
+              }}
+            >
               {userProfile?.totalXp || 0} XP
             </span>
           </div>
@@ -251,7 +327,9 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
             key={item.id}
             onClick={() => onChange(item.id)}
             className={`nav-item ${active === item.id ? "active" : ""}`}
-            style={{ animation: `slideIn 0.5s ease-out backwards ${index * 0.05}s` }}
+            style={{
+              animation: `slideIn 0.5s ease-out backwards ${index * 0.05}s`,
+            }}
           >
             <span className="icon-wrapper">{item.icon}</span>
             {item.label}
@@ -262,7 +340,9 @@ const Sidebar: React.FC<SidebarProps> = ({ active, onChange, onLogout, userProfi
       {/* Footer / Cerrar Sesión */}
       <div className="logout-section">
         <button onClick={onLogout} className="nav-item logout-item">
-          <span className="icon-wrapper"><LogOut size={28} strokeWidth={2.5} /></span>
+          <span className="icon-wrapper">
+            <LogOut size={28} strokeWidth={2.5} />
+          </span>
           Cerrar Sesión
         </button>
       </div>
