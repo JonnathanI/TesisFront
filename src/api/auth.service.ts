@@ -868,3 +868,30 @@ export async function sendChatMessage(
   const data = await res.json();
   return data as ChatMessage;
 }
+
+// auth.service.ts
+
+export async function sendChatFile(
+  friendId: string,
+  file: File,
+  content?: string
+): Promise<ChatMessage> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (content && content.trim().length > 0) {
+    formData.append("content", content.trim());
+  }
+
+  const res = await apiFetch(`/chat/${friendId}/file`, {
+    method: "POST",
+    body: formData, // apiFetch ya NO pone Content-Type si es FormData
+  });
+
+  if (!res.ok) {
+    throw new Error("Error al enviar archivo");
+  }
+
+  const data = await res.json();
+  return data as ChatMessage;
+}
+

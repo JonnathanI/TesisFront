@@ -334,7 +334,6 @@ export interface StudentData {
   role?: UserRole;      // ✅ nueva (STUDENT | TEACHER | ADMIN)
 }
 
-// auth.types.ts
 export interface ChatMessage {
   id: number;
   senderId: string;
@@ -342,7 +341,8 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
 
-  // 👇 AGREGAR ESTO
-  fromMe?: boolean;
+  attachmentUrl?: string | null;
+  attachmentType?: "IMAGE" | "VIDEO" | "AUDIO" | "FILE" | null;
 }
+
 

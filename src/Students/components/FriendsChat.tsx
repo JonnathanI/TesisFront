@@ -1,11 +1,11 @@
 // src/Students/components/FriendsChat.tsx
 import React, { useEffect, useState, useRef } from "react";
 import { StudentData, ChatMessage } from "../../api/auth.types";
-import { getChatMessages, sendChatMessage } from "../../api/auth.service";
+import { getChatMessages, sendChatMessage, sendChatFile } from "../../api/auth.service";
 
 interface FriendsChatProps {
   friend: StudentData;
-  currentUserId?: string; // puede venir o no desde el dashboard
+  currentUserId?: string;
   onClose: () => void;
 }
 
@@ -18,9 +18,13 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Cargar historial al abrir
+  // 🔹 Cargar historial solo una vez al abrir el chat
   useEffect(() => {
     const load = async () => {
       try {
@@ -33,43 +37,96 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
         setLoading(false);
       }
     };
+
     load();
   }, [friend.id]);
 
-  // Auto-scroll al último mensaje
+useEffect(() => {
+  console.log("Mensajes en el chat:", messages);
+}, [messages]);
+
+
+  // 🔄 NUEVO: refrescar el chat cada 3 segundos para ver mensajes nuevos
+  useEffect(() => {
+    let isMounted = true;
+
+    const interval = setInterval(async () => {
+      try {
+        const data = await getChatMessages(friend.id);
+
+        if (!isMounted) return;
+
+        setMessages((prev) => {
+          if (
+            prev.length === data.length &&
+            prev[prev.length - 1]?.id === data[data.length - 1]?.id
+          ) {
+            // No hay cambios, dejamos el estado igual para evitar re-render innecesario
+            return prev;
+          }
+          return data;
+        });
+      } catch (e) {
+        console.error("Error actualizando chat", e);
+      }
+    }, 1000); // 3 segundos
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [friend.id]);
+
+  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+  };
+
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
 
+    // nada que enviar
+    if (!trimmed && !selectedFile) return;
     setSending(true);
+
     try {
-      // Mensaje optimista solo para el front
-      const optimistic: ChatMessage = {
-        id: Date.now(), // temporal
-        senderId: currentUserId ?? "", // el back usa el JWT, esto es solo visual
-        receiverId: friend.id,
-        content: trimmed,
-        createdAt: new Date().toISOString(),
-      };
+      // 1) mensaje de texto normal
+      if (trimmed) {
+        const optimistic: ChatMessage = {
+          id: Date.now(),
+          senderId: currentUserId ?? "",
+          receiverId: friend.id,
+          content: trimmed,
+          createdAt: new Date().toISOString(),
+        };
 
-      setMessages((prev) => [...prev, optimistic]);
-      setText("");
+        setMessages((prev) => [...prev, optimistic]);
+        setText("");
 
-      // El backend usa el JWT para saber quién soy
-      const saved = await sendChatMessage(friend.id, trimmed);
+        const saved = await sendChatMessage(friend.id, trimmed);
 
-      // Reemplazar el optimista por el real
-      setMessages((prev) => {
-        const withoutTemp = prev.filter((m) => m.id !== optimistic.id);
-        return [...withoutTemp, saved];
-      });
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => m.id !== optimistic.id);
+          return [...withoutTemp, saved];
+        });
+      }
+
+      // 2) archivo
+      if (selectedFile) {
+        const savedFileMessage = await sendChatFile(friend.id, selectedFile, "");
+
+        setMessages((prev) => [...prev, savedFileMessage]);
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     } catch (e) {
-      alert("No se pudo enviar el mensaje");
-      console.error("Error al enviar mensaje", e);
+      console.error(e);
+      alert("No se pudo enviar el mensaje o el archivo");
     } finally {
       setSending(false);
     }
@@ -79,6 +136,87 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const renderSelectedFile = () => {
+    if (!selectedFile) return null;
+    return (
+      <div
+        style={{
+          fontSize: 11,
+          color: "#64748B",
+          marginBottom: 4,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        📎 {selectedFile.name}
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "#ef4444",
+            cursor: "pointer",
+            fontSize: 11,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    );
+  };
+
+  const renderAttachment = (m: ChatMessage) => {
+    if (!m.attachmentUrl) return null;
+
+    const url = m.attachmentUrl;
+
+    switch (m.attachmentType) {
+      case "IMAGE":
+        return (
+          <img
+            src={url}
+            alt="imagen"
+            style={{ maxWidth: 200, maxHeight: 200, borderRadius: 8, marginTop: 4 }}
+          />
+        );
+      case "VIDEO":
+        return (
+          <video
+            src={url}
+            controls
+            style={{ maxWidth: 220, borderRadius: 8, marginTop: 4 }}
+          />
+        );
+      case "AUDIO":
+        return (
+          <audio src={url} controls style={{ marginTop: 4, width: "100%" }} />
+        );
+      default:
+        return (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginTop: 4,
+              fontSize: 12,
+              textDecoration: "underline",
+            }}
+          >
+            📎 Ver archivo
+          </a>
+        );
     }
   };
 
@@ -99,7 +237,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
         zIndex: 9999,
       }}
     >
-      {/* header */}
+      {/* header con indicador (verde si friend.isActive === true) */}
       <div
         style={{
           padding: "10px 14px",
@@ -111,27 +249,43 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: "#1CB0F6",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: 14,
-            }}
-          >
-            {friend.fullName.charAt(0).toUpperCase()}
+          <div style={{ position: "relative" }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "#1CB0F6",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+                fontSize: 14,
+              }}
+            >
+              {friend.fullName.charAt(0).toUpperCase()}
+            </div>
+            <span
+              style={{
+                position: "absolute",
+                right: -1,
+                bottom: -1,
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                backgroundColor: friend.isActive ? "#22c55e" : "#94A3B8",
+                border: "2px solid white",
+              }}
+            />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               {friend.fullName}
             </div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>Amigo</div>
+            <div style={{ fontSize: 11, color: "#94A3B8" }}>
+              {friend.isActive ? "En línea" : "Desconectado"}
+            </div>
           </div>
         </div>
 
@@ -166,8 +320,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
           </p>
         ) : (
           messages.map((m) => {
-            // 🔥 Lógica robusta: siempre hay solo 2 personas.
-            // Si el sender ES el amigo → mensaje del amigo (izquierda)
+            // 🔹 usamos friend.id para decidir si el mensaje es del otro
             const isFromFriend = m.senderId === friend.id;
             const isFromMe = !isFromFriend;
 
@@ -180,7 +333,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
                   marginBottom: 6,
                 }}
               >
-                <span
+                <div
                   style={{
                     maxWidth: "80%",
                     padding: "6px 10px",
@@ -194,7 +347,8 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
                   }}
                 >
                   {m.content}
-                </span>
+                  {renderAttachment(m)}
+                </div>
               </div>
             );
           })
@@ -210,41 +364,71 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
           background: "white",
         }}
       >
-        <textarea
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Escribe un mensaje..."
-          style={{
-            width: "100%",
-            resize: "none",
-            borderRadius: 12,
-            border: "1px solid #CBD5E1",
-            padding: "6px 8px",
-            fontSize: 13,
-            outline: "none",
-            fontFamily: "inherit",
-          }}
+        {renderSelectedFile()}
+
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              border: "none",
+              background: "transparent",
+              fontSize: 18,
+              cursor: "pointer",
+            }}
+            title="Adjuntar archivo"
+          >
+            📎
+          </button>
+
+          <textarea
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe un mensaje..."
+            style={{
+              flex: 1,
+              resize: "none",
+              borderRadius: 12,
+              border: "1px solid #CBD5E1",
+              padding: "6px 8px",
+              fontSize: 13,
+              outline: "none",
+              fontFamily: "inherit",
+            }}
+          />
+
+          <button
+            disabled={sending || (!text.trim() && !selectedFile)}
+            onClick={handleSend}
+            style={{
+              border: "none",
+              borderRadius: 999,
+              padding: "6px 14px",
+              fontSize: 12,
+              fontWeight: 700,
+              background:
+                sending || (!text.trim() && !selectedFile)
+                  ? "#BFDBFE"
+                  : "#1CB0F6",
+              color: "white",
+              cursor:
+                sending || (!text.trim() && !selectedFile)
+                  ? "default"
+                  : "pointer",
+            }}
+          >
+            Enviar
+          </button>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
         />
-        <button
-          disabled={sending || !text.trim()}
-          onClick={handleSend}
-          style={{
-            marginTop: 6,
-            border: "none",
-            borderRadius: 999,
-            padding: "6px 14px",
-            fontSize: 12,
-            fontWeight: 700,
-            background: sending || !text.trim() ? "#BFDBFE" : "#1CB0F6",
-            color: "white",
-            cursor: sending || !text.trim() ? "default" : "pointer",
-            float: "right",
-          }}
-        >
-          Enviar
-        </button>
       </div>
     </div>
   );
