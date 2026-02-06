@@ -439,15 +439,24 @@ export const registerBulk = async (data: BulkRegisterRequest): Promise<BulkRegis
 
 
 
+// Antes apuntaba a /teacher/content/courses
 export const createCourse = async (
   payload: CreateCoursePayload
 ): Promise<any> => {
-  const response = await apiFetch('/teacher/content/courses', {
+  const response = await apiFetch('/courses', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    console.error('Error al crear curso:', response.status, errorText);
+    throw new Error('No se pudo crear el curso');
+  }
+
   return response.json();
 };
+
 
 
 
@@ -802,14 +811,29 @@ export const updateUserRole = async (userId: string, newRole: string): Promise<v
     }
 };
 
-export const updateUserStatus = async (userId: string, status: boolean): Promise<any> => {
-    // CAMBIO: /auth/admin/ -> /users/admin/
-    // Nota: Necesitas crear este @PatchMapping o @PutMapping en tu UserController de Kotlin
-    const response = await apiFetch(`/users/admin/status/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ active: status })
-    });
-
-    if (!response.ok) throw new Error("No se pudo cambiar el estado");
-    return response.json();
+export const assignCourseToTeacher = async (courseId: string, teacherId: string) => {
+  return apiFetch(`/courses/${courseId}/assign-teacher/${teacherId}`, {
+    method: "POST",
+  });
 };
+
+export const assignCourseToStudent = async (courseId: string, studentId: string) => {
+  return apiFetch(`/courses/${courseId}/assign-student/${studentId}`, {
+    method: "POST",
+  });
+};
+
+export async function updateUser(userId: string, data: any) {
+  return apiFetch(`/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(data)
+  }).then(res => res.json());
+};
+
+export async function updateUserStatus(userId: string, active: boolean) {
+  return apiFetch(`/users/admin/status/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ active }), // 👈 debe llamarse igual que en el DTO
+  }).then((res) => res.json());
+}
+

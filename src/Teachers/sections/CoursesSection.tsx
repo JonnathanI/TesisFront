@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   createCourse,
   updateCourse,
   deleteCourse,
+  getAllUsersAdmin,
+  assignCourseToTeacher,
+  assignCourseToStudent,
 } from "../../api/auth.service";
+import { StudentData, UserRole } from "../../api/auth.types";
 
 interface Props {
   courses: any[];
@@ -21,8 +25,34 @@ export const CoursesSection = ({
     baseLanguage: "ES",
     targetLanguage: "EN",
   });
-
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // 🔹 usuarios para asignar (profes / estudiantes)
+  const [users, setUsers] = useState<StudentData[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // selección por curso (diccionario courseId -> userId)
+  const [selectedTeacher, setSelectedTeacher] = useState<Record<string, string>>(
+    {}
+  );
+  const [selectedStudent, setSelectedStudent] = useState<Record<string, string>>(
+    {}
+  );
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const res = await getAllUsersAdmin();
+        setUsers(Array.isArray(res) ? res : []);
+      } catch (e) {
+        console.error("Error cargando usuarios para cursos", e);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    loadUsers();
+  }, []);
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
@@ -51,6 +81,46 @@ export const CoursesSection = ({
     if (!window.confirm("¿Eliminar curso?")) return;
     await deleteCourse(id);
     onRefresh();
+  };
+
+  // listas separadas
+  const teachers = users.filter(
+    (u) =>
+      (u.role as UserRole | undefined) === "TEACHER" ||
+      (u.role as UserRole | undefined) === "ADMIN"
+  );
+  const students = users.filter(
+    (u) => (u.role as UserRole | undefined) === "STUDENT" || !u.role
+  );
+
+  const handleAssignTeacher = async (courseId: string) => {
+    const teacherId = selectedTeacher[courseId];
+    if (!teacherId) {
+      alert("Selecciona un profesor para asignar");
+      return;
+    }
+    try {
+      await assignCourseToTeacher(courseId, teacherId);
+      alert("Profesor asignado al curso 🎓");
+    } catch (e) {
+      console.error(e);
+      alert("Error asignando profesor");
+    }
+  };
+
+  const handleAssignStudent = async (courseId: string) => {
+    const studentId = selectedStudent[courseId];
+    if (!studentId) {
+      alert("Selecciona un estudiante para asignar");
+      return;
+    }
+    try {
+      await assignCourseToStudent(courseId, studentId);
+      alert("Estudiante asignado al curso 📚");
+    } catch (e) {
+      console.error(e);
+      alert("Error asignando estudiante");
+    }
   };
 
   return (
@@ -142,62 +212,178 @@ export const CoursesSection = ({
               borderRadius: "16px",
               boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              flexDirection: "column",
+              gap: "12px",
             }}
           >
-            <div>
-              <strong style={{ fontSize: "16px" }}>{course.title}</strong>
-              <div style={{ fontSize: "13px", color: "#666" }}>
-                Idioma base: {course.baseLanguage} → {course.targetLanguage}
+            {/* Cabecera curso */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: "16px" }}>{course.title}</strong>
+                <div style={{ fontSize: "13px", color: "#666" }}>
+                  Idioma base: {course.baseLanguage} → {course.targetLanguage}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => onSelectCourse(course.id)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "#e8f5fe",
+                    color: "#1cb0f6",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Unidades
+                </button>
+
+                <button
+                  onClick={() => handleEdit(course)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "#fff3cd",
+                    color: "#856404",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Editar
+                </button>
+
+                <button
+                  onClick={() => handleDelete(course.id)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "#fdecea",
+                    color: "#d93025",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={() => onSelectCourse(course.id)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "#e8f5fe",
-                  color: "#1cb0f6",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Unidades
-              </button>
+            {/* Asignación profesor / estudiante */}
+            <div
+              style={{
+                borderTop: "1px solid #eee",
+                paddingTop: "10px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))",
+                gap: "10px",
+              }}
+            >
+              {/* PROFESOR */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#999" }}>
+                  Profesor asignado
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <select
+                    disabled={loadingUsers}
+                    value={selectedTeacher[course.id] || ""}
+                    onChange={(e) =>
+                      setSelectedTeacher((prev) => ({
+                        ...prev,
+                        [course.id]: e.target.value,
+                      }))
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                    }}
+                  >
+                    <option value="">
+                      {loadingUsers ? "Cargando..." : "Seleccionar profesor"}
+                    </option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.fullName} ({t.email})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleAssignTeacher(course.id)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#1cb0f6",
+                      color: "#fff",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✔
+                  </button>
+                </div>
+              </div>
 
-              <button
-                onClick={() => handleEdit(course)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "#fff3cd",
-                  color: "#856404",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Editar
-              </button>
-
-              <button
-                onClick={() => handleDelete(course.id)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "#fdecea",
-                  color: "#d93025",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Eliminar
-              </button>
+              {/* ESTUDIANTE */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#999" }}>
+                  Añadir estudiante
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <select
+                    disabled={loadingUsers}
+                    value={selectedStudent[course.id] || ""}
+                    onChange={(e) =>
+                      setSelectedStudent((prev) => ({
+                        ...prev,
+                        [course.id]: e.target.value,
+                      }))
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                    }}
+                  >
+                    <option value="">
+                      {loadingUsers ? "Cargando..." : "Seleccionar alumno"}
+                    </option>
+                    {students.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.fullName} ({s.email})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleAssignStudent(course.id)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#58cc02",
+                      color: "#fff",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ➕
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ))}

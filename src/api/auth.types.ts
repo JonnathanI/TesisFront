@@ -207,7 +207,10 @@ export interface CreateCoursePayload {
   title: string;
   targetLanguage: string;
   baseLanguage: string;
+  teacherId?: string;     // UUID del profesor
+  studentIds?: string[];  // UUIDs de alumnos
 }
+
 
 // --- LEADERBOARD ---
 export interface LeaderboardEntry {
