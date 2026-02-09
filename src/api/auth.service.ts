@@ -246,7 +246,7 @@ export const updateUserAvatar = async (avatarData: any): Promise<void> => {
 // --- TEACHER (GESTIÓN DE CONTENIDO Y ESTUDIANTES) ---
 
 export const getStudentList = async (): Promise<StudentData[]> => {
-    const response = await apiFetch('/teacher/students', { method: 'GET' });
+    const response = await apiFetch('/teacher/content/students', { method: 'GET' });
     return response.json();
 };
 

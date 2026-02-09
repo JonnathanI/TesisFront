@@ -53,10 +53,62 @@ const CoursesSection = ({
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const availableTeachers = allUsers.filter(
-    (u) => u.role === "TEACHER" || u.role === "ADMIN"
+  // 🔹 IDs de profesores ya usados en algún curso
+  const usedTeacherIds = useMemo(() => {
+    const ids = new Set<string>();
+    courses.forEach((c: any) => {
+      if (c.teacher && c.teacher.id) {
+        ids.add(c.teacher.id as string);
+      }
+    });
+    return ids;
+  }, [courses]);
+
+  // 🔹 IDs de estudiantes ya usados en algún curso
+  const usedStudentIds = useMemo(() => {
+    const ids = new Set<string>();
+    courses.forEach((c: any) => {
+      (c.students || []).forEach((s: any) => {
+        if (s.id) ids.add(s.id as string);
+      });
+    });
+    return ids;
+  }, [courses]);
+
+  // 🔹 Curso que se está editando (si hay uno)
+  const editingCourse = useMemo(
+    () => courses.find((c: any) => c.id === editingId) || null,
+    [courses, editingId]
   );
-  const availableStudents = allUsers.filter((u) => u.role === "STUDENT");
+
+  const editingTeacherId = editingCourse?.teacher?.id || null;
+  const editingStudentIds = new Set<string>(
+    (editingCourse?.students || []).map((s: any) => s.id as string)
+  );
+
+  // 🔹 Profesores disponibles (no repetidos en otros cursos)
+  const availableTeachers = allUsers.filter((u) => {
+    const isTeacher = u.role === "TEACHER" || u.role === "ADMIN";
+    if (!isTeacher) return false;
+
+    // Si estoy editando y este profesor ya es del curso actual, debe aparecer
+    if (editingTeacherId && u.id === editingTeacherId) return true;
+
+    // En otro caso, no mostrar si ya está usado en algún curso
+    return !usedTeacherIds.has(u.id!);
+  });
+
+  // 🔹 Estudiantes disponibles (no repetidos en otros cursos)
+  const availableStudents = allUsers.filter((u) => {
+    const isStudent = u.role === "STUDENT";
+    if (!isStudent) return false;
+
+    // Si estoy editando y este estudiante ya es del curso actual, debe aparecer
+    if (editingStudentIds.has(u.id!)) return true;
+
+    // En otro caso, no mostrar si ya está usado en algún curso
+    return !usedStudentIds.has(u.id!);
+  });
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
@@ -215,7 +267,7 @@ const CoursesSection = ({
               <strong style={{ fontSize: "16px" }}>{course.title}</strong>
               <div style={{ fontSize: "12px", color: "#666" }}>
                 👥 {course.students?.length || 0} alumnos | 👨‍🏫{" "}
-                {course.teachers?.length || 0} prof.
+                {course.teacher ? 1 : 0} prof.
               </div>
             </div>
 
@@ -234,8 +286,10 @@ const CoursesSection = ({
                     title: course.title,
                     baseLanguage: course.baseLanguage || "ES",
                     targetLanguage: course.targetLanguage || "EN",
-                    teachers: course.teachers || [],
-                    students: course.students || [],
+                    // si hay profesor, metemos su id en un array
+                    teachers: course.teacher ? [course.teacher.id] : [],
+                    // de los estudiantes, solo queremos los IDs
+                    students: (course.students || []).map((s: any) => s.id),
                   });
                 }}
                 style={{
@@ -337,28 +391,27 @@ export const AdminDashboard = () => {
   };
 
   // 🆕 AQUÍ ES DONDE AHORA SÍ SE GUARDA EN LA BASE
- const saveFullEdit = async () => {
-  if (!editingUser || !editingUser.id) return;
-  setLoading(true);
-  try {
-    await updateUser(editingUser.id, {
-      fullName: editingUser.fullName,
-      email: editingUser.email,
-      cedula: editingUser.cedula,
-    });
+  const saveFullEdit = async () => {
+    if (!editingUser || !editingUser.id) return;
+    setLoading(true);
+    try {
+      await updateUser(editingUser.id, {
+        fullName: editingUser.fullName,
+        email: editingUser.email,
+        cedula: editingUser.cedula,
+      });
 
-    await fetchUsers(); // refresca lista desde la BD
+      await fetchUsers(); // refresca lista desde la BD
 
-    showToast("👤 Perfil actualizado con éxito");
-    setEditingUser(null);
-  } catch (e) {
-    console.error(e);
-    showToast("❌ Error al guardar cambios", "error");
-  } finally {
-    setLoading(false);
-  }
-};
-
+      showToast("👤 Perfil actualizado con éxito");
+      setEditingUser(null);
+    } catch (e) {
+      console.error(e);
+      showToast("❌ Error al guardar cambios", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -841,7 +894,7 @@ const btnActionSmall: React.CSSProperties = { backgroundColor: '#AF85FF', color:
 const rowInputStyle: React.CSSProperties = { display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' };
 const inputStyle: React.CSSProperties = { padding: '12px', borderRadius: '12px', border: '2px solid #E5E5E5', flex: 1, fontWeight: 600, outline: 'none' };
 const btnAddRowStyle: React.CSSProperties = { marginBottom: '20px', padding: '10px 20px', borderRadius: '12px', border: 'none', backgroundColor: '#E1F5FE', color: '#1CB0F6', fontWeight: 800, cursor: 'pointer' };
-const btnMainStyle: React.CSSProperties = { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#58CC02', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: '0 5px 0 #46A302', fontSize: '16px' };
+const btnMainStyle: React.CSSProperties = { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#58CC02', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: '0 5px #46A302', fontSize: '16px' };
 const toastStyle: React.CSSProperties = { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', padding: '15px 30px', borderRadius: '16px', fontWeight: 900, zIndex: 3000 };
 const btnCourseAction: React.CSSProperties = { padding: "8px 14px", borderRadius: "8px", border: "none", background: "#e8f5fe", color: "#1cb0f6", fontWeight: 600, cursor: "pointer" };
 const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
@@ -864,4 +917,15 @@ const scrollListStyle: React.CSSProperties = {
   marginTop: "8px",
 };
 
-const itemSelectStyle = (selected: boolean): React.CSSProperties => ({ padding: "8px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer", backgroundColor: selected ? "#E1F5FE" : "white", border: selected ? "2px solid #1CB0F6" : "2px solid #EEE", color: selected ? "#1CB0F6" : "#4B4B4B", display: "flex", justifyContent: "space-between", });
+const itemSelectStyle = (selected: boolean): React.CSSProperties => ({
+  padding: "8px 12px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: 700,
+  cursor: "pointer",
+  backgroundColor: selected ? "#E1F5FE" : "white",
+  border: selected ? "2px solid #1CB0F6" : "2px solid #EEE",
+  color: selected ? "#1CB0F6" : "#4B4B4B",
+  display: "flex",
+  justifyContent: "space-between",
+});
