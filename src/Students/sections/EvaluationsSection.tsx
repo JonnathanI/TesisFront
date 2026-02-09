@@ -5,8 +5,6 @@ export const EvaluationsSection = () => {
   return (
     <div className="animate-in fade-in duration-500">
       
-
-      {/* ✅ Ya NO se pasa userId */}
       <StudentEvaluationCard />
 
       

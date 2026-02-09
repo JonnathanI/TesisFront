@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   createUnit,
   updateUnit,
-  deleteUnit
+  deleteUnit,
+  getTeacherCourses,
 } from "../../api/auth.service";
+import { UserRole } from "../../api/auth.types";
 
 interface Props {
-  courses: any[];
-  units: any[];
+  courses: any[];                // cursos que recibe (para admin)
+  units: any[];                  // TODAS las unidades del profe (desde el padre)
   selectedCourseId: string | null;
   onSelectCourse: (courseId: string) => void;
   onRefresh: () => void;
@@ -24,37 +26,106 @@ export const UnitsSection = ({
   const [order, setOrder] = useState(1);
   const [editingUnit, setEditingUnit] = useState<any | null>(null);
 
+  const role = (localStorage.getItem("user-role") as UserRole | null) ?? null;
+
+  const [ownCourses, setOwnCourses] = useState<any[]>([]);
+
+  // ⭐ NUEVO: estado local con las unidades que realmente pintamos
+  const [localUnits, setLocalUnits] = useState<any[]>([]);
+
+  // ⭐ Cada vez que el padre cambie `units`, sincronizamos localUnits
+  useEffect(() => {
+    setLocalUnits(units || []);
+  }, [units]);
+
+  const loadTeacherCourses = async () => {
+    if (role !== "TEACHER") return;
+    try {
+      const data = await getTeacherCourses();
+      setOwnCourses(Array.isArray(data) ? data : []);
+      console.log("📗 Cursos del profe:", data);
+    } catch (e) {
+      console.error("Error cargando cursos del profesor en UnitsSection", e);
+    }
+  };
+
+  useEffect(() => {
+    if (role === "TEACHER") {
+      loadTeacherCourses();
+    }
+  }, [role]);
+
   const handleCreate = async () => {
     if (!selectedCourseId) return alert("Selecciona un curso");
 
-    await createUnit({
+    const created = await createUnit({
       courseId: selectedCourseId,
       title,
       unitOrder: order,
     });
 
+    // ⭐ Actualizamos inmediatamente la lista en el front
+    setLocalUnits((prev) => [...prev, created]);
+
     setTitle("");
     setOrder(1);
+
+    // opcional: recargar desde backend
     onRefresh();
   };
 
   const handleUpdate = async () => {
-    await updateUnit(editingUnit.id, {
+    if (!editingUnit) return;
+
+    const updated = await updateUnit(editingUnit.id, {
       title,
       unitOrder: order,
     });
 
+    // ⭐ Reemplazamos en el array local la unidad editada
+    setLocalUnits((prev) =>
+      prev.map((u) => (u.id === updated.id ? updated : u))
+    );
+
     setEditingUnit(null);
     setTitle("");
     setOrder(1);
+
+    // opcional: recargar desde backend
     onRefresh();
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar unidad?")) return;
     await deleteUnit(id);
+
+    // ⭐ Quitamos del estado local
+    setLocalUnits((prev) => prev.filter((u) => u.id !== id));
+
     onRefresh();
   };
+
+  // Cursos que mostramos en el select
+  const coursesToShow = role === "TEACHER" ? ownCourses : courses;
+
+  // ⭐ Usamos localUnits en lugar de `units`
+  const filteredUnits = selectedCourseId
+    ? localUnits.filter((u) => {
+        // Caso 1: unidad trae course anidado
+        if (u.course && u.course.id) {
+          return u.course.id === selectedCourseId;
+        }
+        // Caso 2: unidad trae courseId directo
+        if (u.courseId) {
+          return u.courseId === selectedCourseId;
+        }
+        // Caso 3: sin course ni courseId -> si solo hay un curso, mostramos todas
+        return (
+          coursesToShow.length === 1 &&
+          coursesToShow[0].id === selectedCourseId
+        );
+      })
+    : [];
 
   return (
     <div style={{ maxWidth: "900px" }}>
@@ -62,10 +133,15 @@ export const UnitsSection = ({
         📗 Gestión de Unidades
       </h2>
 
-      {/* SELECTOR */}
+      {/* SELECTOR DE CURSO */}
       <select
         value={selectedCourseId ?? ""}
-        onChange={(e) => onSelectCourse(e.target.value)}
+        onChange={(e) => {
+          setEditingUnit(null);
+          setTitle("");
+          setOrder(1);
+          onSelectCourse(e.target.value);
+        }}
         style={{
           padding: "12px",
           borderRadius: "10px",
@@ -75,7 +151,7 @@ export const UnitsSection = ({
         }}
       >
         <option value="">-- Selecciona un curso --</option>
-        {courses.map((c) => (
+        {coursesToShow.map((c) => (
           <option key={c.id} value={c.id}>
             {c.title}
           </option>
@@ -84,7 +160,7 @@ export const UnitsSection = ({
 
       {selectedCourseId && (
         <>
-          {/* FORM */}
+          {/* FORMULARIO */}
           <div
             style={{
               background: "#fff",
@@ -141,7 +217,11 @@ export const UnitsSection = ({
 
               {editingUnit && (
                 <button
-                  onClick={() => setEditingUnit(null)}
+                  onClick={() => {
+                    setEditingUnit(null);
+                    setTitle("");
+                    setOrder(1);
+                  }}
                   style={{
                     padding: "12px 20px",
                     borderRadius: "10px",
@@ -157,9 +237,9 @@ export const UnitsSection = ({
             </div>
           </div>
 
-          {/* LISTA */}
+          {/* LISTA DE UNIDADES */}
           <div style={{ display: "grid", gap: "16px" }}>
-            {units.map((u) => (
+            {filteredUnits.map((u) => (
               <div
                 key={u.id}
                 style={{
@@ -215,6 +295,12 @@ export const UnitsSection = ({
                 </div>
               </div>
             ))}
+
+            {filteredUnits.length === 0 && (
+              <p style={{ color: "#777" }}>
+                Este curso todavía no tiene unidades.
+              </p>
+            )}
           </div>
         </>
       )}

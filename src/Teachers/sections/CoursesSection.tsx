@@ -6,6 +6,8 @@ import {
   getAllUsersAdmin,
   assignCourseToTeacher,
   assignCourseToStudent,
+  getTeacherCourses,        // ✅ cursos del profe
+  createCourseAsTeacher,    // ✅ NUEVO: crear curso como profe
 } from "../../api/auth.service";
 import { StudentData, UserRole } from "../../api/auth.types";
 
@@ -39,6 +41,24 @@ export const CoursesSection = ({
     {}
   );
 
+  // 🔹 rol del usuario actual (guardado en localStorage como "user-role")
+  const role = (localStorage.getItem("user-role") as UserRole | null) ?? null;
+
+  // 🔹 cursos propios del profesor (cuando el rol es TEACHER)
+  const [ownCourses, setOwnCourses] = useState<any[]>([]);
+
+  // helper para recargar cursos del profe
+  const loadTeacherCourses = async () => {
+    if (role !== "TEACHER") return;
+    try {
+      const data = await getTeacherCourses();
+      setOwnCourses(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Error cargando cursos del profesor", e);
+    }
+  };
+
+  // Cargar usuarios (solo para admin / gestión asignación)
   useEffect(() => {
     const loadUsers = async () => {
       try {
@@ -54,18 +74,44 @@ export const CoursesSection = ({
     loadUsers();
   }, []);
 
+  // Cargar cursos propios si es profe
+  useEffect(() => {
+    if (role === "TEACHER") {
+      loadTeacherCourses();
+    }
+  }, [role]);
+
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
 
-    if (editingId) {
-      await updateCourse(editingId, form);
-    } else {
-      await createCourse(form);
-    }
+    try {
+      if (editingId) {
+        // Editar curso existente
+        await updateCourse(editingId, form);
+      } else {
+        // Crear curso nuevo
+        if (role === "TEACHER") {
+          // 👉 El profesor crea curso por su propio endpoint
+          await createCourseAsTeacher(form);
+        } else {
+          // 👉 Admin u otros usan el endpoint global
+          await createCourse(form);
+        }
+      }
 
-    setForm({ title: "", baseLanguage: "ES", targetLanguage: "EN" });
-    setEditingId(null);
-    onRefresh();
+      setForm({ title: "", baseLanguage: "ES", targetLanguage: "EN" });
+      setEditingId(null);
+
+      // 👇 Si es profe, recarga sus cursos; si no, usa onRefresh (admin)
+      if (role === "TEACHER") {
+        await loadTeacherCourses();
+      } else {
+        onRefresh();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar curso");
+    }
   };
 
   const handleEdit = (course: any) => {
@@ -80,7 +126,12 @@ export const CoursesSection = ({
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Eliminar curso?")) return;
     await deleteCourse(id);
-    onRefresh();
+
+    if (role === "TEACHER") {
+      await loadTeacherCourses();
+    } else {
+      onRefresh();
+    }
   };
 
   // listas separadas
@@ -102,6 +153,11 @@ export const CoursesSection = ({
     try {
       await assignCourseToTeacher(courseId, teacherId);
       alert("Profesor asignado al curso 🎓");
+      if (role === "TEACHER") {
+        await loadTeacherCourses();
+      } else {
+        onRefresh();
+      }
     } catch (e) {
       console.error(e);
       alert("Error asignando profesor");
@@ -117,11 +173,19 @@ export const CoursesSection = ({
     try {
       await assignCourseToStudent(courseId, studentId);
       alert("Estudiante asignado al curso 📚");
+      if (role === "TEACHER") {
+        await loadTeacherCourses();
+      } else {
+        onRefresh();
+      }
     } catch (e) {
       console.error(e);
       alert("Error asignando estudiante");
     }
   };
+
+  // 🔹 Lista que realmente vamos a mostrar
+  const displayCourses = role === "TEACHER" ? ownCourses : courses;
 
   return (
     <div style={{ maxWidth: "900px" }}>
@@ -198,12 +262,12 @@ export const CoursesSection = ({
       </div>
 
       {/* LISTA */}
-      {courses.length === 0 && (
+      {displayCourses.length === 0 && (
         <p style={{ color: "#777" }}>No hay cursos registrados</p>
       )}
 
       <div style={{ display: "grid", gap: "16px" }}>
-        {courses.map((course) => (
+        {displayCourses.map((course) => (
           <div
             key={course.id}
             style={{

@@ -107,7 +107,7 @@ export default function TeacherDashboard() {
           { id: "units", label: "Unidades", icon: "📚" },
           { id: "lessons", label: "Lecciones", icon: "📖" },
           { id: "questions", label: "Preguntas", icon: "❓" },
-          { id: "students", label: "Estudiantes", icon: "🎓" }, // ✅ Agregado
+          { id: "students", label: "Estudiantes", icon: "🎓" },
           { id: "groups", label: "Grupos", icon: "👥" },
           { id: "code", label: "Código", icon: "🔐" },
           { id: "evaluations", label: "Evaluaciones", icon: "📝" }
@@ -147,7 +147,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setShowLogoutModal(true)}
             style={{
-              background: "#ff4b4b", // Rojo Duolingo para salir
+              background: "#ff4b4b", 
               color: "white",
               border: "none",
               padding: "10px 20px",

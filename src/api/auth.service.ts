@@ -154,6 +154,18 @@ export const getCourses = async (): Promise<Course[]> => {
     return response.json();
 };
 
+export const getTeacherCourses = async (): Promise<any[]> => {
+  const response = await apiFetch("/teacher/content/courses", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("Error al cargar cursos del profesor");
+  }
+
+  return response.json();
+};
+
 export const getUserProgress = async (): Promise<UserProgress> => {
     const response = await apiFetch('/progress/me', { method: 'GET' });
     return response.json();
@@ -319,14 +331,24 @@ export const createQuestion = async (formData: FormData): Promise<QuestionData> 
     });
     return response.json();
 };
+export const updateQuestion = async (
+  id: string,
+  formData: FormData
+): Promise<QuestionData> => {
+  const response = await apiFetch(`/teacher/content/questions/${id}`, {
+    method: "PUT",
+    body: formData, // 👈 IMPORTANTE: FormData, sin JSON.stringify
+  });
 
-export const updateQuestion = async (id: string, payload: any): Promise<QuestionData> => {
-    const response = await apiFetch(`/teacher/content/questions/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-    });
-    return response.json();
+  if (!response.ok) {
+    const txt = await response.text().catch(() => "");
+    console.error("Error al actualizar pregunta:", response.status, txt);
+    throw new Error("No se pudo actualizar la pregunta");
+  }
+
+  return response.json();
 };
+
 
 export const deleteQuestion = async (questionId: string): Promise<void> => {
     await apiFetch(`/teacher/content/questions/${questionId}`, {
@@ -459,7 +481,22 @@ export const createCourse = async (
 };
 
 
+export const createCourseAsTeacher = async (
+  payload: CreateCoursePayload
+): Promise<any> => {
+  const response = await apiFetch("/teacher/content/courses", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
+  if (!response.ok) {
+    const txt = await response.text().catch(() => "");
+    console.error("Error creando curso como profesor:", response.status, txt);
+    throw new Error("No se pudo crear el curso del profesor");
+  }
+
+  return response.json();
+};
 
 const TeacherAPI = {
   getCourses: () => apiFetch('/courses'),
@@ -895,3 +932,15 @@ export async function sendChatFile(
   return data as ChatMessage;
 }
 
+// 🔹 Unidades del profesor logueado
+export const getTeacherUnits = async (): Promise<any[]> => {
+  const res = await apiFetch("/teacher/content/units", {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    throw new Error("Error al cargar unidades del profesor");
+  }
+
+  return res.json();
+};
