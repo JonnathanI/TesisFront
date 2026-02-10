@@ -225,6 +225,7 @@ export interface BulkUserItem {
   fullName: string;
   email: string;
   password?: string;
+   cedula: string;
 }
 
 export interface BulkRegisterResponse {
@@ -232,12 +233,6 @@ export interface BulkRegisterResponse {
   successCount: number;
   failureCount: number;
   errors: { email: string; message: string }[];
-}
-
-export interface BulkRegisterRequest {
-  users: BulkUserItem[];
-  registrationCode: string;
-  roleToAssign: UserRole;
 }
 
 // --- TIPOS EXTRA ---

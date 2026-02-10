@@ -1,3 +1,4 @@
+// src/admin/AdminDashboard.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AdminSidebarDashboard } from "./AdminSidebarDashboard";
@@ -12,10 +13,15 @@ import {
   updateCourse,
   deleteCourse,
   apiFetch,
-  // 🆕 IMPORTANTE: agregar esta función
   updateUser,
 } from "../api/auth.service";
-import { StudentData, UserRole } from "../api/auth.types";
+import {
+  StudentData,
+  UserRole,
+  BulkRegisterRequest,
+  BulkUserItem,
+} from "../api/auth.types";
+import * as XLSX from "xlsx";
 
 // ==========================================
 // 1. INTERFACES Y TIPOS
@@ -25,7 +31,6 @@ interface ManualUser {
   email: string;
   password?: string;
   cedula: string;
-  role: UserRole;
 }
 
 interface CoursesProps {
@@ -53,62 +58,29 @@ const CoursesSection = ({
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 🔹 IDs de profesores ya usados en algún curso
-  const usedTeacherIds = useMemo(() => {
-    const ids = new Set<string>();
-    courses.forEach((c: any) => {
-      if (c.teacher && c.teacher.id) {
-        ids.add(c.teacher.id as string);
-      }
-    });
-    return ids;
-  }, [courses]);
-
-  // 🔹 IDs de estudiantes ya usados en algún curso
-  const usedStudentIds = useMemo(() => {
-    const ids = new Set<string>();
-    courses.forEach((c: any) => {
-      (c.students || []).forEach((s: any) => {
-        if (s.id) ids.add(s.id as string);
-      });
-    });
-    return ids;
-  }, [courses]);
-
-  // 🔹 Curso que se está editando (si hay uno)
-  const editingCourse = useMemo(
-    () => courses.find((c: any) => c.id === editingId) || null,
-    [courses, editingId]
+  // Profesores disponibles: no estén ya asignados como teacher de otro curso
+  const usedTeacherIds = new Set(
+    courses
+      .filter((c) => c.teacher)
+      .map((c) => c.teacher.id as string)
   );
 
-  const editingTeacherId = editingCourse?.teacher?.id || null;
-  const editingStudentIds = new Set<string>(
-    (editingCourse?.students || []).map((s: any) => s.id as string)
+  const availableTeachers = allUsers.filter(
+    (u) =>
+      (u.role === "TEACHER" || u.role === "ADMIN") && !usedTeacherIds.has(u.id!)
   );
 
-  // 🔹 Profesores disponibles (no repetidos en otros cursos)
-  const availableTeachers = allUsers.filter((u) => {
-    const isTeacher = u.role === "TEACHER" || u.role === "ADMIN";
-    if (!isTeacher) return false;
-
-    // Si estoy editando y este profesor ya es del curso actual, debe aparecer
-    if (editingTeacherId && u.id === editingTeacherId) return true;
-
-    // En otro caso, no mostrar si ya está usado en algún curso
-    return !usedTeacherIds.has(u.id!);
+  // Estudiantes disponibles: no estén en students de ningún curso
+  const usedStudentIds = new Set<string>();
+  courses.forEach((c) => {
+    (c.students || []).forEach((s: any) => {
+      if (s?.id) usedStudentIds.add(s.id);
+    });
   });
 
-  // 🔹 Estudiantes disponibles (no repetidos en otros cursos)
-  const availableStudents = allUsers.filter((u) => {
-    const isStudent = u.role === "STUDENT";
-    if (!isStudent) return false;
-
-    // Si estoy editando y este estudiante ya es del curso actual, debe aparecer
-    if (editingStudentIds.has(u.id!)) return true;
-
-    // En otro caso, no mostrar si ya está usado en algún curso
-    return !usedStudentIds.has(u.id!);
-  });
+  const availableStudents = allUsers.filter(
+    (u) => u.role === "STUDENT" && !usedStudentIds.has(u.id!)
+  );
 
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
@@ -286,9 +258,7 @@ const CoursesSection = ({
                     title: course.title,
                     baseLanguage: course.baseLanguage || "ES",
                     targetLanguage: course.targetLanguage || "EN",
-                    // si hay profesor, metemos su id en un array
                     teachers: course.teacher ? [course.teacher.id] : [],
-                    // de los estudiantes, solo queremos los IDs
                     students: (course.students || []).map((s: any) => s.id),
                   });
                 }}
@@ -328,6 +298,15 @@ export const AdminDashboard = () => {
   // ⭐ CURSOS
   const [courses, setCourses] = useState<any[]>([]);
 
+  // ⭐ Registro masivo
+  const [manualUsers, setManualUsers] = useState<ManualUser[]>([
+    { fullName: "", email: "", password: "", cedula: "" },
+  ]);
+  const [bulkRole, setBulkRole] = useState<UserRole>("STUDENT");
+  const [bulkTab, setBulkTab] = useState<"manual" | "excel">("manual");
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [bulkRegistrationCode, setBulkRegistrationCode] = useState(""); // 👈 NUEVO
+
   const fetchCourses = async () => {
     try {
       const res = await apiFetch("/courses", { method: "GET" });
@@ -338,13 +317,8 @@ export const AdminDashboard = () => {
     }
   };
 
-  // -------------------
-
   const [studentCode, setStudentCode] = useState("");
   const [teacherRegCode, setTeacherRegCode] = useState("");
-  const [manualUsers, setManualUsers] = useState<ManualUser[]>([
-    { fullName: "", email: "", password: "", cedula: "", role: "STUDENT" },
-  ]);
   const [editingUser, setEditingUser] = useState<StudentData | null>(null);
 
   useEffect(() => {
@@ -390,7 +364,6 @@ export const AdminDashboard = () => {
     }
   };
 
-  // 🆕 AQUÍ ES DONDE AHORA SÍ SE GUARDA EN LA BASE
   const saveFullEdit = async () => {
     if (!editingUser || !editingUser.id) return;
     setLoading(true);
@@ -401,7 +374,7 @@ export const AdminDashboard = () => {
         cedula: editingUser.cedula,
       });
 
-      await fetchUsers(); // refresca lista desde la BD
+      await fetchUsers();
 
       showToast("👤 Perfil actualizado con éxito");
       setEditingUser(null);
@@ -458,7 +431,6 @@ export const AdminDashboard = () => {
         email: "",
         password: "",
         cedula: "",
-        role: "STUDENT",
       },
     ]);
 
@@ -476,7 +448,8 @@ export const AdminDashboard = () => {
     setManualUsers(updated);
   };
 
-  const handleBulkSubmit = async () => {
+  // ------- REGISTRO MASIVO: FORMULARIO MANUAL -------
+  const handleBulkSubmitManual = async () => {
     if (
       manualUsers.some(
         (u) => !u.fullName.trim() || !u.email.trim() || !u.cedula.trim()
@@ -486,28 +459,148 @@ export const AdminDashboard = () => {
       return;
     }
 
+    if (!bulkRegistrationCode.trim()) {
+      showToast(
+        "⚠️ Ingresa un código de vinculación para este lote",
+        "error"
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      await registerBulk({
-        users: manualUsers.map((u) => ({
-          ...u,
+      const payload: BulkRegisterRequest = {
+        users: manualUsers.map<BulkUserItem>((u) => ({
+          fullName: u.fullName,
+          email: u.email,
           password: u.password || "Duo12345*",
+          cedula: u.cedula,
         })),
-        roleToAssign: manualUsers[0].role,
-        registrationCode: "",
-      });
+        registrationCode: bulkRegistrationCode, // 👈 AHORA SÍ VA EL CÓDIGO
+        roleToAssign: bulkRole,
+      };
 
-      showToast("🚀 Registro masivo exitoso");
+      const result = await registerBulk(payload);
+
+      if (result.successCount === 0) {
+        showToast(
+          "❌ No se pudo registrar ningún usuario. Revisa el código o los datos.",
+          "error"
+        );
+      } else {
+        showToast(
+          `🚀 Registro masivo exitoso. Éxitos: ${result.successCount}, errores: ${result.failureCount}`
+        );
+      }
+
       setManualUsers([
-        { fullName: "", email: "", password: "", cedula: "", role: "STUDENT" },
+        { fullName: "", email: "", password: "", cedula: "" },
       ]);
-      setActiveSection("roles");
       fetchUsers();
     } catch (error) {
-      showToast("❌ Error en el registro", "error");
+      console.error(error);
+      showToast("❌ Error en el registro masivo", "error");
     } finally {
       setLoading(false);
     }
+  };
+
+  // ------- REGISTRO MASIVO: SUBIR EXCEL -------
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setExcelFile(file);
+  };
+
+  const handleBulkSubmitExcel = async () => {
+    if (!excelFile) {
+      showToast("⚠️ Primero selecciona un archivo Excel", "error");
+      return;
+    }
+
+    if (!bulkRegistrationCode.trim()) {
+      showToast(
+        "⚠️ Ingresa un código de vinculación para este lote",
+        "error"
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await excelFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+      });
+
+      // Se espera columnas: fullName | email | cedula | password (opcional)
+      const usersFromExcel: BulkUserItem[] = rows.map((row: any) => ({
+  fullName: String(row.fullName || row.nombre || "").trim(),
+  email: String(row.email || "").trim(),
+  cedula: String(row.cedula || row.ced || "").trim(),
+  // ⬇ Leemos bien la columna del Excel
+  password: String(
+    row.password ||
+      row["password"] ||
+      row["password (opcional)"] || // <-- nombre de tu columna
+      ""
+  ).trim(),
+}));
+
+
+   if (
+  usersFromExcel.some(
+    (u) => !u.fullName.trim() || !u.email.trim() || !u.cedula.trim()
+  )
+) {
+  showToast("⚠️ Hay filas en el Excel sin nombre, email o cédula", "error");
+  setLoading(false);
+  return;
+}
+
+
+      const payload: BulkRegisterRequest = {
+        users: usersFromExcel,
+        registrationCode: bulkRegistrationCode, // 👈 CÓDIGO AQUÍ TAMBIÉN
+        roleToAssign: bulkRole,
+      };
+
+      const result = await registerBulk(payload);
+
+      if (result.successCount === 0) {
+        showToast(
+          "❌ No se pudo registrar ningún usuario. Revisa el código o el archivo.",
+          "error"
+        );
+      } else {
+        showToast(
+          `📥 Excel procesado con éxito. Éxitos: ${result.successCount}, errores: ${result.failureCount}`
+        );
+      }
+
+      setExcelFile(null);
+      fetchUsers();
+    } catch (error) {
+      console.error(error);
+      showToast("❌ Error al procesar el Excel", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ------- DESCARGAR PLANTILLA EXCEL -------
+  const handleDownloadTemplateExcel = () => {
+    const headers = [["fullName", "email", "cedula", "password (opcional)"]];
+    const exampleRow = [["Juan Perez", "juan@mail.com", "17263544", "Duo12345*"]];
+
+    const worksheet = XLSX.utils.aoa_to_sheet([...headers, ...exampleRow]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Usuarios");
+
+    XLSX.writeFile(workbook, "plantilla_usuarios.xlsx");
   };
 
   // ==========================================
@@ -797,70 +890,191 @@ export const AdminDashboard = () => {
         {/* REGISTRO MASIVO */}
         {activeSection === "carga" && (
           <div style={cardStyle}>
-            <h2 style={titleStyle}>Registro Masivo</h2>
-
-            <button onClick={addRow} style={btnAddRowStyle}>
-              + Añadir Fila
-            </button>
-
+            {/* Título + selector de rol del lote */}
             <div
               style={{
-                maxHeight: "400px",
-                overflowY: "auto",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 marginBottom: "20px",
               }}
             >
-              {manualUsers.map((user, index) => (
-                <div key={index} style={rowInputStyle}>
-                  <input
-                    style={inputStyle}
-                    placeholder="Nombre"
-                    value={user.fullName}
-                    onChange={(e) =>
-                      handleManualChange(index, "fullName", e.target.value)
-                    }
-                  />
-
-                  <input
-                    style={inputStyle}
-                    placeholder="Email"
-                    value={user.email}
-                    onChange={(e) =>
-                      handleManualChange(index, "email", e.target.value)
-                    }
-                  />
-
-                  <input
-                    style={inputStyle}
-                    placeholder="Cédula"
-                    value={user.cedula}
-                    onChange={(e) =>
-                      handleManualChange(index, "cedula", e.target.value)
-                    }
-                  />
-
-                  <button
-                    onClick={() => removeRow(index)}
-                    style={{
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      fontSize: "18px",
-                    }}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
+              <h2 style={titleStyle}>Registro Masivo</h2>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => setBulkRole("STUDENT")}
+                  style={tabButtonStyle(bulkRole === "STUDENT")}
+                >
+                  Estudiantes
+                </button>
+                <button
+                  onClick={() => setBulkRole("TEACHER")}
+                  style={tabButtonStyle(bulkRole === "TEACHER")}
+                >
+                  Profesores
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={handleBulkSubmit}
-              style={btnMainStyle}
-              disabled={loading}
-            >
-              {loading ? "Procesando..." : "Registrar Lista Completa"}
-            </button>
+            {/* CÓDIGO DE VINCULACIÓN PARA EL LOTE */}
+            <div style={{ marginBottom: "15px" }}>
+              <label style={labelStyle}>Código de vinculación para este lote</label>
+              <input
+                style={inputStyle}
+                placeholder={
+                  bulkRole === "STUDENT"
+                    ? "Ej: AULA-123 (código de aula)"
+                    : "Ej: PROF-XYZ (código de profesor)"
+                }
+                value={bulkRegistrationCode}
+                onChange={(e) =>
+                  setBulkRegistrationCode(e.target.value.toUpperCase())
+                }
+              />
+            </div>
+
+            {/* Tabs Manual / Excel */}
+            <div style={tabContainerStyle}>
+              <button
+                onClick={() => setBulkTab("manual")}
+                style={tabButtonStyle(bulkTab === "manual")}
+              >
+                FORMULARIO MANUAL
+              </button>
+              <button
+                onClick={() => setBulkTab("excel")}
+                style={tabButtonStyle(bulkTab === "excel")}
+              >
+                SUBIR EXCEL
+              </button>
+            </div>
+
+            {/* CONTENIDO: MANUAL */}
+            {bulkTab === "manual" && (
+              <>
+                <button onClick={addRow} style={btnAddRowStyle}>
+                  + Añadir Fila
+                </button>
+
+                <div
+                  style={{
+                    maxHeight: "400px",
+                    overflowY: "auto",
+                    marginBottom: "20px",
+                  }}
+                >
+                  {manualUsers.map((user, index) => (
+                    <div key={index} style={rowInputStyle}>
+                      <input
+                        style={inputStyle}
+                        placeholder="Nombre"
+                        value={user.fullName}
+                        onChange={(e) =>
+                          handleManualChange(index, "fullName", e.target.value)
+                        }
+                      />
+
+                      <input
+                        style={inputStyle}
+                        placeholder="Email"
+                        value={user.email}
+                        onChange={(e) =>
+                          handleManualChange(index, "email", e.target.value)
+                        }
+                      />
+
+                      <input
+                        style={inputStyle}
+                        placeholder="Cédula"
+                        value={user.cedula}
+                        onChange={(e) =>
+                          handleManualChange(index, "cedula", e.target.value)
+                        }
+                      />
+
+                      <button
+                        onClick={() => removeRow(index)}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          cursor: "pointer",
+                          fontSize: "18px",
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleBulkSubmitManual}
+                  style={btnMainStyle}
+                  disabled={loading}
+                >
+                  {loading ? "Procesando..." : "Registrar Lista Completa"}
+                </button>
+              </>
+            )}
+
+            {/* CONTENIDO: EXCEL */}
+            {bulkTab === "excel" && (
+              <div style={{ marginTop: "20px" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "#777",
+                    marginBottom: 10,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  1️⃣ Descarga la plantilla de Excel, 2️⃣ llénala en tu computadora y
+                  3️⃣ vuelve aquí para subirla.
+                  <br />
+                  Columnas esperadas:
+                  <br />
+                  <code>fullName | email | cedula | password (opcional)</code>
+                </p>
+
+                <button
+                  onClick={handleDownloadTemplateExcel}
+                  style={{
+                    marginBottom: "15px",
+                    padding: "10px 20px",
+                    borderRadius: "12px",
+                    border: "none",
+                    backgroundColor: "#1cb0f6",
+                    color: "white",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    boxShadow: "0 3px 0 #0e86c5",
+                  }}
+                >
+                  ⬇️ Descargar plantilla Excel
+                </button>
+
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelFileChange}
+                  style={{
+                    marginBottom: "20px",
+                    padding: "10px",
+                    borderRadius: "12px",
+                    border: "2px solid #E5E5E5",
+                    width: "100%",
+                  }}
+                />
+
+                <button
+                  onClick={handleBulkSubmitExcel}
+                  style={btnMainStyle}
+                  disabled={loading || !excelFile}
+                >
+                  {loading ? "Procesando..." : "Importar desde Excel"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -869,39 +1083,251 @@ export const AdminDashboard = () => {
 };
 
 // ========================= ESTILOS =========================
-const layoutStyle: React.CSSProperties = { display: 'flex', backgroundColor: '#F7F9FA', minHeight: '100vh', fontFamily: '"Nunito", sans-serif' };
-const mainContainerStyle: React.CSSProperties = { marginLeft: 260, padding: '10px 20px 10px 10px', width: 'calc(100% - 260px)', boxSizing: 'border-box' };
-const cardStyle: React.CSSProperties = { backgroundColor: 'white', borderRadius: '24px', padding: '20px', border: '2px solid #E5E5E5', boxShadow: '0 4px 0 #E5E5E5' };
-const titleStyle: React.CSSProperties = { fontSize: '28px', fontWeight: 900, color: '#3C3C3C', marginBottom: '25px' };
-const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'separate', borderSpacing: '0 10px' };
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '0 20px', fontSize: '12px', fontWeight: 900, color: '#BDBDBD', textTransform: 'uppercase' };
-const tdStyleFirst: React.CSSProperties = { padding: '15px 20px', border: '2px solid #F0F0F0', borderRight: 'none', borderRadius: '15px 0 0 15px', backgroundColor: 'white' };
-const tdStyle: React.CSSProperties = { padding: '15px 20px', borderTop: '2px solid #F0F0F0', borderBottom: '2px solid #F0F0F0', backgroundColor: 'white', fontWeight: 700, color: '#4B4B4B' };
-const tdStyleLast: React.CSSProperties = { padding: '15px 20px', border: '2px solid #F0F0F0', borderLeft: 'none', borderRadius: '0 15px 15px 0', backgroundColor: 'white', textAlign: 'right' };
-const searchBarStyle: React.CSSProperties = { padding: '12px 20px', borderRadius: '15px', border: '2px solid #E5E5E5', width: '300px', fontWeight: 700, outline: 'none' };
-const btnSecondary: React.CSSProperties = { padding: '12px 20px', borderRadius: '15px', border: '2px solid #E5E5E5', backgroundColor: 'white', fontWeight: 800, cursor: 'pointer', color: '#4B4B4B' };
-const headerFlexStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
-const tabContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', marginBottom: '25px', borderBottom: '2px solid #E5E5E5', paddingBottom: '10px' };
-const tabButtonStyle = (active: boolean): React.CSSProperties => ({ padding: '10px 5px', border: 'none', borderBottom: active ? '4px solid #1cb0f6' : '4px solid transparent', backgroundColor: 'transparent', color: active ? '#1cb0f6' : '#AFAFAF', fontWeight: 900, cursor: 'pointer' });
-const btnStatusStyle: React.CSSProperties = { border: 'none', padding: '8px 15px', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', fontSize: '11px' };
-const selectRoleStyle: React.CSSProperties = { padding: '8px', borderRadius: '12px', border: '2px solid #F0F0F0', fontWeight: 700, color: '#777', cursor: 'pointer' };
-const horizontalGrid: React.CSSProperties = { display: 'flex', gap: '20px' };
-const modernCodeCard: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '24px', border: '2px solid #E5E5E5', flex: 1, boxShadow: '0 4px 0 #E5E5E5' };
-const codeRowFlex: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' };
-const smallLabel: React.CSSProperties = { fontSize: '11px', fontWeight: 900, color: '#BDBDBD' };
-const digitalCode: React.CSSProperties = { fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '2px' };
-const btnActionSmall: React.CSSProperties = { backgroundColor: '#AF85FF', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '15px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 0 #9366E4' };
-const rowInputStyle: React.CSSProperties = { display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' };
-const inputStyle: React.CSSProperties = { padding: '12px', borderRadius: '12px', border: '2px solid #E5E5E5', flex: 1, fontWeight: 600, outline: 'none' };
-const btnAddRowStyle: React.CSSProperties = { marginBottom: '20px', padding: '10px 20px', borderRadius: '12px', border: 'none', backgroundColor: '#E1F5FE', color: '#1CB0F6', fontWeight: 800, cursor: 'pointer' };
-const btnMainStyle: React.CSSProperties = { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', backgroundColor: '#58CC02', color: 'white', fontWeight: 900, cursor: 'pointer', boxShadow: '0 5px #46A302', fontSize: '16px' };
-const toastStyle: React.CSSProperties = { position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', padding: '15px 30px', borderRadius: '16px', fontWeight: 900, zIndex: 3000 };
-const btnCourseAction: React.CSSProperties = { padding: "8px 14px", borderRadius: "8px", border: "none", background: "#e8f5fe", color: "#1cb0f6", fontWeight: 600, cursor: "pointer" };
-const overlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 };
-const modalEditStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '28px', width: '400px', boxShadow: '0 15px 30px rgba(0,0,0,0.2)' };
-const inputGroup: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '5px' };
-const labelStyle: React.CSSProperties = { fontSize: '11px', fontWeight: 900, color: '#AFAFAF', marginLeft: '5px' };
-const btnEditMini: React.CSSProperties = { background: '#F0F0F0', border: 'none', borderRadius: '10px', padding: '8px', cursor: 'pointer' };
+const layoutStyle: React.CSSProperties = {
+  display: "flex",
+  backgroundColor: "#F7F9FA",
+  minHeight: "100vh",
+  fontFamily: '"Nunito", sans-serif',
+};
+const mainContainerStyle: React.CSSProperties = {
+  marginLeft: 260,
+  padding: "10px 20px 10px 10px",
+  width: "calc(100% - 260px)",
+  boxSizing: "border-box",
+};
+const cardStyle: React.CSSProperties = {
+  backgroundColor: "white",
+  borderRadius: "24px",
+  padding: "20px",
+  border: "2px solid #E5E5E5",
+  boxShadow: "0 4px 0 #E5E5E5",
+};
+const titleStyle: React.CSSProperties = {
+  fontSize: "28px",
+  fontWeight: 900,
+  color: "#3C3C3C",
+  marginBottom: "25px",
+};
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "separate",
+  borderSpacing: "0 10px",
+};
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  padding: "0 20px",
+  fontSize: "12px",
+  fontWeight: 900,
+  color: "#BDBDBD",
+  textTransform: "uppercase",
+};
+const tdStyleFirst: React.CSSProperties = {
+  padding: "15px 20px",
+  border: "2px solid #F0F0F0",
+  borderRight: "none",
+  borderRadius: "15px 0 0 15px",
+  backgroundColor: "white",
+};
+const tdStyle: React.CSSProperties = {
+  padding: "15px 20px",
+  borderTop: "2px solid #F0F0F0",
+  borderBottom: "2px solid #F0F0F0",
+  backgroundColor: "white",
+  fontWeight: 700,
+  color: "#4B4B4B",
+};
+const tdStyleLast: React.CSSProperties = {
+  padding: "15px 20px",
+  border: "2px solid #F0F0F0",
+  borderLeft: "none",
+  borderRadius: "0 15px 15px 0",
+  backgroundColor: "white",
+  textAlign: "right",
+};
+const searchBarStyle: React.CSSProperties = {
+  padding: "12px 20px",
+  borderRadius: "15px",
+  border: "2px solid #E5E5E5",
+  width: "300px",
+  fontWeight: 700,
+  outline: "none",
+};
+const btnSecondary: React.CSSProperties = {
+  padding: "12px 20px",
+  borderRadius: "15px",
+  border: "2px solid #E5E5E5",
+  backgroundColor: "white",
+  fontWeight: 800,
+  cursor: "pointer",
+  color: "#4B4B4B",
+};
+const headerFlexStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "30px",
+};
+const tabContainerStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "15px",
+  marginBottom: "25px",
+  borderBottom: "2px solid #E5E5E5",
+  paddingBottom: "10px",
+};
+const tabButtonStyle = (active: boolean): React.CSSProperties => ({
+  padding: "10px 5px",
+  border: "none",
+  borderBottom: active ? "4px solid #1cb0f6" : "4px solid transparent",
+  backgroundColor: "transparent",
+  color: active ? "#1cb0f6" : "#AFAFAF",
+  fontWeight: 900,
+  cursor: "pointer",
+});
+const btnStatusStyle: React.CSSProperties = {
+  border: "none",
+  padding: "8px 15px",
+  borderRadius: "12px",
+  fontWeight: 900,
+  cursor: "pointer",
+  fontSize: "11px",
+};
+const selectRoleStyle: React.CSSProperties = {
+  padding: "8px",
+  borderRadius: "12px",
+  border: "2px solid #F0F0F0",
+  fontWeight: 700,
+  color: "#777",
+  cursor: "pointer",
+};
+const horizontalGrid: React.CSSProperties = { display: "flex", gap: "20px" };
+const modernCodeCard: React.CSSProperties = {
+  backgroundColor: "white",
+  padding: "25px",
+  borderRadius: "24px",
+  border: "2px solid #E5E5E5",
+  flex: 1,
+  boxShadow: "0 4px 0 #E5E5E5",
+};
+const codeRowFlex: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginTop: "15px",
+};
+const smallLabel: React.CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 900,
+  color: "#BDBDBD",
+};
+const digitalCode: React.CSSProperties = {
+  fontSize: "24px",
+  fontWeight: 900,
+  fontFamily: "monospace",
+  letterSpacing: "2px",
+};
+const btnActionSmall: React.CSSProperties = {
+  backgroundColor: "#AF85FF",
+  color: "white",
+  border: "none",
+  padding: "12px 20px",
+  borderRadius: "15px",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 4px 0 #9366E4",
+};
+const rowInputStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  marginBottom: "12px",
+  alignItems: "center",
+};
+const inputStyle: React.CSSProperties = {
+  padding: "12px",
+  borderRadius: "12px",
+  border: "2px solid #E5E5E5",
+  flex: 1,
+  fontWeight: 600,
+  outline: "none",
+};
+const btnAddRowStyle: React.CSSProperties = {
+  marginBottom: "20px",
+  padding: "10px 20px",
+  borderRadius: "12px",
+  border: "none",
+  backgroundColor: "#E1F5FE",
+  color: "#1CB0F6",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+const btnMainStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "16px",
+  borderRadius: "16px",
+  border: "none",
+  backgroundColor: "#58CC02",
+  color: "white",
+  fontWeight: 900,
+  cursor: "pointer",
+  boxShadow: "0 5px 0 #46A302",
+  fontSize: "16px",
+};
+const toastStyle: React.CSSProperties = {
+  position: "fixed",
+  top: "20px",
+  left: "50%",
+  transform: "translateX(-50%)",
+  color: "white",
+  padding: "15px 30px",
+  borderRadius: "16px",
+  fontWeight: 900,
+  zIndex: 3000,
+};
+const btnCourseAction: React.CSSProperties = {
+  padding: "8px 14px",
+  borderRadius: "8px",
+  border: "none",
+  background: "#e8f5fe",
+  color: "#1cb0f6",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+const overlayStyle: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 4000,
+};
+const modalEditStyle: React.CSSProperties = {
+  backgroundColor: "white",
+  padding: "30px",
+  borderRadius: "28px",
+  width: "400px",
+  boxShadow: "0 15px 30px rgba(0,0,0,0.2)",
+};
+const inputGroup: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "5px",
+};
+const labelStyle: React.CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 900,
+  color: "#AFAFAF",
+  marginLeft: "5px",
+};
+const btnEditMini: React.CSSProperties = {
+  background: "#F0F0F0",
+  border: "none",
+  borderRadius: "10px",
+  padding: "8px",
+  cursor: "pointer",
+};
 const selectorBoxStyle: React.CSSProperties = {
   border: "2px solid #F0F0F0",
   borderRadius: "12px",
@@ -916,7 +1342,6 @@ const scrollListStyle: React.CSSProperties = {
   gap: "5px",
   marginTop: "8px",
 };
-
 const itemSelectStyle = (selected: boolean): React.CSSProperties => ({
   padding: "8px 12px",
   borderRadius: "8px",
