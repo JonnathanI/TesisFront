@@ -834,19 +834,21 @@ export const getAllUsersAdmin = async (): Promise<StudentData[]> => {
     }
 };
 
-export const updateUserRole = async (userId: string, newRole: string): Promise<void> => {
-   const response = await apiFetch(`/users/admin/role/${userId}`, {
-        method: 'PATCH', // En tu Kotlin pusiste @PatchMapping
-        body: JSON.stringify(newRole) // Tu Kotlin recibe
-        //  @RequestBody newRole: String directo
+export const updateUserRole = async (userId: string, role: string) => {
+  const response = await apiFetch(`/users/admin/role/${userId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",   // 👈 OBLIGATORIO
+    },
+    body: JSON.stringify({ role }),         // 👈 Body JSON con { role: "TEACHER" }
+  });
 
-        
-    });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Error al actualizar rol");
+  }
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "No se pudo actualizar el rol del usuario");
-    }
+  return response.json();
 };
 
 export const assignCourseToTeacher = async (courseId: string, teacherId: string) => {
