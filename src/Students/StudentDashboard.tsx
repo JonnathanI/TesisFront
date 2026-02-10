@@ -9,6 +9,8 @@ import ShopSection from "./sections/ShopSection";
 import ProfileSection from "./sections/ProfileSection";
 import Challenges from "./Challenges";
 import { FriendsChat } from "./components/FriendsChat";
+import { BadgesSection } from "./sections/BadgesSection";
+
 
 // --- CORRECCIÓN DE IMPORTACIONES ---
 import { FriendRequests } from "./components/FriendRequests";
@@ -30,6 +32,8 @@ import {
   getFriendsList,
   getStudentClassrooms,
   getClassroomDetails,
+  getStudentCourseUnits,
+  getCourseUnits
 } from "../api/auth.service";
 import {
   StudentData,
@@ -62,42 +66,65 @@ const StudentDashboard = () => {
   const [fullGroupDetails, setFullGroupDetails] = useState<any>(null);
   const [groupTab, setGroupTab] = useState<"TAREAS" | "COMPAÑEROS">("TAREAS");
 
-  const loadData = useCallback(
-    async (isSilent = false): Promise<UserProfileData> => {
-      try {
-        if (!isSilent) setIsLoading(true);
-        setErrorMsg(null);
+const loadData = useCallback(
+  async (isSilent = false): Promise<UserProfileData> => {
+    try {
+      if (!isSilent) setIsLoading(true);
+      setErrorMsg(null);
 
-        const profile = await getUserProfile();
-        setUserProfile(profile);
-        setHeartTimer(profile.nextHeartRegenTime ?? "");
+      const profile = await getUserProfile();
+      setUserProfile(profile);
+      setHeartTimer(profile.nextHeartRegenTime ?? "");
 
-        const topUsers = await getGlobalLeaderboard();
-        setLeaderboard(topUsers);
+      const topUsers = await getGlobalLeaderboard();
+      setLeaderboard(topUsers);
 
-        const friendsData = await getFriendsList();
-        setFriends(friendsData);
+      const friendsData = await getFriendsList();
+      setFriends(friendsData);
 
-        const courses = await getCourses();
-        if (courses?.length > 0) {
-          const unitsData = await getCourseStatus(String(courses[0].id));
-          setUnits(unitsData);
+      // 🔹 1) Traer todos los cursos visibles
+      const courses = await getCourses();
+      console.log("📚 Cursos visibles para el alumno:", courses);
+
+      let foundUnits: UnitWithLessons[] = [];
+      let usedCourseId: string | null = null;
+
+      // 🔹 2) Probar curso por curso hasta encontrar uno con unidades
+      for (const c of courses) {
+        const cid = String(c.id);
+        const unitsData = await getCourseUnits(cid);
+        console.log("🔎 Probando curso:", c.title, cid, " -> units:", unitsData.length);
+
+        if (unitsData.length > 0) {
+          foundUnits = unitsData;
+          usedCourseId = cid;
+          break;
         }
-
-        const groupsData = await getStudentClassrooms();
-        setMyGroups(groupsData);
-
-        return profile;
-      } catch (error) {
-        console.error("Error al sincronizar dashboard:", error);
-        if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
-        throw error;
-      } finally {
-        if (!isSilent) setIsLoading(false);
       }
-    },
-    []
-  );
+
+      if (usedCourseId) {
+        console.log("✅ Usando courseId para LearnSection:", usedCourseId);
+        setUnits(foundUnits);
+      } else {
+        console.warn("⚠️ Ningún curso con unidades visibles para este alumno");
+        setUnits([]);
+      }
+
+      const groupsData = await getStudentClassrooms();
+      setMyGroups(groupsData);
+
+      return profile;
+    } catch (error) {
+      console.error("Error al sincronizar dashboard:", error);
+      if (!isSilent) setErrorMsg("No pudimos conectar con el servidor.");
+      throw error;
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  },
+  []
+);
+
 
   useEffect(() => {
     loadData();
@@ -259,15 +286,16 @@ const StudentDashboard = () => {
           }}
         >
           <div style={{ width: "100%", maxWidth: "700px" }}>
-            {section === "learn" && (
-              <LearnSection
-                units={units}
-                userProfile={userProfile!}
-                heartTimer={heartTimer}
-                onUpdateProfile={setUserProfile}
-                onRefreshData={loadData}
-              />
-            )}
+           {section === "learn" && (
+  <LearnSection
+    units={units}
+    userProfile={userProfile!}
+    heartTimer={heartTimer}
+    onUpdateProfile={setUserProfile}
+    onRefreshData={loadData}
+  />
+)}
+
 
             {section === "evaluations" && <EvaluationsSection />}
 
@@ -294,6 +322,18 @@ const StudentDashboard = () => {
               />
             )}
             {section === "profile" && <ProfileSection />}
+           {section === "badges" && (
+  <pre style={{ fontSize: 10, color: "gray" }}>
+    DEBUG badges – section: {section} – userId: {userProfile?.userId}
+  </pre>
+)}
+
+{section === "badges" && <BadgesSection />}
+
+
+
+
+
             {section === "challenges" && (
               <div
                 style={{

@@ -7,7 +7,7 @@ import {
   ShoppingBag,
   UserCircle,
   Trophy,
-  Settings,
+  Award,      // 👈 cambié Settings por Award
   LogOut,
   ClipboardList,
 } from "lucide-react";
@@ -29,10 +29,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const items = [
     { id: "learn", label: "Aprender", icon: <Home size={28} strokeWidth={2.5} /> },
     { id: "sounds", label: "Sonidos", icon: <Volume2 size={28} strokeWidth={2.5} /> },
-    { id: "evaluations", label: "Evaluacion", icon: <ClipboardList size={28} strokeWidth={2.5} /> },
+    { id: "evaluations", label: "Evaluación", icon: <ClipboardList size={28} strokeWidth={2.5} /> },
     { id: "groups", label: "Grupos", icon: <Users size={28} strokeWidth={2.5} /> },
     { id: "shop", label: "Tienda", icon: <ShoppingBag size={28} strokeWidth={2.5} /> },
     { id: "profile", label: "Perfil", icon: <UserCircle size={28} strokeWidth={2.5} /> },
+    // 🏅 NUEVO: sección de Insignias
+    { id: "badges", label: "Insignias", icon: <Trophy size={28} strokeWidth={2.5} /> },
+
     { id: "challenges", label: "Desafíos", icon: <Trophy size={28} strokeWidth={2.5} /> },
   ];
 

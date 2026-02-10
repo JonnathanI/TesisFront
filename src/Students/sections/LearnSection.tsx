@@ -1,11 +1,6 @@
 import React, { useState } from "react";
-import {
-  //UnitWithLessons,
-  //UserProfileData,
-  getLessonQuestions,
-  //QuestionDTO,
-} from "../../api/auth.service";
-import { QuestionDTO ,UserProfileData , UnitWithLessons} from "../../api/auth.types";
+import { getLessonQuestions } from "../../api/auth.service";
+import { QuestionDTO, UserProfileData, UnitWithLessons } from "../../api/auth.types";
 import { QuizModal } from "../../Components/QuizModal";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -33,6 +28,8 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   onUpdateProfile,
   onRefreshData,
 }) => {
+  console.log("🔍 Units recibidas en LearnSection:", units);
+
   const [selectedUnit, setSelectedUnit] = useState<UnitWithLessons | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
@@ -84,9 +81,6 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
       return;
     }
 
-    // Antes mirábamos si la unidad ya estaba hecha y bloqueábamos el video
-    // const wasUnitAlreadyDone = selectedUnit.lessons.every((l) => l.isCompleted);
-
     const updatedLessons = selectedUnit.lessons.map((lesson) =>
       lesson.id === selectedLessonId
         ? { ...lesson, isCompleted: true }
@@ -94,11 +88,8 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     );
 
     const isUnitDoneNow = updatedLessons.every((l) => l.isCompleted);
-
-    // ✅ AHORA: si DESPUÉS de esta lección la unidad está al 100%, mostramos video + resumen
     const shouldShowUnitSummary = isUnitDoneNow;
 
-    // Guardar resumen de la lección actual
     setUnitSummary((prev) => [
       ...prev,
       {
@@ -116,7 +107,6 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
     setShowSummary(true);
 
     if (shouldShowUnitSummary) {
-      // 🎊 Confetti de unidad completada
       confetti({
         particleCount: 180,
         spread: 70,
@@ -124,13 +114,11 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         colors: ["#58CC02", "#1CB0F6", "#FFC800"],
       });
 
-      // Cerrar resumen de lección y luego mostrar VIDEO
       setTimeout(() => {
         setShowSummary(false);
-        setShowUnitVideo(true); // video antes del resumen de la unidad
+        setShowUnitVideo(true);
       }, 2200);
     } else {
-      // Solo cierre de resumen de lección
       setTimeout(() => {
         setShowSummary(false);
       }, 1800);
@@ -142,6 +130,21 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   };
 
   /* ===========================
+        SIN UNIDADES
+     =========================== */
+  if (!units || units.length === 0) {
+    return (
+      <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
+        <h2 style={{ fontWeight: 900, marginBottom: 12 }}>No tienes unidades asignadas</h2>
+        <p style={{ color: "#777", fontWeight: 500 }}>
+          Pídele a tu profesor que te asigne un curso o revisa si ya te uniste a una clase
+          con el código de aula.
+        </p>
+      </div>
+    );
+  }
+
+  /* ===========================
         LISTA DE UNIDADES
      =========================== */
   if (!selectedUnit) {
@@ -149,9 +152,9 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
       <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
         {[...units]
           .sort((a, b) => a.unitOrder - b.unitOrder)
-          .map((unit, i, arr) => {
-            const isLocked =
-              i !== 0 && !arr[i - 1].lessons.every((l) => l.isCompleted);
+          .map((unit) => {
+            // 🔁 AHORA usamos el isLocked que viene del backend
+            const isLocked = unit.isLocked;
             const completed = unit.lessons.filter((l) => l.isCompleted).length;
             const progress = Math.round(
               (completed / unit.lessons.length) * 100

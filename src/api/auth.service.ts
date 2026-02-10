@@ -3,6 +3,7 @@
 
 import {
   UserRole,
+  BadgeDTO,
   AuthResponse,
   LoginCredentials,
   RegisterCredentials,
@@ -38,6 +39,7 @@ import {
   BulkRegisterRequest,
   CreateCoursePayload,
   ChatMessage,
+  UnitStatusDTO
 } from "./auth.types";
 
 // --- CONFIGURACIÓN BASE ---
@@ -150,8 +152,15 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
 
 
 export const getCourses = async (): Promise<Course[]> => {
-    const response = await apiFetch('/courses', { method: 'GET' }, false);
-    return response.json();
+  const response = await apiFetch(`/courses`, { method: "GET" });
+
+  if (!response.ok) {
+    console.error("Error al obtener cursos", response.status);
+    return [];
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
 };
 
 export const getTeacherCourses = async (): Promise<any[]> => {
@@ -182,9 +191,35 @@ export const getCourseStatus = async (courseId: string): Promise<UnitWithLessons
 };
 
 
-export const getCourseUnits = async (courseId: string): Promise<UnitData[]> => {
-    const response = await apiFetch(`/courses/${courseId}/units`, { method: 'GET' });
-    return response.json();
+export const getCourseUnits = async (courseId: string): Promise<UnitWithLessons[]> => {
+  const response = await apiFetch(`/progress/course/${courseId}`, { method: "GET" });
+
+  if (!response.ok) {
+    console.error("Error al obtener unidades del curso", response.status);
+    return [];
+  }
+
+  const raw = await response.json();
+
+  // raw = List<UnitStatusDTO> del backend
+  const units: UnitWithLessons[] = (raw || []).map((u: any) => ({
+    id: u.id,
+    title: u.title,
+    unitOrder: u.unitOrder,
+    isLocked: u.isLocked,
+    isCompleted: u.isCompleted,
+    lessons: (u.lessons || []).map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      lessonOrder: l.lessonOrder,
+      requiredXp: l.requiredXp,
+      isCompleted: l.isCompleted,
+      // si tu tipo Lesson tiene más campos, agrégalos aquí
+    })),
+  }));
+
+  console.log("✅ Units mapeadas desde /progress/course:", units);
+  return units;
 };
 
 export const getUnitProgress = async (unitId: string): Promise<LessonProgressDTO[]> => {
@@ -246,9 +281,38 @@ export const updateUserAvatar = async (avatarData: any): Promise<void> => {
 // --- TEACHER (GESTIÓN DE CONTENIDO Y ESTUDIANTES) ---
 
 export const getStudentList = async (): Promise<StudentData[]> => {
-    const response = await apiFetch('/teacher/content/students', { method: 'GET' });
-    return response.json();
+  const response = await apiFetch("/teacher/content/students", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    console.error(
+      "❌ Error al obtener lista de estudiantes (status):",
+      response.status
+    );
+    // Si es 403 o cualquier otro error, devolvemos SIEMPRE un array vacío
+    return [];
+  }
+
+  try {
+    const data = await response.json();
+    console.log("📥 Estudiantes desde /teacher/content/students:", data);
+
+    if (Array.isArray(data)) {
+      return data;
+    } else {
+      console.warn(
+        "⚠️ Respuesta de /teacher/content/students NO es un array:",
+        data
+      );
+      return [];
+    }
+  } catch (err) {
+    console.error("❌ Error parseando JSON de estudiantes:", err);
+    return [];
+  }
 };
+
 
 export const getQuestionsByLesson = async (lessonId: string): Promise<QuestionData[]> => {
     const response = await apiFetch(`/teacher/content/lessons/${lessonId}/questions`, { method: 'GET' });
@@ -298,8 +362,27 @@ export const getAllUnits = async (): Promise<any[]> => {
   const response = await apiFetch("/teacher/content/units", {
     method: "GET",
   });
-  return response.json();
+
+  if (!response.ok) {
+    console.error("❌ Error al obtener unidades (status):", response.status);
+    // Si es 403 u otro error, devolvemos SIEMPRE array vacío
+    return [];
+  }
+
+  try {
+    const data = await response.json();
+    if (Array.isArray(data)) {
+      return data;
+    } else {
+      console.warn("⚠️ Respuesta de /teacher/content/units no es un array:", data);
+      return [];
+    }
+  } catch (err) {
+    console.error("❌ Error parseando JSON de unidades:", err);
+    return [];
+  }
 };
+
 
 
 export const createLesson = async (payload: NewLessonPayload): Promise<any> => {
@@ -362,11 +445,25 @@ export const deleteQuestion = async (questionId: string): Promise<void> => {
   return response.json();
 };*/
 
-export const createClassroom = async (name: string): Promise<ClassroomData> => {
-  const response = await apiFetch('/teacher/classrooms', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
+// auth.service.ts
+export const createClassroom = async (
+  name: string,
+  courseId: string
+): Promise<ClassroomData> => {
+  const response = await apiFetch("/teacher/classrooms", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      courseId, // 👈 AHORA SÍ SE ENVÍA
+    }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("Error al crear classroom:", response.status, errorText);
+    throw new Error("No se pudo crear el grupo");
+  }
+
   return response.json();
 };
 
@@ -946,3 +1043,35 @@ export const getTeacherUnits = async (): Promise<any[]> => {
 
   return res.json();
 };
+
+export const getStudentCourseUnits = async (
+  courseId: string
+): Promise<UnitWithLessons[]> => {
+  const response = await apiFetch(`/progress/course/${courseId}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    console.error("❌ Error al obtener unidades del curso del alumno", response.status);
+    return [];
+  }
+
+  const data = await response.json();
+  console.log("📘 Unidades desde /progress/course:", data);
+
+  // Si tu UnitStatusDTO ya coincide con UnitWithLessons,
+  // puedes devolver data directamente, si no, lo mapeas:
+  return data as UnitWithLessons[];
+};
+
+// auth.service.ts
+export const getUserBadges = async (): Promise<BadgeDTO[]> => {
+  const response = await apiFetch(`/badges/me`, { method: "GET" });
+
+  if (!response.ok) {
+    throw new Error("No se pudieron cargar las insignias");
+  }
+
+  return response.json();
+};
+

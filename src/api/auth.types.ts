@@ -70,8 +70,19 @@ export interface LessonProgressDTO {
   isCompleted: boolean;
   masteryLevel: number;
   lastPracticed: string | null;
-  xpEarned: number;
+  xpEarned?: number;
 }
+// --- PROGRESO ---
+
+export interface UnitStatusDTO {
+  id: string;
+  title: string;
+  unitOrder: number;
+  isLocked: boolean;
+  isCompleted: boolean;
+  lessons: LessonProgressDTO[];
+}
+
 
 export interface QuestionDTO {
   id: string;
@@ -341,3 +352,10 @@ export interface ChatMessage {
 }
 
 
+export interface BadgeDTO {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  earnedAt: number;
+}

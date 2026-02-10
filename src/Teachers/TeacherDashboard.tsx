@@ -17,7 +17,6 @@ import {
   getCourses,
   getCourseUnits,
   getLessonsByUnit,
-  getTeacherClassrooms
 } from "../api/auth.service";
 
 export default function TeacherDashboard() {
@@ -27,7 +26,6 @@ export default function TeacherDashboard() {
   const [courses, setCourses] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
 
   // --- ESTADOS DE SELECCIÓN ---
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -71,15 +69,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  const loadGroups = async () => {
-    try {
-      const data = await getTeacherClassrooms();
-      setGroups(data);
-    } catch (error) {
-      console.error("Error al cargar grupos:", error);
-    }
-  };
-
   const handleLogout = () => {
     removeToken();
     navigate("/login");
@@ -88,7 +77,6 @@ export default function TeacherDashboard() {
   // Carga inicial
   useEffect(() => {
     loadCourses();
-    loadGroups();
   }, []);
 
   return (
@@ -97,7 +85,7 @@ export default function TeacherDashboard() {
         display: "flex",
         height: "100vh",
         background: "#f6f7f8",
-        fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif"
+        fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif",
       }}
     >
       {/* SIDEBAR */}
@@ -110,7 +98,7 @@ export default function TeacherDashboard() {
           { id: "students", label: "Estudiantes", icon: "🎓" },
           { id: "groups", label: "Grupos", icon: "👥" },
           { id: "code", label: "Código", icon: "🔐" },
-          { id: "evaluations", label: "Evaluaciones", icon: "📝" }
+          { id: "evaluations", label: "Evaluaciones", icon: "📝" },
         ]}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -128,7 +116,7 @@ export default function TeacherDashboard() {
         style={{
           flex: 1,
           padding: "30px",
-          overflowY: "auto"
+          overflowY: "auto",
         }}
       >
         {/* HEADER */}
@@ -137,7 +125,7 @@ export default function TeacherDashboard() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "25px"
+            marginBottom: "25px",
           }}
         >
           <h2 style={{ margin: 0, color: "#3c3c3c", fontWeight: 800 }}>
@@ -147,7 +135,7 @@ export default function TeacherDashboard() {
           <button
             onClick={() => setShowLogoutModal(true)}
             style={{
-              background: "#ff4b4b", 
+              background: "#ff4b4b",
               color: "white",
               border: "none",
               padding: "10px 20px",
@@ -155,10 +143,14 @@ export default function TeacherDashboard() {
               cursor: "pointer",
               fontWeight: "bold",
               boxShadow: "0 4px 0 #d33131",
-              transition: "transform 0.1s"
+              transition: "transform 0.1s",
             }}
-            onMouseDown={(e) => (e.currentTarget.style.transform = "translateY(2px)")}
-            onMouseUp={(e) => (e.currentTarget.style.transform = "translateY(0px)")}
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "translateY(2px)")
+            }
+            onMouseUp={(e) =>
+              (e.currentTarget.style.transform = "translateY(0px)")
+            }
           >
             Cerrar sesión
           </button>
@@ -171,7 +163,7 @@ export default function TeacherDashboard() {
             borderRadius: "18px",
             padding: "25px",
             boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
-            minHeight: "calc(100vh - 150px)"
+            minHeight: "calc(100vh - 150px)",
           }}
         >
           {activeTab === "courses" && (
@@ -202,20 +194,16 @@ export default function TeacherDashboard() {
             />
           )}
 
-          {/* ✅ NUEVA SECCIÓN DE ESTUDIANTES */}
+          {/* ✅ SECCIÓN DE ESTUDIANTES */}
           {activeTab === "students" && <StudentsSection />}
 
           {activeTab === "questions" && <QuestionsSection />}
-          
-          {activeTab === "groups" && (
-            <GroupsSection 
-              groups={groups} 
-              onRefresh={loadGroups} 
-            />
-          )}
+
+          {/* ✅ AHORA GroupsSection NO RECIBE PROPS */}
+          {activeTab === "groups" && <GroupsSection />}
 
           {activeTab === "code" && <GenerateCodeSection />}
-          
+
           {activeTab === "evaluations" && <EvaluationsSection />}
         </div>
       </main>
@@ -231,7 +219,7 @@ export default function TeacherDashboard() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            backdropFilter: "blur(4px)"
+            backdropFilter: "blur(4px)",
           }}
         >
           <div
@@ -241,14 +229,20 @@ export default function TeacherDashboard() {
               borderRadius: "20px",
               textAlign: "center",
               minWidth: "320px",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
             }}
           >
             <h3 style={{ marginTop: 0 }}>¿Cerrar sesión?</h3>
             <p style={{ color: "#777", marginBottom: "25px" }}>
               Tendrás que volver a ingresar tus credenciales para acceder.
             </p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "center",
+              }}
+            >
               <button
                 onClick={handleLogout}
                 style={{
@@ -259,7 +253,7 @@ export default function TeacherDashboard() {
                   borderRadius: "12px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  flex: 1
+                  flex: 1,
                 }}
               >
                 Cerrar Sesión
@@ -274,7 +268,7 @@ export default function TeacherDashboard() {
                   borderRadius: "12px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  flex: 1
+                  flex: 1,
                 }}
               >
                 Cancelar
