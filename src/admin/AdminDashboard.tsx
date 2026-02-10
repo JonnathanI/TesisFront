@@ -991,6 +991,15 @@ export const AdminDashboard = () => {
                           handleManualChange(index, "cedula", e.target.value)
                         }
                       />
+                         <input
+      style={inputStyle}
+      type="text"
+      placeholder="Contraseña (opcional)"
+      value={user.password || ""}
+      onChange={(e) =>
+        handleManualChange(index, "password", e.target.value)
+      }
+    />
 
                       <button
                         onClick={() => removeRow(index)}
