@@ -1075,3 +1075,8 @@ export const getUserBadges = async (): Promise<BadgeDTO[]> => {
   return response.json();
 };
 
+export const getAllBadges = async () => {
+  const r = await apiFetch("/badges/all", { method: "GET" });
+  return r.json();
+};
+
