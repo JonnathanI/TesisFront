@@ -319,6 +319,8 @@ export const AdminDashboard = () => {
 
   const [studentCode, setStudentCode] = useState("");
   const [teacherRegCode, setTeacherRegCode] = useState("");
+   const [studentMaxUses, setStudentMaxUses] = useState<number>(20);
+  const [teacherMaxUses, setTeacherMaxUses] = useState<number>(5);
   const [editingUser, setEditingUser] = useState<StudentData | null>(null);
 
   useEffect(() => {
@@ -407,21 +409,31 @@ export const AdminDashboard = () => {
     });
   }, [users, searchTerm, filterType]);
 
-  const handleGenCode = async (type: "student" | "teacher") => {
-    try {
-      const code =
-        type === "student"
-          ? await generateClassroomCode()
-          : await generateTeacherRegistrationCode();
+const handleGenCode = async (type: "student" | "teacher") => {
+  try {
+    if (type === "student") {
+      // Aseguramos un número válido
+      const safeUses =
+        typeof studentMaxUses === "number" && studentMaxUses > 0
+          ? studentMaxUses
+          : 1;
 
-      if (type === "student") setStudentCode(code);
-      else setTeacherRegCode(code);
-
-      showToast("✨ Código generado");
-    } catch (e) {
-      showToast("❌ Error al generar código", "error");
+      const code = await generateClassroomCode(safeUses);
+      setStudentCode(code);
+    } else {
+      // 👉 Por ahora el backend de PROFESORES NO recibe maxUses.
+      //    Si luego lo agregas, aquí le pasas teacherMaxUses.
+      const code = await generateTeacherRegistrationCode();
+      setTeacherRegCode(code);
     }
-  };
+
+    showToast("✨ Código generado");
+  } catch (e) {
+    showToast("❌ Error al generar código", "error");
+  }
+};
+
+
 
   const addRow = () =>
     setManualUsers([
@@ -438,15 +450,50 @@ export const AdminDashboard = () => {
     manualUsers.length > 1 &&
     setManualUsers(manualUsers.filter((_, i) => i !== index));
 
-  const handleManualChange = (
-    index: number,
-    field: keyof ManualUser,
-    value: string
-  ) => {
-    const updated = [...manualUsers];
-    updated[index] = { ...updated[index], [field]: value };
-    setManualUsers(updated);
-  };
+ const handleManualChange = (
+  index: number,
+  field: keyof ManualUser,
+  value: string
+) => {
+  setManualUsers((prev) => {
+    const updated = [...prev];
+
+    const before = updated[index];
+
+    const next: ManualUser = {
+      ...before,
+      [field]: value,
+    };
+
+    updated[index] = next;
+
+    const isLastRow = index === updated.length - 1;
+
+    // ✅ Consideramos la fila "completa" SOLO si:
+    //   - tiene nombre, email, cédula y contraseña
+    const isCompleteNow =
+      (next.fullName || "").trim() !== "" &&
+      (next.email || "").trim() !== "" &&
+      (next.cedula || "").trim() !== "" &&
+      (next.password || "").trim() !== "";
+
+    // 👇 Solo agregamos una nueva fila si:
+    //   - estamos editando la ÚLTIMA fila
+    //   - el campo que se está editando es "password"
+    //   - y después del cambio, la fila está completa
+    if (isLastRow && field === "password" && isCompleteNow) {
+      updated.push({
+        fullName: "",
+        email: "",
+        password: "",
+        cedula: "",
+      });
+    }
+
+    return updated;
+  });
+};
+
 
   // ------- REGISTRO MASIVO: FORMULARIO MANUAL -------
   const handleBulkSubmitManual = async () => {
@@ -593,7 +640,7 @@ export const AdminDashboard = () => {
 
   // ------- DESCARGAR PLANTILLA EXCEL -------
   const handleDownloadTemplateExcel = () => {
-    const headers = [["fullName", "email", "cedula", "password (opcional)"]];
+    const headers = [["fullName", "email", "cedula", "password)"]];
     const exampleRow = [["Juan Perez", "juan@mail.com", "17263544", "Duo12345*"]];
 
     const worksheet = XLSX.utils.aoa_to_sheet([...headers, ...exampleRow]);
@@ -843,249 +890,306 @@ export const AdminDashboard = () => {
         )}
 
         {/* GENERAR CÓDIGOS */}
-        {activeSection === "generar" && (
-          <div style={{ width: "100%" }}>
-            <h2 style={titleStyle}>Códigos</h2>
+       {activeSection === "generar" && (
+  <div style={{ width: "100%" }}>
+    <h2 style={titleStyle}>Códigos</h2>
 
-            <div style={horizontalGrid}>
-              {/* ESTUDIANTES */}
-              <div style={modernCodeCard}>
-                <p style={smallLabel}>AULA ESTUDIANTES</p>
+    <div style={horizontalGrid}>
+      {/* ESTUDIANTES */}
+      <div style={modernCodeCard}>
+        <p style={smallLabel}>AULA ESTUDIANTES</p>
 
-                <div style={codeRowFlex}>
-                  <span style={{ ...digitalCode, color: "#1cb0f6" }}>
-                    {studentCode || "••••"}
-                  </span>
+        {/* 🔢 Cantidad de usos */}
+        <div style={{ marginTop: 10, marginBottom: 10 }}>
+          <label style={labelStyle}>Cantidad de usos permitidos</label>
+          <input
+            type="number"
+            min={1}
+            value={studentMaxUses}
+            onChange={(e) =>
+              setStudentMaxUses(
+                Math.max(1, Number.parseInt(e.target.value || "1", 10))
+              )
+            }
+            style={inputStyle}
+          />
+        </div>
 
-                  <button
-                    onClick={() => handleGenCode("student")}
-                    style={btnActionSmall}
-                  >
-                    Generar
-                  </button>
-                </div>
-              </div>
+        <div style={codeRowFlex}>
+          <span style={{ ...digitalCode, color: "#1cb0f6" }}>
+            {studentCode || "••••"}
+          </span>
 
-              {/* PROFESORES */}
-              <div style={modernCodeCard}>
-                <p style={smallLabel}>REGISTRO PROFESORES</p>
+          <button
+            onClick={() => handleGenCode("student")}
+            style={btnActionSmall}
+          >
+            Generar
+          </button>
+        </div>
 
-                <div style={codeRowFlex}>
-                  <span style={{ ...digitalCode, color: "#AF85FF" }}>
-                    {teacherRegCode || "••••"}
-                  </span>
+        <small style={{ fontSize: 11, color: "#999" }}>
+          Este código se podrá usar hasta {studentMaxUses} veces por estudiantes.
+        </small>
+      </div>
 
-                  <button
-                    onClick={() => handleGenCode("teacher")}
-                    style={btnActionSmall}
-                  >
-                    Generar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* PROFESORES */}
+      <div style={modernCodeCard}>
+        <p style={smallLabel}>REGISTRO PROFESORES</p>
+
+        {/* 🔢 Cantidad de usos (solo informativo hasta que cambies backend) */}
+        <div style={{ marginTop: 10, marginBottom: 10 }}>
+          <label style={labelStyle}>Cantidad de usos permitidos</label>
+          <input
+            type="number"
+            min={1}
+            value={teacherMaxUses}
+            onChange={(e) =>
+              setTeacherMaxUses(
+                Math.max(1, Number.parseInt(e.target.value || "1", 10))
+              )
+            }
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={codeRowFlex}>
+          <span style={{ ...digitalCode, color: "#AF85FF" }}>
+            {teacherRegCode || "••••"}
+          </span>
+
+          <button
+            onClick={() => handleGenCode("teacher")}
+            style={btnActionSmall}
+          >
+            Generar
+          </button>
+        </div>
+
+        <small style={{ fontSize: 11, color: "#999" }}>
+          Comparte este código con hasta {teacherMaxUses} profesores.
+        </small>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* REGISTRO MASIVO */}
-        {activeSection === "carga" && (
-          <div style={cardStyle}>
-            {/* Título + selector de rol del lote */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <h2 style={titleStyle}>Registro Masivo</h2>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={() => setBulkRole("STUDENT")}
-                  style={tabButtonStyle(bulkRole === "STUDENT")}
-                >
-                  Estudiantes
-                </button>
-                <button
-                  onClick={() => setBulkRole("TEACHER")}
-                  style={tabButtonStyle(bulkRole === "TEACHER")}
-                >
-                  Profesores
-                </button>
-              </div>
-            </div>
+ {activeSection === "carga" && (
+  <div
+    style={{
+      width: "100%",
+      display: "flex",
+      justifyContent: "center",
+    }}
+  >
+    {/* CARD CENTRADO Y MÁS ANGOSTO */}
+    <div
+      style={{
+        ...cardStyle,
+        maxWidth: "900px",   // 👈 más angosto para que quepa cómodo
+        width: "100%",
+      }}
+    >
+      {/* Título + selector de rol del lote */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
+      >
+        <h2 style={titleStyle}>Registro Masivo</h2>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={() => setBulkRole("STUDENT")}
+            style={tabButtonStyle(bulkRole === "STUDENT")}
+          >
+            Estudiantes
+          </button>
+          <button
+            onClick={() => setBulkRole("TEACHER")}
+            style={tabButtonStyle(bulkRole === "TEACHER")}
+          >
+            Profesores
+          </button>
+        </div>
+      </div>
 
-            {/* CÓDIGO DE VINCULACIÓN PARA EL LOTE */}
-            <div style={{ marginBottom: "15px" }}>
-              <label style={labelStyle}>Código de vinculación para este lote</label>
-              <input
-                style={inputStyle}
-                placeholder={
-                  bulkRole === "STUDENT"
-                    ? "Ej: AULA-123 (código de aula)"
-                    : "Ej: PROF-XYZ (código de profesor)"
-                }
-                value={bulkRegistrationCode}
-                onChange={(e) =>
-                  setBulkRegistrationCode(e.target.value.toUpperCase())
-                }
-              />
-            </div>
+      {/* CÓDIGO DE VINCULACIÓN PARA EL LOTE */}
+      <div style={{ marginBottom: "15px" }}>
+        <label style={labelStyle}>Código de vinculación para este lote</label>
+        <input
+          style={inputStyle}
+          placeholder={
+            bulkRole === "STUDENT"
+              ? "Ej: AULA-123 (código de aula)"
+              : "Ej: PROF-XYZ (código de profesor)"
+          }
+          value={bulkRegistrationCode}
+          onChange={(e) =>
+            setBulkRegistrationCode(e.target.value.toUpperCase())
+          }
+        />
+      </div>
 
-            {/* Tabs Manual / Excel */}
-            <div style={tabContainerStyle}>
-              <button
-                onClick={() => setBulkTab("manual")}
-                style={tabButtonStyle(bulkTab === "manual")}
-              >
-                FORMULARIO MANUAL
-              </button>
-              <button
-                onClick={() => setBulkTab("excel")}
-                style={tabButtonStyle(bulkTab === "excel")}
-              >
-                SUBIR EXCEL
-              </button>
-            </div>
+      {/* Tabs Manual / Excel */}
+      <div style={tabContainerStyle}>
+        <button
+          onClick={() => setBulkTab("manual")}
+          style={tabButtonStyle(bulkTab === "manual")}
+        >
+          FORMULARIO MANUAL
+        </button>
+        <button
+          onClick={() => setBulkTab("excel")}
+          style={tabButtonStyle(bulkTab === "excel")}
+        >
+          SUBIR EXCEL
+        </button>
+      </div>
 
-            {/* CONTENIDO: MANUAL */}
-            {bulkTab === "manual" && (
-              <>
-                <button onClick={addRow} style={btnAddRowStyle}>
-                  + Añadir Fila
-                </button>
+      {/* CONTENIDO: MANUAL */}
+      {bulkTab === "manual" && (
+        <>
+         
 
-                <div
-                  style={{
-                    maxHeight: "400px",
-                    overflowY: "auto",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {manualUsers.map((user, index) => (
-                    <div key={index} style={rowInputStyle}>
-                      <input
-                        style={inputStyle}
-                        placeholder="Nombre"
-                        value={user.fullName}
-                        onChange={(e) =>
-                          handleManualChange(index, "fullName", e.target.value)
-                        }
-                      />
-
-                      <input
-                        style={inputStyle}
-                        placeholder="Email"
-                        value={user.email}
-                        onChange={(e) =>
-                          handleManualChange(index, "email", e.target.value)
-                        }
-                      />
-
-                      <input
-                        style={inputStyle}
-                        placeholder="Cédula"
-                        value={user.cedula}
-                        onChange={(e) =>
-                          handleManualChange(index, "cedula", e.target.value)
-                        }
-                      />
-                         <input
-      style={inputStyle}
-      type="text"
-      placeholder="Contraseña (opcional)"
-      value={user.password || ""}
-      onChange={(e) =>
-        handleManualChange(index, "password", e.target.value)
-      }
-    />
-
-                      <button
-                        onClick={() => removeRow(index)}
-                        style={{
-                          border: "none",
-                          background: "none",
-                          cursor: "pointer",
-                          fontSize: "18px",
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleBulkSubmitManual}
-                  style={btnMainStyle}
-                  disabled={loading}
-                >
-                  {loading ? "Procesando..." : "Registrar Lista Completa"}
-                </button>
-              </>
-            )}
-
-            {/* CONTENIDO: EXCEL */}
-            {bulkTab === "excel" && (
-              <div style={{ marginTop: "20px" }}>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "#777",
-                    marginBottom: 10,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  1️⃣ Descarga la plantilla de Excel, 2️⃣ llénala en tu computadora y
-                  3️⃣ vuelve aquí para subirla.
-                  <br />
-                  Columnas esperadas:
-                  <br />
-                  <code>fullName | email | cedula | password (opcional)</code>
-                </p>
-
-                <button
-                  onClick={handleDownloadTemplateExcel}
-                  style={{
-                    marginBottom: "15px",
-                    padding: "10px 20px",
-                    borderRadius: "12px",
-                    border: "none",
-                    backgroundColor: "#1cb0f6",
-                    color: "white",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    boxShadow: "0 3px 0 #0e86c5",
-                  }}
-                >
-                  ⬇️ Descargar plantilla Excel
-                </button>
+          <div
+            style={{
+              maxHeight: "400px",
+              overflowY: "auto",
+              marginBottom: "20px",
+            }}
+          >
+            {manualUsers.map((user, index) => (
+              <div key={index} style={rowInputStyle}>
+                <input
+                  style={inputStyle}
+                  placeholder="Nombre"
+                  value={user.fullName}
+                  onChange={(e) =>
+                    handleManualChange(index, "fullName", e.target.value)
+                  }
+                />
 
                 <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleExcelFileChange}
-                  style={{
-                    marginBottom: "20px",
-                    padding: "10px",
-                    borderRadius: "12px",
-                    border: "2px solid #E5E5E5",
-                    width: "100%",
-                  }}
+                  style={inputStyle}
+                  placeholder="Email"
+                  value={user.email}
+                  onChange={(e) =>
+                    handleManualChange(index, "email", e.target.value)
+                  }
+                />
+
+                <input
+                  style={inputStyle}
+                  placeholder="Cédula"
+                  value={user.cedula}
+                  onChange={(e) =>
+                    handleManualChange(index, "cedula", e.target.value)
+                  }
+                />
+
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="Contraseña"
+                  value={user.password || ""}
+                  onChange={(e) =>
+                    handleManualChange(index, "password", e.target.value)
+                  }
                 />
 
                 <button
-                  onClick={handleBulkSubmitExcel}
-                  style={btnMainStyle}
-                  disabled={loading || !excelFile}
+                  onClick={() => removeRow(index)}
+                  style={{
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                  }}
                 >
-                  {loading ? "Procesando..." : "Importar desde Excel"}
+                  🗑️
                 </button>
               </div>
-            )}
+            ))}
           </div>
-        )}
+
+          <button
+            onClick={handleBulkSubmitManual}
+            style={btnMainStyle}
+            disabled={loading}
+          >
+            {loading ? "Procesando..." : "Registrar Lista Completa"}
+          </button>
+        </>
+      )}
+
+      {/* CONTENIDO: EXCEL */}
+      {bulkTab === "excel" && (
+        <div style={{ marginTop: "20px" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "#777",
+              marginBottom: 10,
+              lineHeight: 1.4,
+            }}
+          >
+            1️⃣ Descarga la plantilla de Excel, 2️⃣ llénala en tu computadora y
+            3️⃣ vuelve aquí para subirla.
+            <br />
+            Columnas esperadas:
+            <br />
+            <code>fullName | email | cedula | password </code>
+          </p>
+
+          <button
+            onClick={handleDownloadTemplateExcel}
+            style={{
+              marginBottom: "15px",
+              padding: "10px 20px",
+              borderRadius: "12px",
+              border: "none",
+              backgroundColor: "#1cb0f6",
+              color: "white",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 3px 0 #0e86c5",
+            }}
+          >
+            ⬇️ Descargar plantilla Excel
+          </button>
+
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelFileChange}
+            style={{
+              marginBottom: "20px",
+              padding: "10px",
+              borderRadius: "12px",
+              border: "2px solid #E5E5E5",
+              width: "100%",
+            }}
+          />
+
+          <button
+            onClick={handleBulkSubmitExcel}
+            style={btnMainStyle}
+            disabled={loading || !excelFile}
+          >
+            {loading ? "Procesando..." : "Importar desde Excel"}
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+
       </main>
     </div>
   );
@@ -1099,9 +1203,8 @@ const layoutStyle: React.CSSProperties = {
   fontFamily: '"Nunito", sans-serif',
 };
 const mainContainerStyle: React.CSSProperties = {
-  marginLeft: 260,
-  padding: "10px 20px 10px 10px",
-  width: "calc(100% - 260px)",
+  flex: 1,                         // ocupa todo el espacio restante
+  padding: "20px 32px",            // ajusta padding a lo que te guste
   boxSizing: "border-box",
 };
 const cardStyle: React.CSSProperties = {

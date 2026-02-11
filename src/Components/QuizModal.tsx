@@ -74,7 +74,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     recognition.onresult = (event: any) => {
       const current = event.results[0][0].transcript;
       setTranscript(current);
-      setSelectedOption(current); // La voz capturada se vuelve nuestra opción seleccionada
+      setSelectedOption(current); 
     };
 
     recognition.onerror = () => setIsListening(false);

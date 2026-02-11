@@ -677,20 +677,24 @@ export const getUserChallenges = async (): Promise<UserChallengesDTO> => {
 };
 
 // BUSCA O AGREGA ESTA FUNCIÓN EN TU auth.service.ts
-export const generateClassroomCode = async (): Promise<string> => {
-  // 1. Apuntamos a /teacher/ (Ruta del Profesor), NO a /auth/admin/
-  const response = await apiFetch('/teacher/generate-classroom-code', { 
-    method: 'POST',
+// 🔹 Generar código de aula con límite de usos
+export const generateClassroomCode = async (maxUses: number): Promise<string> => {
+  const response = await apiFetch("/teacher/generate-classroom-code", {
+    method: "POST",
+    body: JSON.stringify({ maxUses }), // 👈 enviamos el número de usos
   });
 
   if (!response.ok) {
+    const txt = await response.text().catch(() => "");
+    console.error("Error al generar código de aula:", response.status, txt);
     throw new Error("No se pudo generar el código de aula");
   }
 
   const data = await response.json();
-  // Retornará el JSON { "code": "AULA-XXXXXX" }
-  return data.code; 
+  // backend debería devolver { "code": "AULA-ABC123" }
+  return data.code;
 };
+
 
 // En auth.service.ts
 export const getStudentDetailProgress = async (studentId: string): Promise<DetailedStudentProgress> => {
