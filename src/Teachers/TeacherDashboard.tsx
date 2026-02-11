@@ -4,14 +4,14 @@ import { removeToken } from "../api/auth.service";
 import { useNavigate } from "react-router-dom";
 
 // --- SECCIONES ---
-import { CoursesSection } from "./sections/CoursesSection";
+// ❌ Ya no importamos CoursesSection
 import { UnitsSection } from "./sections/UnitsSection";
 import { LessonsSection } from "./sections/LessonsSection";
 import { GroupsSection } from "./sections/GroupsSection";
 import { GenerateCodeSection } from "./sections/GenerateCodeSection";
 import { QuestionsSection } from "./sections/QuestionsSection";
 import { EvaluationsSection } from "./sections/EvaluationsSection";
-import { StudentsSection } from "./sections/StudentsSection"; // ✅ Nueva sección
+import { StudentsSection } from "./sections/StudentsSection";
 
 import {
   getCourses,
@@ -20,7 +20,8 @@ import {
 } from "../api/auth.service";
 
 export default function TeacherDashboard() {
-  const [activeTab, setActiveTab] = useState("courses");
+  // 🔹 Ahora el tab inicial es "units" (no "courses")
+  const [activeTab, setActiveTab] = useState("units");
 
   // --- ESTADOS DE DATOS ---
   const [courses, setCourses] = useState<any[]>([]);
@@ -41,7 +42,7 @@ export default function TeacherDashboard() {
   const loadCourses = async () => {
     try {
       const data = await getCourses();
-      setCourses(data);
+      setCourses(data); // solo se usan para que el profe elija curso en UnitsSection
     } catch (error) {
       console.error("Error al cargar cursos:", error);
     }
@@ -74,7 +75,7 @@ export default function TeacherDashboard() {
     navigate("/login");
   };
 
-  // Carga inicial
+  // Carga inicial de cursos (solo lectura)
   useEffect(() => {
     loadCourses();
   }, []);
@@ -91,7 +92,7 @@ export default function TeacherDashboard() {
       {/* SIDEBAR */}
       <Sidebar
         sidebarNavItems={[
-          { id: "courses", label: "Cursos", icon: "📘" },
+          // ❌ Eliminado "courses"
           { id: "units", label: "Unidades", icon: "📚" },
           { id: "lessons", label: "Lecciones", icon: "📖" },
           { id: "questions", label: "Preguntas", icon: "❓" },
@@ -166,13 +167,7 @@ export default function TeacherDashboard() {
             minHeight: "calc(100vh - 150px)",
           }}
         >
-          {activeTab === "courses" && (
-            <CoursesSection
-              courses={courses}
-              onSelectCourse={loadUnits}
-              onRefresh={loadCourses}
-            />
-          )}
+          {/* ❌ Ya no hay sección de cursos aquí */}
 
           {activeTab === "units" && (
             <UnitsSection
@@ -194,12 +189,12 @@ export default function TeacherDashboard() {
             />
           )}
 
-          {/* ✅ SECCIÓN DE ESTUDIANTES */}
+          {/* SECCIÓN DE ESTUDIANTES */}
           {activeTab === "students" && <StudentsSection />}
 
           {activeTab === "questions" && <QuestionsSection />}
 
-          {/* ✅ AHORA GroupsSection NO RECIBE PROPS */}
+          {/* GroupsSection */}
           {activeTab === "groups" && <GroupsSection />}
 
           {activeTab === "code" && <GenerateCodeSection />}

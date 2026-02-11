@@ -31,7 +31,7 @@ import {
   removeToken,
   getFriendsList,
   getStudentClassrooms,
-  getClassroomDetails,
+  getStudentClassroomDetails,
   getStudentCourseUnits,
   getCourseUnits
 } from "../api/auth.service";
@@ -132,19 +132,25 @@ const loadData = useCallback(
 
   // 🔥 Carga el detalle real (alumnos/compañeros) al hacer clic
   const handleViewClass = async (id: string | null) => {
-    setViewingGroupId(id);
-    if (id) {
-      try {
-        const details = await getClassroomDetails(id);
-        setFullGroupDetails(details);
-      } catch (error) {
-        console.error("Error al obtener detalle del grupo:", error);
-        setFullGroupDetails(myGroups.find((g) => String(g.id) === String(id)));
-      }
-    } else {
-      setFullGroupDetails(null);
-    }
-  };
+  setViewingGroupId(id);
+
+  if (!id) {
+    setFullGroupDetails(null);
+    return;
+  }
+
+  try {
+    // 👇 AHORA LLAMAMOS AL ENDPOINT /api/student/classrooms/{id}
+    const details = await getStudentClassroomDetails(id);
+    console.log("DETALLE DEL GRUPO (ALUMNO):", details);
+    setFullGroupDetails(details);
+  } catch (error) {
+    console.error("Error al obtener detalle del grupo:", error);
+    // fallback: al menos muestra nombre del grupo si falla
+    setFullGroupDetails(myGroups.find((g) => String(g.id) === String(id)) || null);
+  }
+};
+
 
   const handlePurchase = async (type: string, cost: number) => {
     if (userProfile && userProfile.lingots >= cost) {

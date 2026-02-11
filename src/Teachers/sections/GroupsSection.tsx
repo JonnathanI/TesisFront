@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import * as AuthService from "../../api/auth.service";
+import { AssignmentData } from "../../api/auth.types";
 
 export const GroupsSection: React.FC = () => {
   const [groups, setGroups] = useState<any[]>([]);
@@ -8,13 +9,20 @@ export const GroupsSection: React.FC = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 👉 Nuevo: cursos y curso seleccionado
+  // 👉 cursos y curso seleccionado
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState("");
 
-  // 🔧 formulario de creación
+  // 🔧 formulario de creación de grupo
   const [newGroupName, setNewGroupName] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // 🔧 tareas del grupo
+  const [tasks, setTasks] = useState<AssignmentData[]>([]);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskLoading, setTaskLoading] = useState(false);
 
   // ==========================
   // CARGAR GRUPOS Y CURSOS
@@ -31,7 +39,6 @@ export const GroupsSection: React.FC = () => {
 
   const loadCourses = async () => {
     try {
-      // Puedes usar getTeacherCourses() si tienes cursos por profesor
       const data = await AuthService.getCourses();
       setCourses(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -61,11 +68,10 @@ export const GroupsSection: React.FC = () => {
     setCreating(true);
 
     try {
-      // 👈 Ahora enviamos nombre + courseId
       await AuthService.createClassroom(newGroupName.trim(), selectedCourseId);
       setNewGroupName("");
       setSelectedCourseId("");
-      await loadGroups(); // recargar lista
+      await loadGroups();
     } catch (err) {
       console.error(err);
       alert("No se pudo crear el grupo");
@@ -75,14 +81,19 @@ export const GroupsSection: React.FC = () => {
   };
 
   // ==========================
-  // CARGA DETALLE DE GRUPO
+  // CARGA DETALLE DE GRUPO + TAREAS
   // ==========================
   const openGroup = async (id: string) => {
     try {
-      const data = await AuthService.getClassroomDetails(id);
-      setSelectedGroup(data);
+      const [groupDetails, assignments] = await Promise.all([
+        AuthService.getClassroomDetails(id),
+        AuthService.getClassroomAssignments(id),
+      ]);
+
+      setSelectedGroup(groupDetails);
+      setTasks(Array.isArray(assignments) ? assignments : []);
     } catch (err) {
-      console.error("Error cargando detalle de grupo", err);
+      console.error("Error cargando detalle de grupo o tareas", err);
     }
   };
 
@@ -100,8 +111,11 @@ export const GroupsSection: React.FC = () => {
     setLoading(true);
     try {
       await AuthService.addStudentToClassroom(selectedGroup.id, emailToAdd);
+
+      // recargar detalle del grupo
       const updated = await AuthService.getClassroomDetails(selectedGroup.id);
       setSelectedGroup(updated);
+
       setEmailToAdd("");
     } catch (err) {
       console.error(err);
@@ -132,7 +146,45 @@ export const GroupsSection: React.FC = () => {
   }, [emailToAdd]);
 
   // ==========================
-  // PANTALLA DETALLE
+  // CREAR TAREA PARA EL GRUPO
+  // ==========================
+  const handleCreateTask = async () => {
+    if (!selectedGroup?.id) return;
+    if (!taskTitle.trim()) {
+      alert("Ponle un título a la tarea");
+      return;
+    }
+
+    setTaskLoading(true);
+    try {
+      // usamos tu servicio existente: createAssignment
+      await AuthService.createAssignment(selectedGroup.id, {
+        title: taskTitle.trim(),
+        description: taskDescription.trim(),
+        // si el backend espera ISO: puedes hacer new Date(taskDueDate).toISOString()
+        dueDate: taskDueDate || null,
+      });
+
+      // recargamos solo las tareas
+      const assignments = await AuthService.getClassroomAssignments(
+        selectedGroup.id
+      );
+      setTasks(Array.isArray(assignments) ? assignments : []);
+
+      // limpiar formulario
+      setTaskTitle("");
+      setTaskDescription("");
+      setTaskDueDate("");
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo crear la tarea");
+    } finally {
+      setTaskLoading(false);
+    }
+  };
+
+  // ==========================
+  // PANTALLA DETALLE DE UN GRUPO
   // ==========================
   if (selectedGroup) {
     return (
@@ -185,8 +237,83 @@ export const GroupsSection: React.FC = () => {
           </div>
         </div>
 
-        {/* LISTA DE ALUMNOS */}
+        {/* FORMULARIO DE TAREAS */}
+        <div className="mt-6 bg-white p-5 rounded-xl border">
+          <h3 className="font-black text-lg text-gray-700 mb-3">
+            Asignar tarea al grupo
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <input
+              className="border p-3 rounded-xl md:col-span-1"
+              placeholder="Título de la tarea"
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+            />
+
+            <input
+              className="border p-3 rounded-xl md:col-span-1"
+              placeholder="Fecha límite (opcional)"
+              type="date"
+              value={taskDueDate}
+              onChange={(e) => setTaskDueDate(e.target.value)}
+            />
+
+            <button
+              onClick={handleCreateTask}
+              disabled={taskLoading}
+              className="bg-[#1cb0f6] text-white rounded-xl font-black px-4 py-3 md:col-span-1"
+            >
+              {taskLoading ? "Guardando..." : "Crear tarea"}
+            </button>
+          </div>
+
+          <textarea
+            className="w-full border p-3 rounded-xl"
+            rows={3}
+            placeholder="Descripción / instrucciones (opcional)"
+            value={taskDescription}
+            onChange={(e) => setTaskDescription(e.target.value)}
+          />
+        </div>
+
+        {/* LISTA DE TAREAS */}
         <h3 className="mt-6 font-black text-gray-500 uppercase text-xs">
+          Tareas del grupo
+        </h3>
+
+        {tasks.length === 0 ? (
+          <p className="text-sm text-gray-500 mt-2">
+            Aún no has asignado tareas a este grupo.
+          </p>
+        ) : (
+          tasks.map((t) => (
+            <div
+              key={t.id || t.title}
+              className="bg-gray-100 p-4 rounded-xl border mt-2"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-black">{t.title}</span>
+                {t.dueDate && (
+                  <span className="text-xs text-gray-600">
+                    vence:{" "}
+                    {new Date(t.dueDate).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+              </div>
+              {t.description && (
+                <p className="text-sm text-gray-700">{t.description}</p>
+              )}
+            </div>
+          ))
+        )}
+
+        {/* LISTA DE ALUMNOS */}
+        <h3 className="mt-8 font-black text-gray-500 uppercase text-xs">
           Estudiantes del grupo
         </h3>
 
