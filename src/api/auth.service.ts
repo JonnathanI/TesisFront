@@ -484,13 +484,24 @@ export const addStudentToClassroom = async (classId: string, email: string): Pro
   });
 };
 
-export const createAssignment = async (classId: string, payload: any): Promise<AssignmentData> => {
+export const createAssignment = async (
+  classId: string,
+  payload: any
+): Promise<AssignmentData> => {
   const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const txt = await response.text().catch(() => "");
+    console.error("Error al crear tarea:", response.status, txt);
+    throw new Error("No se pudo crear la tarea");
+  }
+
   return response.json();
 };
+
 
 export const getClassroomAssignments = async (classId: string): Promise<AssignmentData[]> => {
   const response = await apiFetch(`/teacher/classrooms/${classId}/assignments`, { method: 'GET' });

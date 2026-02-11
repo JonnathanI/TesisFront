@@ -22,6 +22,7 @@ export const GroupsSection: React.FC = () => {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskXp, setTaskXp] = useState<number>(50); // XP por defecto
   const [taskLoading, setTaskLoading] = useState(false);
 
   // ==========================
@@ -157,12 +158,12 @@ export const GroupsSection: React.FC = () => {
 
     setTaskLoading(true);
     try {
-      // usamos tu servicio existente: createAssignment
+      // 🔹 mandamos también el XP porque el backend espera "xp"
       await AuthService.createAssignment(selectedGroup.id, {
         title: taskTitle.trim(),
         description: taskDescription.trim(),
-        // si el backend espera ISO: puedes hacer new Date(taskDueDate).toISOString()
-        dueDate: taskDueDate || null,
+        xp: Number(taskXp) || 0,
+        dueDate: taskDueDate || null, // "2025-02-20" -> LocalDate.parse OK
       });
 
       // recargamos solo las tareas
@@ -175,6 +176,7 @@ export const GroupsSection: React.FC = () => {
       setTaskTitle("");
       setTaskDescription("");
       setTaskDueDate("");
+      setTaskXp(50);
     } catch (err) {
       console.error(err);
       alert("No se pudo crear la tarea");
@@ -243,33 +245,42 @@ export const GroupsSection: React.FC = () => {
             Asignar tarea al grupo
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
             <input
-              className="border p-3 rounded-xl md:col-span-1"
+              className="border p-3 rounded-xl md:col-span-2"
               placeholder="Título de la tarea"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
             />
 
             <input
-              className="border p-3 rounded-xl md:col-span-1"
+              className="border p-3 rounded-xl"
               placeholder="Fecha límite (opcional)"
               type="date"
               value={taskDueDate}
               onChange={(e) => setTaskDueDate(e.target.value)}
             />
 
-            <button
-              onClick={handleCreateTask}
-              disabled={taskLoading}
-              className="bg-[#1cb0f6] text-white rounded-xl font-black px-4 py-3 md:col-span-1"
-            >
-              {taskLoading ? "Guardando..." : "Crear tarea"}
-            </button>
+            <input
+              className="border p-3 rounded-xl"
+              type="number"
+              min={0}
+              placeholder="XP"
+              value={taskXp}
+              onChange={(e) => setTaskXp(Number(e.target.value) || 0)}
+            />
           </div>
 
+          <button
+            onClick={handleCreateTask}
+            disabled={taskLoading}
+            className="bg-[#1cb0f6] text-white rounded-xl font-black px-4 py-3 w-full md:w-auto"
+          >
+            {taskLoading ? "Guardando..." : "Crear tarea"}
+          </button>
+
           <textarea
-            className="w-full border p-3 rounded-xl"
+            className="w-full border p-3 rounded-xl mt-3"
             rows={3}
             placeholder="Descripción / instrucciones (opcional)"
             value={taskDescription}
@@ -294,16 +305,23 @@ export const GroupsSection: React.FC = () => {
             >
               <div className="flex justify-between items-center mb-1">
                 <span className="font-black">{t.title}</span>
-                {t.dueDate && (
-                  <span className="text-xs text-gray-600">
-                    vence:{" "}
-                    {new Date(t.dueDate).toLocaleDateString("es-ES", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                  </span>
-                )}
+                <div className="flex flex-col items-end text-xs text-gray-600">
+                  {t.dueDate && (
+                    <span>
+                      vence:{" "}
+                      {new Date(t.dueDate).toLocaleDateString("es-ES", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    </span>
+                  )}
+                  {typeof (t as any).xpReward === "number" && (
+                    <span className="text-[#58cc02] font-bold">
+                      {`+${(t as any).xpReward} XP`}
+                    </span>
+                  )}
+                </div>
               </div>
               {t.description && (
                 <p className="text-sm text-gray-700">{t.description}</p>
