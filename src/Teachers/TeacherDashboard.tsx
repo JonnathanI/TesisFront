@@ -1,10 +1,10 @@
+// src/Teachers/TeacherDashboard.tsx
 import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
-import { removeToken } from "../api/auth.service";
+import { removeToken, getCourses, getCourseUnits, getLessonsByUnit } from "../api/auth.service";
 import { useNavigate } from "react-router-dom";
 
 // --- SECCIONES ---
-// ❌ Ya no importamos CoursesSection
 import { UnitsSection } from "./sections/UnitsSection";
 import { LessonsSection } from "./sections/LessonsSection";
 import { GroupsSection } from "./sections/GroupsSection";
@@ -13,36 +13,44 @@ import { QuestionsSection } from "./sections/QuestionsSection";
 import { EvaluationsSection } from "./sections/EvaluationsSection";
 import { StudentsSection } from "./sections/StudentsSection";
 
-import {
-  getCourses,
-  getCourseUnits,
-  getLessonsByUnit,
-} from "../api/auth.service";
-
 export default function TeacherDashboard() {
-  // 🔹 Ahora el tab inicial es "units" (no "courses")
   const [activeTab, setActiveTab] = useState("units");
 
-  // --- ESTADOS DE DATOS ---
+  // --- DATOS ---
   const [courses, setCourses] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
 
-  // --- ESTADOS DE SELECCIÓN ---
+  // --- SELECCIÓN ---
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const navigate = useNavigate();
 
-  // ==========================================
-  // LÓGICA DE CARGA DE DATOS
-  // ==========================================
+  // ✅ RESPONSIVE
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Cierra sidebar si pasas a desktop
+  useEffect(() => {
+    if (!isMobile) setIsSidebarOpen(false);
+  }, [isMobile]);
+
+  // ==========================================
+  // CARGA DE DATOS
+  // ==========================================
   const loadCourses = async () => {
     try {
       const data = await getCourses();
-      setCourses(data); // solo se usan para que el profe elija curso en UnitsSection
+      setCourses(data);
     } catch (error) {
       console.error("Error al cargar cursos:", error);
     }
@@ -53,7 +61,7 @@ export default function TeacherDashboard() {
     try {
       const data = await getCourseUnits(courseId);
       setUnits(data);
-      setLessons([]); // Reset lecciones al cambiar curso
+      setLessons([]);
       setSelectedUnitId(null);
     } catch (error) {
       console.error("Error al cargar unidades:", error);
@@ -75,135 +83,243 @@ export default function TeacherDashboard() {
     navigate("/login");
   };
 
-  // Carga inicial de cursos (solo lectura)
   useEffect(() => {
     loadCourses();
   }, []);
 
+  // ==========================================
+  // UI
+  // ==========================================
+  const sidebarWidth = 260;
+
   return (
     <div
       style={{
-        display: "flex",
-        height: "100vh",
+        minHeight: "100vh",
         background: "#f6f7f8",
         fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif",
       }}
     >
-      {/* SIDEBAR */}
-      <Sidebar
-        sidebarNavItems={[
-          // ❌ Eliminado "courses"
-          { id: "units", label: "Unidades", icon: "📚" },
-          { id: "lessons", label: "Lecciones", icon: "📖" },
-          { id: "questions", label: "Preguntas", icon: "❓" },
-          { id: "students", label: "Estudiantes", icon: "🎓" },
-          { id: "groups", label: "Grupos", icon: "👥" },
-          { id: "code", label: "Código", icon: "🔐" },
-          { id: "evaluations", label: "Evaluaciones", icon: "📝" },
-        ]}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        setSubTab={() => {}}
-        resetForm={() => {}}
-        currentTheme={{ border: "#e5e5e5", sidebarBg: "#ffffff" }}
-        theme="light"
-        handleMoreMenuClick={() => {}}
-        showMoreMenu={false}
-        setShowMoreMenu={() => {}}
-      />
+      {/* ✅ Botón hamburguesa (móvil/tablet) */}
+      {isMobile && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          style={{
+            position: "fixed",
+            left: 12,
+            top: 12,
+            zIndex: 1300,
+            background: "white",
+            borderRadius: 999,
+            border: "2px solid #E5E5E5",
+            padding: "8px 12px",
+            fontWeight: 900,
+            boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
+            cursor: "pointer",
+          }}
+          aria-label="Abrir menú"
+        >
+          ☰
+        </button>
+      )}
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* ✅ Sidebar Desktop (normal) */}
+      {!isMobile && (
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: sidebarWidth,
+            zIndex: 20,
+          }}
+        >
+          <Sidebar
+            sidebarNavItems={[
+              { id: "units", label: "Unidades", icon: "📚" },
+              { id: "lessons", label: "Lecciones", icon: "📖" },
+              { id: "questions", label: "Preguntas", icon: "❓" },
+              { id: "students", label: "Estudiantes", icon: "🎓" },
+              { id: "groups", label: "Grupos", icon: "👥" },
+              { id: "code", label: "Código", icon: "🔐" },
+              { id: "evaluations", label: "Evaluaciones", icon: "📝" },
+            ]}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            setSubTab={() => {}}
+            resetForm={() => {}}
+            currentTheme={{ border: "#e5e5e5", sidebarBg: "#ffffff" }}
+            theme="light"
+            handleMoreMenuClick={() => {}}
+            showMoreMenu={false}
+            setShowMoreMenu={() => {}}
+          />
+        </div>
+      )}
+
+      {/* ✅ Sidebar Mobile/Tablet (overlay) */}
+      {isMobile && isSidebarOpen && (
+        <>
+          {/* backdrop */}
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.35)",
+              zIndex: 1200,
+            }}
+          />
+
+          {/* panel */}
+          <div
+            style={{
+              position: "fixed",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: sidebarWidth,
+              zIndex: 1250,
+              background: "white",
+              boxShadow: "10px 0 30px rgba(0,0,0,0.15)",
+            }}
+          >
+            {/* botón cerrar dentro */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              style={{
+                position: "absolute",
+                right: 10,
+                top: 10,
+                zIndex: 1260,
+                border: "none",
+                background: "transparent",
+                fontSize: 18,
+                fontWeight: 900,
+                cursor: "pointer",
+                color: "#6b7280",
+              }}
+              aria-label="Cerrar menú"
+            >
+              ✕
+            </button>
+
+            <Sidebar
+              sidebarNavItems={[
+                { id: "units", label: "Unidades", icon: "📚" },
+                { id: "lessons", label: "Lecciones", icon: "📖" },
+                { id: "questions", label: "Preguntas", icon: "❓" },
+                { id: "students", label: "Estudiantes", icon: "🎓" },
+                { id: "groups", label: "Grupos", icon: "👥" },
+                { id: "code", label: "Código", icon: "🔐" },
+                { id: "evaluations", label: "Evaluaciones", icon: "📝" },
+              ]}
+              activeTab={activeTab}
+              setActiveTab={(tab: string) => {
+                setActiveTab(tab);
+                setIsSidebarOpen(false);
+              }}
+              setSubTab={() => {}}
+              resetForm={() => {}}
+              currentTheme={{ border: "#e5e5e5", sidebarBg: "#ffffff" }}
+              theme="light"
+              handleMoreMenuClick={() => {}}
+              showMoreMenu={false}
+              setShowMoreMenu={() => {}}
+            />
+          </div>
+        </>
+      )}
+
+      {/* ✅ MAIN */}
       <main
         style={{
-          flex: 1,
-          padding: "30px",
-          overflowY: "auto",
+          // en desktop deja espacio para sidebar fijo
+          marginLeft: isMobile ? 0 : sidebarWidth,
+          // en móvil dejamos espacio SOLO para el botón hamburguesa (no más)
+          paddingTop: isMobile ? 56 : 24,
+          paddingLeft: isMobile ? 12 : 32,
+          paddingRight: isMobile ? 12 : 32,
+          paddingBottom: 16,
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        {/* HEADER */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "25px",
-          }}
-        >
-          <h2 style={{ margin: 0, color: "#3c3c3c", fontWeight: 800 }}>
-            Panel de Control del Profesor
-          </h2>
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
+        <div style={{ width: "100%", maxWidth: 1200 }}>
+          {/* HEADER */}
+          <div
             style={{
-              background: "#ff4b4b",
-              color: "white",
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: "12px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              boxShadow: "0 4px 0 #d33131",
-              transition: "transform 0.1s",
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 12 : 0,
+              justifyContent: "space-between",
+              alignItems: isMobile ? "stretch" : "center",
+              marginBottom: 18,
             }}
-            onMouseDown={(e) =>
-              (e.currentTarget.style.transform = "translateY(2px)")
-            }
-            onMouseUp={(e) =>
-              (e.currentTarget.style.transform = "translateY(0px)")
-            }
           >
-            Cerrar sesión
-          </button>
-        </div>
+            <h2 style={{ margin: 0, color: "#3c3c3c", fontWeight: 800 }}>
+              Panel de Control del Profesor
+            </h2>
 
-        {/* CONTENEDOR DE SECCIONES */}
-        <div
-          style={{
-            background: "white",
-            borderRadius: "18px",
-            padding: "25px",
-            boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
-            minHeight: "calc(100vh - 150px)",
-          }}
-        >
-          {/* ❌ Ya no hay sección de cursos aquí */}
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              style={{
+                background: "#ff4b4b",
+                color: "white",
+                border: "none",
+                padding: "10px 18px",
+                borderRadius: "12px",
+                cursor: "pointer",
+                fontWeight: "bold",
+                boxShadow: "0 4px 0 #d33131",
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              Cerrar sesión
+            </button>
+          </div>
 
-          {activeTab === "units" && (
-            <UnitsSection
-              courses={courses}
-              units={units}
-              selectedCourseId={selectedCourseId}
-              onSelectCourse={loadUnits}
-              onRefresh={() => selectedCourseId && loadUnits(selectedCourseId)}
-            />
-          )}
+          {/* CONTENEDOR */}
+          <div
+            style={{
+              background: "white",
+              borderRadius: 18,
+              padding: isMobile ? 14 : 25,
+              boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
+              minHeight: isMobile ? "auto" : "calc(100vh - 170px)",
+            }}
+          >
+            {activeTab === "units" && (
+              <UnitsSection
+                courses={courses}
+                units={units}
+                selectedCourseId={selectedCourseId}
+                onSelectCourse={loadUnits}
+                onRefresh={() => selectedCourseId && loadUnits(selectedCourseId)}
+              />
+            )}
 
-          {activeTab === "lessons" && (
-            <LessonsSection
-              units={units}
-              lessons={lessons}
-              selectedUnitId={selectedUnitId}
-              onSelectUnit={loadLessons}
-              onRefresh={() => selectedUnitId && loadLessons(selectedUnitId)}
-            />
-          )}
+            {activeTab === "lessons" && (
+              <LessonsSection
+                units={units}
+                lessons={lessons}
+                selectedUnitId={selectedUnitId}
+                onSelectUnit={loadLessons}
+                onRefresh={() => selectedUnitId && loadLessons(selectedUnitId)}
+              />
+            )}
 
-          {/* SECCIÓN DE ESTUDIANTES */}
-          {activeTab === "students" && <StudentsSection />}
-
-          {activeTab === "questions" && <QuestionsSection />}
-
-          {/* GroupsSection */}
-          {activeTab === "groups" && <GroupsSection />}
-
-          {activeTab === "code" && <GenerateCodeSection />}
-
-          {activeTab === "evaluations" && <EvaluationsSection />}
+            {activeTab === "students" && <StudentsSection />}
+            {activeTab === "questions" && <QuestionsSection />}
+            {activeTab === "groups" && <GroupsSection />}
+            {activeTab === "code" && <GenerateCodeSection />}
+            {activeTab === "evaluations" && <EvaluationsSection />}
+          </div>
         </div>
       </main>
 
-      {/* MODAL DE CIERRE DE SESIÓN */}
+      {/* MODAL LOGOUT */}
       {showLogoutModal && (
         <div
           style={{
@@ -213,29 +329,31 @@ export default function TeacherDashboard() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
-            backdropFilter: "blur(4px)",
+            zIndex: 2000,
+            padding: 12,
           }}
         >
           <div
             style={{
               background: "white",
-              padding: "30px",
-              borderRadius: "20px",
+              padding: isMobile ? 18 : 30,
+              borderRadius: 20,
               textAlign: "center",
-              minWidth: "320px",
+              width: "100%",
+              maxWidth: 420,
               boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
             }}
           >
             <h3 style={{ marginTop: 0 }}>¿Cerrar sesión?</h3>
-            <p style={{ color: "#777", marginBottom: "25px" }}>
+            <p style={{ color: "#777", marginBottom: 18 }}>
               Tendrás que volver a ingresar tus credenciales para acceder.
             </p>
+
             <div
               style={{
                 display: "flex",
-                gap: "10px",
-                justifyContent: "center",
+                gap: 10,
+                flexDirection: isMobile ? "column" : "row",
               }}
             >
               <button
@@ -245,14 +363,15 @@ export default function TeacherDashboard() {
                   color: "white",
                   border: "none",
                   padding: "10px 20px",
-                  borderRadius: "12px",
+                  borderRadius: 12,
                   fontWeight: "bold",
                   cursor: "pointer",
-                  flex: 1,
+                  width: "100%",
                 }}
               >
                 Cerrar Sesión
               </button>
+
               <button
                 onClick={() => setShowLogoutModal(false)}
                 style={{
@@ -260,10 +379,10 @@ export default function TeacherDashboard() {
                   color: "#4b4b4b",
                   border: "none",
                   padding: "10px 20px",
-                  borderRadius: "12px",
+                  borderRadius: 12,
                   fontWeight: "bold",
                   cursor: "pointer",
-                  flex: 1,
+                  width: "100%",
                 }}
               >
                 Cancelar

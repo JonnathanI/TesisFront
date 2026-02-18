@@ -228,6 +228,7 @@ export const AnimatedAvatarRenderer: React.FC<AvatarRendererProps> = ({
       variants={breathingVariant}
       initial="initial"
       animate="animate"
+      style={{ maxWidth: "100%", height: "auto" }}
     >
       {/* CUERPO */}
       <g>
@@ -505,31 +506,163 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
   const skinTones = ["#FFDBAC", "#F1C27D", "#E0AC69", "#C68642", "#8D5524", "#5D4037"];
   const shirtColors = ["#9C6FD6", "#58CC02", "#1CB0F6", "#FF4B4B", "#FFC800", "#FFFFFF", "#333333"];
-  const eyeColors = [
-    "#000000",
-    "#634e34",
-    "#2e536f",
-    "#3d6e70",
-    "#7d5d8c",
-    "#9b111e",
-    "#ffc800",
-    "#999999",
-  ];
+  const eyeColors = ["#000000", "#634e34", "#2e536f", "#3d6e70", "#7d5d8c", "#9b111e", "#ffc800", "#999999"];
+
+  const styles = `
+    .ae-overlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      padding: 14px;
+    }
+
+    .ae-modal{
+      background: #1A202C;
+      border-radius: 24px;
+      width: 95%;
+      max-width: 900px;
+      height: min(90vh, 820px);
+      display: flex;
+      gap: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .ae-preview{
+      flex: 0 0 350px;
+      background: #EDF2F7;
+      border-radius: 18px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+      margin: 18px 0 18px 18px;
+      min-height: 260px;
+      min-width: 0;
+    }
+
+    .ae-controls{
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 18px 18px 18px 0;
+    }
+
+    .ae-title{
+      color: white;
+      margin: 0 0 14px 0;
+    }
+
+    .ae-tabs{
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid #4a5568;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .ae-tabbtn{
+      padding: 10px 12px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      color: #aaa;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .ae-tabbtn-active{
+      border-bottom: 3px solid #1cb0f6;
+      color: white;
+    }
+
+    .ae-scroll{
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 6px;
+      min-height: 0;
+    }
+
+    .ae-actions{
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding-top: 14px;
+      margin-top: 10px;
+      border-top: 1px solid #2d3748;
+      flex-wrap: wrap;
+    }
+
+    .ae-btn{
+      padding: 12px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 900;
+      border: none;
+    }
+
+    .ae-btn-cancel{
+      background: transparent;
+      border: 2px solid #a0aec0;
+      color: #a0aec0;
+    }
+
+    .ae-btn-save{
+      background: #58CC02;
+      color: white;
+      box-shadow: 0 4px 0 #46a302;
+    }
+
+    /* ✅ Mobile/Tablet: una columna (preview arriba) */
+    @media (max-width: 900px){
+      .ae-modal{
+        width: 100%;
+        height: 100dvh;
+        max-width: none;
+        border-radius: 0;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .ae-preview{
+        flex: 0 0 auto;
+        margin: 12px;
+        height: 240px;
+      }
+
+      .ae-controls{
+        padding: 0 12px 12px 12px;
+      }
+
+      .ae-actions{
+        justify-content: stretch;
+      }
+
+      .ae-btn{
+        flex: 1;
+      }
+    }
+
+    /* Extra small */
+    @media (max-width: 420px){
+      .ae-preview{ height: 210px; }
+      .ae-tabbtn{ padding: 10px 10px; font-size: 13px; }
+    }
+  `;
 
   const TabBtn = ({ id, label }: { id: AvatarTab; label: string }) => (
     <button
       onClick={() => setActiveTab(id)}
-      style={{
-        padding: "0.5rem 1rem",
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        borderBottom:
-          activeTab === id ? "3px solid #1cb0f6" : "3px solid transparent",
-        color: activeTab === id ? "white" : "#aaa",
-        fontWeight: "bold",
-        whiteSpace: "nowrap",
-      }}
+      className={`ae-tabbtn ${activeTab === id ? "ae-tabbtn-active" : ""}`}
     >
       {label}
     </button>
@@ -553,6 +686,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
         fontSize: "0.9rem",
         flexDirection: "column",
         gap: "0.5rem",
+        minWidth: 0,
       }}
     >
       {children}
@@ -564,8 +698,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
       style={{
-        width: "50px",
-        height: "50px",
+        width: 50,
+        height: 50,
         borderRadius: "50%",
         background: color,
         cursor: "pointer",
@@ -576,65 +710,26 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
   );
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.85)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 9999,
-      }}
-    >
+    <div className="ae-overlay">
+      <style>{styles}</style>
+
       <motion.div
+        className="ae-modal"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        style={{
-          background: "#1A202C",
-          padding: "2rem",
-          borderRadius: "1.5rem",
-          width: "95%",
-          maxWidth: "900px",
-          height: "90vh",
-          display: "flex",
-          gap: "2rem",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
-          overflow: "hidden",
-        }}
       >
         {/* PREVIEW */}
-        <div
-          style={{
-            flex: "0 0 350px",
-            background: "#EDF2F7",
-            borderRadius: "1rem",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            boxShadow: "inset 0 0 20px rgba(0,0,0,0.1)",
-          }}
-        >
+        <div className="ae-preview">
+          {/* En móvil se ajusta por CSS */}
           <AnimatedAvatarRenderer avatar={currentAvatar} />
         </div>
 
         {/* CONTROLES */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <h2 style={{ color: "white", margin: "0 0 1.5rem 0" }}>
-            Edita tu Avatar
-          </h2>
+        <div className="ae-controls">
+          <h2 className="ae-title">Edita tu Avatar</h2>
 
           {/* pestañas */}
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              borderBottom: "1px solid #4a5568",
-              marginBottom: "1.5rem",
-              overflowX: "auto",
-              paddingBottom: "5px",
-            }}
-          >
+          <div className="ae-tabs">
             <TabBtn id="skin" label="Piel" />
             <TabBtn id="eyes" label="Ojos" />
             <TabBtn id="mouth" label="Boca" />
@@ -643,22 +738,10 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             <TabBtn id="extra" label="Extras" />
           </div>
 
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              paddingRight: "0.5rem",
-            }}
-          >
+          <div className="ae-scroll">
             {/* OJOS */}
             {activeTab === "eyes" && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.5rem",
-                }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
                   <h4
                     style={{
@@ -670,13 +753,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                   >
                     Color de ojos
                   </h4>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0.8rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
+
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                     {eyeColors.map((c) => (
                       <ColorCircle
                         key={c}
@@ -687,6 +765,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     ))}
                   </div>
                 </div>
+
                 <div>
                   <h4
                     style={{
@@ -698,12 +777,12 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                   >
                     Expresión
                   </h4>
+
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(90px, 1fr))",
-                      gap: "1rem",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+                      gap: 12,
                     }}
                   >
                     {(
@@ -759,9 +838,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                 <h4 style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}>
                   Tono de piel
                 </h4>
-                <div
-                  style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}
-                >
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {skinTones.map((c) => (
                     <ColorCircle
                       key={c}
@@ -780,9 +857,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                 <h4 style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}>
                   Color de ropa
                 </h4>
-                <div
-                  style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}
-                >
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {shirtColors.map((c) => (
                     <ColorCircle
                       key={c}
@@ -800,8 +875,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "1rem",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                  gap: 12,
                 }}
               >
                 <OptionBox
@@ -813,6 +888,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Sonrisa
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("mouth", "frown")}
                   isSelected={currentAvatar.mouth === "frown"}
@@ -822,6 +898,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Triste
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("mouth", "open")}
                   isSelected={currentAvatar.mouth === "open"}
@@ -831,6 +908,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Sorpresa
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("mouth", "smirk")}
                   isSelected={currentAvatar.mouth === "smirk"}
@@ -848,8 +926,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "1rem",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 12,
                 }}
               >
                 <OptionBox
@@ -861,6 +939,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Normal
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("bodyType", "slim")}
                   isSelected={currentAvatar.bodyType === "slim"}
@@ -870,6 +949,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Delgado
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("bodyType", "broad")}
                   isSelected={currentAvatar.bodyType === "broad"}
@@ -887,8 +967,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "1rem",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 12,
                 }}
               >
                 <OptionBox
@@ -900,6 +980,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Ninguno
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("accessory", "hat")}
                   isSelected={currentAvatar.accessory === "hat"}
@@ -909,6 +990,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Sombrero
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("accessory", "glasses")}
                   isSelected={currentAvatar.accessory === "glasses"}
@@ -918,6 +1000,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Lentes
                   </span>
                 </OptionBox>
+
                 <OptionBox
                   onClick={() => updateAttr("accessory", "bowtie")}
                   isSelected={currentAvatar.accessory === "bowtie"}
@@ -931,43 +1014,11 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             )}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "1rem",
-              marginTop: "2rem",
-              paddingTop: "1rem",
-              borderTop: "1px solid #2d3748",
-            }}
-          >
-            <button
-              onClick={onCancel}
-              style={{
-                background: "transparent",
-                border: "2px solid #a0aec0",
-                color: "#a0aec0",
-                padding: "0.8rem 1.5rem",
-                borderRadius: "0.8rem",
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
-            >
+          <div className="ae-actions">
+            <button className="ae-btn ae-btn-cancel" onClick={onCancel}>
               Cancelar
             </button>
-            <button
-              onClick={() => onSave(currentAvatar)}
-              style={{
-                background: "#58CC02",
-                border: "none",
-                color: "white",
-                padding: "0.8rem 1.5rem",
-                borderRadius: "0.8rem",
-                cursor: "pointer",
-                fontWeight: "bold",
-                boxShadow: "0 4px 0 #46a302",
-              }}
-            >
+            <button className="ae-btn ae-btn-save" onClick={() => onSave(currentAvatar)}>
               Guardar Cambios
             </button>
           </div>

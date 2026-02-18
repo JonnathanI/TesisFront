@@ -43,7 +43,15 @@ import {
 } from "./auth.types";
 
 // --- CONFIGURACIÓN BASE ---
-const BASE_URL = 'http://localhost:8081/api';
+// --- CONFIGURACIÓN BASE (CRA) ---
+const API_ORIGIN =
+  (window as any).__API_URL__ ||
+  (process.env.REACT_APP_API_URL as string) ||
+  "https://tesisbackend-1.onrender.com";
+
+const BASE_URL = `${API_ORIGIN.replace(/\/$/, "")}/api`;
+
+
 // Cambia esto por tu IP real
 //const BASE_URL = "http://192.168.20.207:8081/api";
 //const BASE_URL = 'https://rex-unantagonised-tommy.ngrok-free.dev/api';

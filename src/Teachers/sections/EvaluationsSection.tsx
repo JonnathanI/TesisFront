@@ -351,7 +351,7 @@ export function EvaluationsSection() {
                     </div>
 
                     <div style={fieldGroup}>
-                      <label style={labelTiny}>Puntos / dificultad</label>
+                      <label style={labelTiny}>Puntos XP</label>
                       <input
                         type="number"
                         step="0.5"

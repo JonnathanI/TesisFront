@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { getLessonQuestions } from "../../api/auth.service";
-import { QuestionDTO, UserProfileData, UnitWithLessons } from "../../api/auth.types";
+import {
+  QuestionDTO,
+  UserProfileData,
+  UnitWithLessons,
+} from "../../api/auth.types";
 import { QuizModal } from "../../Components/QuizModal";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -30,7 +34,9 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
 }) => {
   console.log("🔍 Units recibidas en LearnSection:", units);
 
-  const [selectedUnit, setSelectedUnit] = useState<UnitWithLessons | null>(null);
+  const [selectedUnit, setSelectedUnit] = useState<UnitWithLessons | null>(
+    null
+  );
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -135,10 +141,12 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   if (!units || units.length === 0) {
     return (
       <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
-        <h2 style={{ fontWeight: 900, marginBottom: 12 }}>No tienes unidades asignadas</h2>
+        <h2 style={{ fontWeight: 900, marginBottom: 12 }}>
+          No tienes unidades asignadas
+        </h2>
         <p style={{ color: "#777", fontWeight: 500 }}>
-          Pídele a tu profesor que te asigne un curso o revisa si ya te uniste a una clase
-          con el código de aula.
+          Pídele a tu profesor que te asigne un curso o revisa si ya te uniste
+          a una clase con el código de aula.
         </p>
       </div>
     );
@@ -148,47 +156,65 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         LISTA DE UNIDADES
      =========================== */
   if (!selectedUnit) {
+    // 👉 Primero ordenamos las unidades UNA sola vez
+    const sortedUnits = [...units].sort(
+      (a, b) => a.unitOrder - b.unitOrder
+    );
+
     return (
       <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
-        {[...units]
-          .sort((a, b) => a.unitOrder - b.unitOrder)
-          .map((unit) => {
-            // 🔁 AHORA usamos el isLocked que viene del backend
-            const isLocked = unit.isLocked;
-            const completed = unit.lessons.filter((l) => l.isCompleted).length;
-            const progress = Math.round(
-              (completed / unit.lessons.length) * 100
-            );
+        {sortedUnits.map((unit, index) => {
+          // progreso de ESTA unidad
+          const completed = unit.lessons.filter((l) => l.isCompleted).length;
+          const progress = Math.round(
+            (completed / unit.lessons.length) * 100
+          );
 
-            return (
-              <motion.div
-                key={unit.id}
-                whileHover={!isLocked ? { scale: 1.02 } : {}}
-                onClick={() => !isLocked && setSelectedUnit(unit)}
-                style={{
-                  background: isLocked ? "#F5F5F5" : "white",
-                  padding: 25,
-                  borderRadius: 24,
-                  border: "2px solid #E5E5E5",
-                  borderBottomWidth: 6,
-                  marginBottom: 24,
-                  cursor: isLocked ? "not-allowed" : "pointer",
-                }}
+          // unidad anterior (si existe)
+          const previousUnit = index > 0 ? sortedUnits[index - 1] : null;
+          const previousFullyCompleted = previousUnit
+            ? previousUnit.lessons.every((l) => l.isCompleted)
+            : true; // la primera unidad no depende de ninguna
+
+          // si backend ya la marca bloqueada, respetamos eso
+          const backendLocked = unit.isLocked;
+
+          // 💡 REGLA: bloqueada si backend lo dice O si la unidad anterior no está completa
+          const isLocked =
+            backendLocked || (index > 0 && !previousFullyCompleted);
+
+          return (
+            <motion.div
+              key={unit.id}
+              whileHover={!isLocked ? { scale: 1.02 } : {}}
+              onClick={() => !isLocked && setSelectedUnit(unit)}
+              style={{
+                background: isLocked ? "#F5F5F5" : "white",
+                padding: 25,
+                borderRadius: 24,
+                border: "2px solid #E5E5E5",
+                borderBottomWidth: 6,
+                marginBottom: 24,
+                cursor: isLocked ? "not-allowed" : "pointer",
+                opacity: isLocked ? 0.7 : 1,
+              }}
+            >
+              <div
+                style={{ display: "flex", justifyContent: "space-between" }}
               >
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <h3>
-                    {isLocked ? "🔒 " : ""}
-                    {unit.title}
-                  </h3>
-                  {!isLocked && (
-                    <strong style={{ color: getBarColor(progress) }}>
-                      {progress}%
-                    </strong>
-                  )}
-                </div>
+                <h3>
+                  {isLocked ? "🔒 " : ""}
+                  {unit.title}
+                </h3>
 
+                {!isLocked && (
+                  <strong style={{ color: getBarColor(progress) }}>
+                    {progress}%
+                  </strong>
+                )}
+              </div>
+
+              {!isLocked && (
                 <div
                   style={{
                     height: 18,
@@ -206,9 +232,10 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
                     }}
                   />
                 </div>
-              </motion.div>
-            );
-          })}
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     );
   }
@@ -238,7 +265,10 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
             : "#1CB0F6";
 
           return (
-            <div key={lesson.id} style={{ transform: `translateX(${offset}px)` }}>
+            <div
+              key={lesson.id}
+              style={{ transform: `translateX(${offset}px)` }}
+            >
               <button
                 disabled={isLocked}
                 onClick={() => handleOpenLesson(lesson.id)}
@@ -272,6 +302,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
           userProfile={userProfile}
           heartTimer={heartTimer}
           onClose={handleCloseQuiz}
+          backgroundImageUrl="/fondo.jpeg"
         />
       )}
 
