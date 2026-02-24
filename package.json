@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@react-spring/web": "^10.0.3",
+    "@stomp/stompjs": "^7.3.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -12,6 +13,7 @@
     "@types/node": "^16.18.126",
     "axios": "^1.13.2",
     "canvas-confetti": "^1.9.4",
+    "firebase": "^12.9.0",
     "framer-motion": "^12.23.24",
     "gsap": "^3.13.0",
     "lucide-react": "^0.562.0",
@@ -21,6 +23,7 @@
     "react-router-dom": "^7.9.4",
     "react-scripts": "5.0.1",
     "react-transition-group": "^4.4.5",
+    "sockjs-client": "^1.6.1",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
@@ -54,6 +57,7 @@
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@types/react-icons": "^2.2.7",
+    "@types/sockjs-client": "^1.5.4",
     "@types/xlsx": "^0.0.36",
     "autoprefixer": "^10.4.23",
     "postcss": "^8.5.6",

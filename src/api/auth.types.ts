@@ -359,3 +359,14 @@ export interface BadgeDTO {
   description: string;
   earnedAt: number;
 }
+
+// --- NOTIFICACIONES ---
+export interface NotificationDto {
+  id: string;
+  type: string;          // por ejemplo: TASK, EVALUATION, FRIEND_REQUEST, MESSAGE
+  title: string;
+  message: string;
+  createdAt: string;     // ISO date
+  read: boolean;
+  relatedId?: string | null;
+}

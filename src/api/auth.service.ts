@@ -39,17 +39,37 @@ import {
   BulkRegisterRequest,
   CreateCoursePayload,
   ChatMessage,
-  UnitStatusDTO
+  UnitStatusDTO,
+  NotificationDto
 } from "./auth.types";
 
 // --- CONFIGURACIÓN BASE ---
 // --- CONFIGURACIÓN BASE (CRA) ---
+
+const getApiOrigin = () => {
+  // 1. Si existe una variable global definida externamente
+  if ((window as any).__API_URL__) return (window as any).__API_URL__;
+
+  // 2. Si estamos en localhost (desarrollo), usar el puerto 8081
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:8081";
+  }
+
+  // 3. Por defecto, usar producción (Render) o variable de entorno de React
+  return (process.env.REACT_APP_API_URL as string) || "https://tesisbackend-1.onrender.com";
+};
+
+const API_ORIGIN = getApiOrigin();
+const BASE_URL = `${API_ORIGIN.replace(/\/$/, "")}/api`;
+
+console.log("🚀 Conectado a la API en:", BASE_URL);
+/*
 const API_ORIGIN =
   (window as any).__API_URL__ ||
   (process.env.REACT_APP_API_URL as string) ||
   "https://tesisbackend-1.onrender.com";
 
-const BASE_URL = `${API_ORIGIN.replace(/\/$/, "")}/api`;
+const BASE_URL = `${API_ORIGIN.replace(/\/$/, "")}/api`;*/
 
 
 // Cambia esto por tu IP real
@@ -1103,3 +1123,51 @@ export const getAllBadges = async () => {
   return r.json();
 };
 
+// Obtener todas las notificaciones del usuario logueado
+export const getNotifications = async (): Promise<NotificationDto[]> => {
+  const res = await apiFetch("/notifications", { method: "GET" });
+
+  if (!res.ok) {
+    console.error("Error al cargar notificaciones:", res.status);
+    return [];
+  }
+
+  return res.json();
+};
+
+// Obtener número de notificaciones sin leer
+export const getUnreadNotificationsCount = async (): Promise<number> => {
+  const res = await apiFetch("/notifications/unread-count", { method: "GET" });
+
+  if (!res.ok) {
+    console.error("Error al cargar conteo de notificaciones:", res.status);
+    return 0;
+  }
+
+  // el backend devuelve un número
+  const data = await res.json();
+  return typeof data === "number" ? data : 0;
+};
+
+// Marcar como leída una notificación
+export const markNotificationAsRead = async (id: string): Promise<void> => {
+  const res = await apiFetch(`/notifications/${id}/read`, {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.error("Error al marcar notificación como leída:", res.status, txt);
+    throw new Error("No se pudo marcar la notificación como leída");
+  }
+};
+
+export async function registerFcmToken(token: string) {
+  return apiFetch("/notifications/register-token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token }), // 👈 nombre del campo correcto
+  });
+}

@@ -17,6 +17,11 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { EvaluationsSection } from "./sections/EvaluationsSection";
 
+// ⬇️ NUEVO IMPORT
+import { NotificationsBell } from "./components/NotificationsBell";
+import { requestNotificationPermissionAndToken } from "../firebase";
+import { registerFcmToken } from "../api/auth.service";
+
 import {
   getUserProfile,
   getCourses,
@@ -153,6 +158,25 @@ const StudentDashboard = () => {
     loadData();
   }, [loadData]);
 
+    // 🔥 Registrar token FCM en el backend (solo una vez al entrar)
+  useEffect(() => {
+    const setupFcm = async () => {
+      try {
+        const token = await requestNotificationPermissionAndToken();
+        if (!token) {
+          console.log("Usuario no aceptó notificaciones o no hay token");
+          return;
+        }
+        await registerFcmToken(token);
+        console.log("✅ FCM token registrado en backend:", token);
+      } catch (e) {
+        console.error("Error registrando FCM token:", e);
+      }
+    };
+
+    setupFcm();
+  }, []);
+
   // 🔥 Carga el detalle real (alumnos/compañeros) al hacer clic
   const handleViewClass = async (id: string | null) => {
     setViewingGroupId(id);
@@ -238,6 +262,10 @@ const StudentDashboard = () => {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <StatsBar profile={userProfile} />
+
+        {/* 🔔 CAMPANA DE NOTIFICACIONES */}
+        <NotificationsBell />
+
         <UserSearch />
         <FriendRequests />
 
@@ -744,7 +772,10 @@ const StudentDashboard = () => {
             )}
 
             {section === "shop" && userProfile && (
-              <ShopSection userProfile={userProfile} handlePurchase={handlePurchase} />
+              <ShopSection
+                userProfile={userProfile}
+                handlePurchase={handlePurchase}
+              />
             )}
 
             {section === "profile" && <ProfileSection />}

@@ -1,3 +1,4 @@
+// src/index.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
@@ -15,8 +16,7 @@ root.render(
   </React.StrictMode>
 );
 
-// 🔥 REGISTRO DEL SERVICE WORKER
+// ⬇️ Esto está OK: no usamos el SW de CRA para FCM
 serviceWorkerRegistration.unregister();
-
 
 reportWebVitals();
