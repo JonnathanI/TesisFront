@@ -8,8 +8,6 @@ import {
 } from "../../api/auth.service";
 import { NotificationDto } from "../../api/auth.types";
 
-// URL del WebSocket (asegúrate que coincida con tu backend)
-// Si quieres, puedes usar process.env.REACT_APP_WS_URL
 const WS_URL =
   process.env.REACT_APP_WS_URL ||
   (process.env.NODE_ENV === "production"
@@ -23,39 +21,49 @@ export const NotificationsBell: React.FC = () => {
   const stompRef = useRef<Client | null>(null);
   const bellRef = useRef<HTMLDivElement | null>(null);
 
-  // 🔹 Cargar inicial (REST)
+  // 🔹 1) Función reutilizable para recargar desde el backend
+  const reloadFromServer = async () => {
+    try {
+      const [list, unread] = await Promise.all([
+        getNotifications(),
+        getUnreadNotificationsCount(),
+      ]);
+      setNotifications(list);
+      setUnreadCount(unread);
+    } catch (err) {
+      console.error("Error recargando notificaciones", err);
+    }
+  };
+
+  // 🔹 Carga inicial
   useEffect(() => {
-    const loadInitial = async () => {
-      try {
-        const [list, unread] = await Promise.all([
-          getNotifications(),
-          getUnreadNotificationsCount(),
-        ]);
-        setNotifications(list);
-        setUnreadCount(unread);
-      } catch (err) {
-        console.error("Error cargando notificaciones iniciales", err);
-      }
-    };
-    loadInitial();
+    reloadFromServer();
   }, []);
 
-  // 🔹 WebSocket: suscripción a /user/queue/notifications
+  // 🔹 2) WebSocket: se actualiza en tiempo real cuando llega una nueva
   useEffect(() => {
     const client = new Client({
       webSocketFactory: () => new SockJS(WS_URL),
       reconnectDelay: 5000,
       onConnect: () => {
         console.log("✅ Notificaciones WS conectado");
+
         client.subscribe("/user/queue/notifications", (msg) => {
           try {
             const notif: NotificationDto = JSON.parse(msg.body);
+
+            // Añadimos la nueva notificación arriba:
             setNotifications((prev) => [notif, ...prev]);
+
+            // Incrementamos el contador local:
             setUnreadCount((prev) => prev + 1);
           } catch (e) {
             console.error("Error parseando notificación WS", e);
           }
         });
+
+        // Opcional PRO: al reconectar, sincroniza todo por si algo se perdió
+        reloadFromServer();
       },
       onStompError: (frame) => {
         console.error("STOMP error:", frame);
@@ -70,7 +78,19 @@ export const NotificationsBell: React.FC = () => {
     };
   }, []);
 
-  // 🔹 Cerrar dropdown si clicas fuera
+  // 🔹 3) Cuando el usuario vuelve a la pestaña, sincroniza (por si FCM llegó mientras tanto)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reloadFromServer();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  // 🔹 Cerrar dropdown si haces clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
