@@ -11,7 +11,10 @@ import { NotificationDto } from "../../api/auth.types";
 // URL del WebSocket (asegúrate que coincida con tu backend)
 // Si quieres, puedes usar process.env.REACT_APP_WS_URL
 const WS_URL =
-  (process.env.REACT_APP_WS_URL as string) || "http://localhost:8081/ws";
+  process.env.REACT_APP_WS_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://tesisbackend-1.onrender.com/ws"
+    : "http://localhost:8081/ws");
 
 export const NotificationsBell: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
