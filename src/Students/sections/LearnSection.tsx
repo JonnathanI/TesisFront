@@ -18,6 +18,7 @@ interface LearnSectionProps {
 }
 
 interface UnitLessonSummary {
+  lessonId: string;
   title: string;
   correct: number;
   total: number;
@@ -74,67 +75,115 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
   /* ===========================
         CIERRE DEL QUIZ
      =========================== */
-  const handleCloseQuiz = async (
-    completed: boolean,
-    score: number,
-    total: number
-  ) => {
-    setIsQuizOpen(false);
+const handleCloseQuiz = async (
+  completed: boolean,
+  score: number,
+  total: number
+) => {
+  setIsQuizOpen(false);
 
-    if (!completed || !selectedUnit || !selectedLessonId) {
-      setSelectedLessonId(null);
-      await onRefreshData(true);
-      return;
-    }
+  if (!completed || !selectedUnit || !selectedLessonId) {
+    setSelectedLessonId(null);
+    await onRefreshData(true);
+    return;
+  }
 
-    const updatedLessons = selectedUnit.lessons.map((lesson) =>
-      lesson.id === selectedLessonId
-        ? { ...lesson, isCompleted: true }
-        : lesson
+  // 1) Marcamos la lección actual como completada en la unidad
+  const updatedLessons = selectedUnit.lessons.map((lesson) =>
+    lesson.id === selectedLessonId
+      ? { ...lesson, isCompleted: true }
+      : lesson
+  );
+
+  // 2) ¿Todas las lecciones de la unidad están completas ahora?
+  const isUnitDoneNow = updatedLessons.every((l) => l.isCompleted);
+
+  // 3) ¿Es la última lección del camino?
+  const currentIndex = updatedLessons.findIndex(
+    (l) => l.id === selectedLessonId
+  );
+  const isLastLesson = currentIndex === updatedLessons.length - 1;
+
+  const shouldShowUnitSummary = isUnitDoneNow && isLastLesson;
+
+  // ⚡ Guardamos/actualizamos los datos de ESTA lección en unitSummary
+  const lessonTitle =
+    selectedUnit.lessons.find((l) => l.id === selectedLessonId)?.title || "";
+
+  const mergedSummary: UnitLessonSummary[] = (() => {
+    const withoutCurrent = unitSummary.filter(
+      (s) => s.lessonId !== selectedLessonId
     );
-
-    const isUnitDoneNow = updatedLessons.every((l) => l.isCompleted);
-    const shouldShowUnitSummary = isUnitDoneNow;
-
-    setUnitSummary((prev) => [
-      ...prev,
+    return [
+      ...withoutCurrent,
       {
-        title:
-          selectedUnit.lessons.find((l) => l.id === selectedLessonId)?.title ||
-          "",
+        lessonId: selectedLessonId,
+        title: lessonTitle,
         correct: score,
         total,
         xp: score * 10,
         gems: 10,
       },
-    ]);
+    ];
+  })();
 
-    setSummaryData({ score, total });
-    setShowSummary(true);
+  // 🔹 Siempre mostramos resumen de ESTA lección
+  setSummaryData({ score, total });
+  setShowSummary(true);
 
-    if (shouldShowUnitSummary) {
-      confetti({
-        particleCount: 180,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ["#58CC02", "#1CB0F6", "#FFC800"],
-      });
+  if (shouldShowUnitSummary) {
+    // 🧩 Construimos el resumen final de UNIDAD usando
+    // los datos que ya teníamos + esta última lección.
+    const fullUnitSummary: UnitLessonSummary[] = updatedLessons.map(
+      (lesson) => {
+        const existing = mergedSummary.find(
+          (s) => s.lessonId === lesson.id
+        );
 
-      setTimeout(() => {
-        setShowSummary(false);
-        setShowUnitVideo(true);
-      }, 2200);
-    } else {
-      setTimeout(() => {
-        setShowSummary(false);
-      }, 1800);
-    }
+        if (existing) {
+          return existing; // mantiene sus aciertos/errores previos
+        }
 
-    setSelectedUnit({ ...selectedUnit, lessons: updatedLessons });
-    setSelectedLessonId(null);
-    await onRefreshData(true);
-  };
+        // Lección completada pero sin datos detallados (por si acaso)
+        return {
+          lessonId: lesson.id,
+          title: lesson.title,
+          correct: 0,
+          total: 0,
+          xp: lesson.isCompleted ? 10 : 0,
+          gems: lesson.isCompleted ? 10 : 0,
+        };
+      }
+    );
 
+    setUnitSummary(fullUnitSummary);
+
+    // 🎉 confetti y flujo: resumen lección → video → resumen unidad
+    confetti({
+      particleCount: 180,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ["#58CC02", "#1CB0F6", "#FFC800"],
+    });
+
+    setTimeout(() => {
+      setShowSummary(false);
+      setShowUnitVideo(true);
+    }, 2200);
+  } else {
+    // Si NO se terminó la unidad, solo actualizamos el resumen parcial
+    setUnitSummary(mergedSummary);
+
+    setTimeout(() => {
+      setShowSummary(false);
+    }, 1800);
+  }
+
+  setSelectedUnit({ ...selectedUnit, lessons: updatedLessons });
+  setSelectedLessonId(null);
+
+  await onRefreshData(true);
+};
   /* ===========================
         SIN UNIDADES
      =========================== */
@@ -156,30 +205,23 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         LISTA DE UNIDADES
      =========================== */
   if (!selectedUnit) {
-    // 👉 Primero ordenamos las unidades UNA sola vez
-    const sortedUnits = [...units].sort(
-      (a, b) => a.unitOrder - b.unitOrder
-    );
+    // 👉 Ordenamos las unidades por unitOrder
+    const sortedUnits = [...units].sort((a, b) => a.unitOrder - b.unitOrder);
 
     return (
       <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
         {sortedUnits.map((unit, index) => {
-          // progreso de ESTA unidad
           const completed = unit.lessons.filter((l) => l.isCompleted).length;
           const progress = Math.round(
             (completed / unit.lessons.length) * 100
           );
 
-          // unidad anterior (si existe)
           const previousUnit = index > 0 ? sortedUnits[index - 1] : null;
           const previousFullyCompleted = previousUnit
             ? previousUnit.lessons.every((l) => l.isCompleted)
             : true; // la primera unidad no depende de ninguna
 
-          // si backend ya la marca bloqueada, respetamos eso
           const backendLocked = unit.isLocked;
-
-          // 💡 REGLA: bloqueada si backend lo dice O si la unidad anterior no está completa
           const isLocked =
             backendLocked || (index > 0 && !previousFullyCompleted);
 
@@ -244,10 +286,39 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
         CAMINO DE LECCIONES
      =========================== */
   return (
-    <div>
+    <div style={{ maxWidth: 650, margin: "0 auto", padding: 20 }}>
+      {/* HEADER UNIDAD: botón volver + título (FIJOS) */}
+      <div style={unitHeaderStyle as React.CSSProperties}>
+        <button
+          style={backButtonStyle as React.CSSProperties}
+          onClick={() => {
+            setShowUnitVideo(false);
+            setShowSummary(false);
+            setShowUnitSummary(false);
+            //setUnitSummary([]);
+            setSelectedLessonId(null);
+            setSelectedUnit(null);
+          }}
+        >
+          ← Volver a unidades
+        </button>
+
+        <h2
+          style={{
+            marginTop: 10,
+            marginBottom: 0,
+            fontWeight: 900,
+            fontSize: "1.4rem",
+          }}
+        >
+          {selectedUnit.title}
+        </h2>
+      </div>
+
+      {/* CAMINO “SNAKE” DE LECCIONES */}
       <div
         style={{
-          padding: "60px 0",
+          padding: "50px 0 60px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -409,7 +480,7 @@ export const LearnSection: React.FC<LearnSectionProps> = ({
                 onClick={() => {
                   setShowUnitSummary(false);
                   setSelectedUnit(null);
-                  setUnitSummary([]);
+                  //setUnitSummary([]);
                 }}
               >
                 CONTINUAR
@@ -483,4 +554,28 @@ const continueBtnStyle: React.CSSProperties = {
   border: "none",
   cursor: "pointer",
   fontSize: "1rem",
+};
+
+/* 🔥 AQUÍ ES DONDE LO HACEMOS FIJO */
+const unitHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 6,
+  marginBottom: 10,
+  position: "sticky",
+  top: 0,
+  background: "white",
+  zIndex: 10,
+  paddingTop: 8,
+  paddingBottom: 8,
+};
+
+const backButtonStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid #E5E5E5",
+  background: "white",
+  fontSize: "0.9rem",
+  cursor: "pointer",
 };
