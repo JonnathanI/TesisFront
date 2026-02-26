@@ -1,7 +1,13 @@
+// src/Pages/Login.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { login, forgotPassword } from "../api/auth.service";
+import {
+  login,
+  forgotPassword,
+  getToken,
+  getUserRole,
+} from "../api/auth.service";
 import { AuthResponse } from "../api/auth.types";
 
 const COLOR_PRIMARY_BLUE = "#278DCE";
@@ -24,6 +30,23 @@ export const Login: React.FC = () => {
   const [recoverMessage, setRecoverMessage] = useState<string | null>(null);
 
   const navigate = useNavigate();
+
+  // ✅ Si ya hay sesión guardada, mandar directo al dashboard
+  useEffect(() => {
+    const token = getToken();
+    const role = getUserRole();
+
+    if (token && role) {
+      const path =
+        role === "ADMIN"
+          ? "/admin/dashboard"
+          : role === "TEACHER"
+          ? "/teacher/dashboard"
+          : "/student/dashboard";
+
+      navigate(path, { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const id = "poppins-font";
@@ -54,6 +77,8 @@ export const Login: React.FC = () => {
       const data: AuthResponse = await login({ username: email, password });
       setSuccess("¡Inicio de sesión exitoso! Redirigiendo...");
 
+      // El login ya guarda token + rol en localStorage.
+      // Aquí solo hacemos la navegación.
       setTimeout(() => {
         if (data.role === "ADMIN") navigate("/admin/dashboard");
         else if (data.role === "TEACHER") navigate("/teacher/dashboard");
@@ -263,56 +288,52 @@ export const Login: React.FC = () => {
     }
 
     /* ✅ Mobile */
- @media (max-width: 480px){
+    @media (max-width: 480px){
+      .login-page{
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
 
-  .login-page{
-    padding: 0;
-    display: flex;
-    justify-content: center;   /* ✅ centra horizontal */
-    align-items: center;       /* ✅ centra vertical */
-  }
+      .login-logo{
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 26px;
+        text-align: center;
+      }
 
-  .login-logo{
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 26px;
-    text-align: center;
-  }
+      .login-card{
+        width: 100%;
+        max-width: 420px;
+        border-radius: 0;
+        padding: 28px 22px;
+        box-shadow: none;
+      }
 
-  .login-card{
-    width: 100%;
-    max-width: 420px;          /* ✅ evita que se pegue a los bordes */
-    border-radius: 0;
-    padding: 28px 22px;
-    box-shadow: none;
-  }
+      .login-title{
+        font-size: 1.9rem;
+      }
 
-  .login-title{
-    font-size: 1.9rem;
-  }
+      .login-subtitle{
+        font-size: 0.95rem;
+        margin-bottom: 22px;
+      }
 
-  .login-subtitle{
-    font-size: 0.95rem;
-    margin-bottom: 22px;
-  }
+      .login-input{
+        padding: 14px;
+        font-size: 0.95rem;
+        margin-bottom: 14px;
+      }
 
-  .login-input{
-    padding: 14px;
-    font-size: 0.95rem;
-    margin-bottom: 14px;
-  }
-
-  .login-btn,
-  .recover-btn{
-    padding: 14px;
-    font-size: 1rem;
-  }
-
-}
-
-
+      .login-btn,
+      .recover-btn{
+        padding: 14px;
+        font-size: 1rem;
+      }
+    }
   `;
 
   return (
@@ -323,12 +344,17 @@ export const Login: React.FC = () => {
         Europeek
       </div>
 
-      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+      >
         <div className="login-card">
           {!showRecover ? (
             <>
               <h1 className="login-title">¡Bienvenido!</h1>
-              <p className="login-subtitle">Aprende inglés de forma divertida</p>
+              <p className="login-subtitle">
+                Aprende inglés de forma divertida
+              </p>
 
               <input
                 className="login-input"
@@ -348,20 +374,32 @@ export const Login: React.FC = () => {
               />
 
               <div className="login-message login-error">{error}</div>
-              {success && <div className="login-message login-success">{success}</div>}
+              {success && (
+                <div className="login-message login-success">{success}</div>
+              )}
 
-              <button className="login-btn" onClick={handleLogin} disabled={isLoading}>
+              <button
+                className="login-btn"
+                onClick={handleLogin}
+                disabled={isLoading}
+              >
                 {isLoading ? "Cargando..." : "Iniciar sesión"}
               </button>
 
               <div className="login-row">
                 ¿No tienes cuenta?{" "}
-                <span className="login-link" onClick={() => navigate("/register")}>
+                <span
+                  className="login-link"
+                  onClick={() => navigate("/register")}
+                >
                   Regístrate
                 </span>
               </div>
 
-              <div className="login-recover" onClick={() => setShowRecover(true)}>
+              <div
+                className="login-recover"
+                onClick={() => setShowRecover(true)}
+              >
                 ¿Olvidaste tu contraseña?
               </div>
             </>
@@ -381,9 +419,15 @@ export const Login: React.FC = () => {
                 onKeyDown={(e) => e.key === "Enter" && handleRecoverPassword()}
               />
 
-              <div className="login-message login-success">{recoverMessage}</div>
+              <div className="login-message login-success">
+                {recoverMessage}
+              </div>
 
-              <button className="recover-btn" onClick={handleRecoverPassword} disabled={isLoading}>
+              <button
+                className="recover-btn"
+                onClick={handleRecoverPassword}
+                disabled={isLoading}
+              >
                 {isLoading ? "Enviando..." : "Enviar enlace"}
               </button>
 

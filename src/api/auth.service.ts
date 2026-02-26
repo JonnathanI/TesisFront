@@ -87,6 +87,30 @@ const BASE_URL = `${API_ORIGIN.replace(/\/$/, "")}/api`;*/
 // ==========================================
 const TOKEN_KEY = 'jwt-token';
 const ROLE_KEY = 'user-role'; 
+const AUTH_KEY = "auth-data";
+
+export const saveAuthData = (data: AuthResponse) => {
+  saveToken(data.token);
+  localStorage.setItem(ROLE_KEY, data.role);
+  localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+};
+
+export const getAuthData = (): AuthResponse | null => {
+  const raw = localStorage.getItem(AUTH_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthResponse;
+  } catch {
+    return null;
+  }
+};
+
+export const logout = () => {
+  removeToken();
+  localStorage.removeItem(AUTH_KEY);
+  // si quieres volver siempre al login:
+  window.location.href = "/login";
+};
 
 export const saveToken = (token: string): void => {
     localStorage.setItem(TOKEN_KEY, token);
@@ -136,21 +160,22 @@ export const apiFetch = async (
 // ==========================================
 
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const response = await apiFetch('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: credentials.username, password: credentials.password }),
-    }, false);
-    
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Credenciales inválidas");
-    }
+  const response = await apiFetch('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: credentials.username, password: credentials.password }),
+  }, false);
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Credenciales inválidas");
+  }
 
-    const data: AuthResponse = await response.json();
-    saveToken(data.token);
-    localStorage.setItem(ROLE_KEY, data.role); 
-    
-    return data;
+  const data: AuthResponse = await response.json();
+
+  // ✅ ahora guardamos todo
+  saveAuthData(data);
+
+  return data;
 };
 
 export const register = async (credentials: RegisterCredentials): Promise<AuthResponse> => {
@@ -173,8 +198,10 @@ export const register = async (credentials: RegisterCredentials): Promise<AuthRe
   }
 
   const data: AuthResponse = await response.json();
-  saveToken(data.token);
-  localStorage.setItem(ROLE_KEY, data.role);
+
+  // ✅ guardar sesión también aquí
+  saveAuthData(data);
+
   return data;
 };
 
