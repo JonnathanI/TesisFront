@@ -1171,3 +1171,39 @@ export async function registerFcmToken(token: string) {
     body: JSON.stringify({ token }), // 👈 nombre del campo correcto
   });
 }
+
+// --- UNIDADES DEL ALUMNO LOGUEADO ---
+export const getMyUnits = async (): Promise<UnitWithLessons[]> => {
+  const response = await apiFetch("/progress/my-units", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    console.error(
+      "❌ Error al obtener unidades del alumno (my-units):",
+      response.status
+    );
+    return [];
+  }
+
+  const raw = await response.json();
+  console.log("📘 Respuesta cruda /progress/my-units:", raw);
+
+  // raw viene como List<UnitStatusDTO> desde el backend
+  const units: UnitWithLessons[] = (raw || []).map((u: any) => ({
+    id: u.id,
+    title: u.title,
+    unitOrder: u.unitOrder,
+    isLocked: u.isLocked,
+    isCompleted: u.isCompleted,
+    lessons: (u.lessons || []).map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      lessonOrder: l.lessonOrder,
+      requiredXp: l.requiredXp,
+      isCompleted: l.isCompleted,
+    })),
+  }));
+
+  return units;
+};

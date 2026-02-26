@@ -32,6 +32,7 @@ import {
   getStudentClassrooms,
   getStudentClassroomDetails,
   getCourseUnits,
+  getMyUnits,
 } from "../api/auth.service";
 
 import {
@@ -105,39 +106,10 @@ const StudentDashboard = () => {
         const friendsData = await getFriendsList();
         setFriends(friendsData);
 
-        // 🔹 1) Traer todos los cursos visibles
-        const courses = await getCourses();
-        console.log("📚 Cursos visibles para el alumno:", courses);
-
-        let foundUnits: UnitWithLessons[] = [];
-        let usedCourseId: string | null = null;
-
-        // 🔹 2) Probar curso por curso hasta encontrar uno con unidades
-        for (const c of courses) {
-          const cid = String(c.id);
-          const unitsData = await getCourseUnits(cid);
-          console.log(
-            "🔎 Probando curso:",
-            c.title,
-            cid,
-            " -> units:",
-            unitsData.length
-          );
-
-          if (unitsData.length > 0) {
-            foundUnits = unitsData;
-            usedCourseId = cid;
-            break;
-          }
-        }
-
-        if (usedCourseId) {
-          console.log("✅ Usando courseId para LearnSection:", usedCourseId);
-          setUnits(foundUnits);
-        } else {
-          console.warn("⚠️ Ningún curso con unidades visibles para este alumno");
-          setUnits([]);
-        }
+        // 🔹 Unidades SOLO de los cursos donde este alumno está inscrito
+        const myUnits = await getMyUnits();
+        console.log("📘 Unidades del alumno (my-units):", myUnits);
+        setUnits(myUnits);
 
         const groupsData = await getStudentClassrooms();
         setMyGroups(groupsData);
