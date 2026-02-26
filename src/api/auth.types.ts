@@ -2,6 +2,30 @@
 
 // --- ROLES Y AUTH BÁSICO ---
 export type UserRole = "STUDENT" | "TEACHER" | "ADMIN";
+export type ChallengeType = "XP" | "TIME" | "PERFECT" | "GENERIC";
+
+export interface SingleChallengeDTO {
+  id: number;
+  title: string;
+  type: ChallengeType;
+  progress: number;
+  total: number;
+}
+
+export interface UserChallengesDTO {
+  challengesCompleted: number;
+  challenges: SingleChallengeDTO[];
+
+  // estos otros campos pueden existir o no, pero no molestan:
+  dailyExpProgress?: number;
+  dailyExpGoal?: number;
+  minutesLearned?: number;
+  minutesGoal?: number;
+  perfectLessonsCount?: number;
+  perfectLessonsGoal?: number;
+  sqlTitle?: string;
+  sqlSnippet?: string;
+}
 
 export interface AuthResponse {
   token: string;
@@ -252,7 +276,7 @@ export interface QuestionType {
   typeName: string;
   description?: string;
 }
-
+/*
 export interface UserChallengesDTO {
   dailyExpProgress: number;
   dailyExpGoal: number;
@@ -261,7 +285,7 @@ export interface UserChallengesDTO {
   perfectLessonsCount: number;
   perfectLessonsGoal: number;
   challengesCompleted: number;
-}
+}*/
 
 // --- EVALUACIONES ---
 export interface EvaluationRequest {
