@@ -150,7 +150,7 @@ export function QuestionsSection() {
     "ORDERING",
   ].includes(typeName);
 
-  const usesAudio = ["LISTENING", "AUDIO_SELECT", "SPEAKING"].includes(typeName);
+  const usesAudio = ["LISTENING", "AUDIO_SELECT", "SPEAKING","WRITING"].includes(typeName);
 
   /* ===================== SAVE (API CALL) ===================== */
 
