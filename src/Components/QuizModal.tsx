@@ -75,6 +75,19 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     ? currentQuestion.options
     : [];
 
+  // 🔒 Bloquear scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [isOpen]);
+
   // sincroniza corazones si el perfil cambia
   useEffect(() => {
     setLocalHearts(getHeartsFromProfile(userProfile));
@@ -128,8 +141,8 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     setIsListening(false);
     setWritingAnswer("");
 
-    // ⛔ OJO: SOLO ORDERING / TRANSLATION usan fichas, NO WRITING
-    if (type === "ORDERING" || type === "TRANSLATION_TO_TARGET") {
+    // SOLO ORDERING usa fichas
+    if (type === "ORDERING") {
       if (optionsSafe.length > 0) {
         const parsedOptions = optionsSafe.map((opt: any) => {
           try {
@@ -165,12 +178,13 @@ export const QuizModal: React.FC<QuizModalProps> = ({
 
     if (type === "WRITING") {
       answerRaw = writingAnswer;
-    } else if (type === "ORDERING" || type === "TRANSLATION_TO_TARGET") {
+    } else if (type === "ORDERING") {
       answerRaw = orderedWords.join(" ");
     } else if (type === "SPEAKING") {
       // si quieres evaluar speaking por texto reconocido:
       answerRaw = transcript;
     } else {
+      // MULTIPLE CHOICE, IMAGE_SELECT, TRANSLATION_TO_TARGET, etc.
       answerRaw = selectedOption || "";
     }
 
@@ -237,7 +251,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   const isAnswerEmpty =
     type === "WRITING"
       ? writingAnswer.trim().length === 0
-      : type === "ORDERING" || type === "TRANSLATION_TO_TARGET"
+      : type === "ORDERING"
       ? orderedWords.length === 0
       : type === "SPEAKING"
       ? transcript.trim().length === 0
@@ -291,8 +305,10 @@ export const QuizModal: React.FC<QuizModalProps> = ({
             ? "Escucha y repite la frase"
             : type === "WRITING"
             ? "Escribe la frase correctamente"
-            : type === "ORDERING" || type === "TRANSLATION_TO_TARGET"
+            : type === "ORDERING"
             ? "Ordena la frase correctamente"
+            : type === "TRANSLATION_TO_TARGET"
+            ? "Traduce la frase seleccionando la opción correcta"
             : "Selecciona la opción correcta"}
         </h2>
 
@@ -370,7 +386,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
               rows={3}
             />
           </div>
-        ) : type === "ORDERING" || type === "TRANSLATION_TO_TARGET" ? (
+        ) : type === "ORDERING" ? (
           /* VISTA DE ORDENAR */
           <>
             <div style={sentenceBox}>
@@ -403,7 +419,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
             </div>
           </>
         ) : (
-          /* VISTA DE OPCIONES (GRID) */
+          /* VISTA DE OPCIONES (GRID) – incluye TRANSLATION_TO_TARGET */
           <div
             style={{
               ...optionsGrid,
@@ -624,8 +640,8 @@ const overlay: React.CSSProperties = {
   zIndex: 5000,
   display: "flex",
   justifyContent: "center",
-  alignItems: "stretch",
-  overflow: "hidden",
+  alignItems: "flex-start",
+  overflowY: "auto",
   fontFamily: "sans-serif",
 };
 
@@ -636,8 +652,6 @@ const container: React.CSSProperties = {
   padding: "20px 16px 80px",
   display: "flex",
   flexDirection: "column",
-  maxHeight: "100vh",
-  overflowY: "auto",
   boxSizing: "border-box",
 };
 
