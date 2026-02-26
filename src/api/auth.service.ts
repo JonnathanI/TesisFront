@@ -47,16 +47,19 @@ import {
 // --- CONFIGURACIÓN BASE (CRA) ---
 
 const getApiOrigin = () => {
-  // 1. Si existe una variable global definida externamente
+  // 1. Primero, si hay REACT_APP_API_URL, usar esa SIEMPRE
+  if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
+
+  // 2. Luego, variable global si la usas
   if ((window as any).__API_URL__) return (window as any).__API_URL__;
 
-  // 2. Si estamos en localhost (desarrollo), usar el puerto 8081
+  // 3. Fallback: localhost en desarrollo
   if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
     return "http://localhost:8081";
   }
 
-  // 3. Por defecto, usar producción (Render) o variable de entorno de React
-  return (process.env.REACT_APP_API_URL as string) || "https://tesisbackend-1.onrender.com";
+  // 4. Último respaldo: viejo backend en Render (si algo falla)
+  return "https://tesisbackend-1.onrender.com";
 };
 
 const API_ORIGIN = getApiOrigin();
