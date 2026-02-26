@@ -1,7 +1,12 @@
 // src/Teachers/TeacherDashboard.tsx
 import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
-import { removeToken, getCourses, getCourseUnits, getLessonsByUnit } from "../api/auth.service";
+import {
+  removeToken,
+  getTeacherCourses,
+  getTeacherUnits,
+  getLessonsByUnit,
+} from "../api/auth.service";
 import { useNavigate } from "react-router-dom";
 
 // --- SECCIONES ---
@@ -45,28 +50,28 @@ export default function TeacherDashboard() {
   }, [isMobile]);
 
   // ==========================================
-  // CARGA DE DATOS
+  // CARGA DE DATOS (PROFESOR)
   // ==========================================
-  const loadCourses = async () => {
+  const loadAllTeacherData = async () => {
     try {
-      const data = await getCourses();
-      setCourses(data);
+      const [coursesRes, unitsRes] = await Promise.all([
+        getTeacherCourses(), // cursos del profe logueado
+        getTeacherUnits(),   // todas las unidades del profe (con courseId)
+      ]);
+
+      setCourses(coursesRes);
+      setUnits(unitsRes);
+
+      console.log("📗 Cursos del profe:", coursesRes);
+      console.log("📘 Unidades del profe:", unitsRes);
     } catch (error) {
-      console.error("Error al cargar cursos:", error);
+      console.error("Error al cargar cursos/unidades del profesor:", error);
     }
   };
 
-  const loadUnits = async (courseId: string) => {
-    setSelectedCourseId(courseId);
-    try {
-      const data = await getCourseUnits(courseId);
-      setUnits(data);
-      setLessons([]);
-      setSelectedUnitId(null);
-    } catch (error) {
-      console.error("Error al cargar unidades:", error);
-    }
-  };
+  useEffect(() => {
+    loadAllTeacherData();
+  }, []);
 
   const loadLessons = async (unitId: string) => {
     setSelectedUnitId(unitId);
@@ -82,10 +87,6 @@ export default function TeacherDashboard() {
     removeToken();
     navigate("/login");
   };
-
-  useEffect(() => {
-    loadCourses();
-  }, []);
 
   // ==========================================
   // UI
@@ -235,9 +236,7 @@ export default function TeacherDashboard() {
       {/* ✅ MAIN */}
       <main
         style={{
-          // en desktop deja espacio para sidebar fijo
           marginLeft: isMobile ? 0 : sidebarWidth,
-          // en móvil dejamos espacio SOLO para el botón hamburguesa (no más)
           paddingTop: isMobile ? 56 : 24,
           paddingLeft: isMobile ? 12 : 32,
           paddingRight: isMobile ? 12 : 32,
@@ -295,8 +294,10 @@ export default function TeacherDashboard() {
                 courses={courses}
                 units={units}
                 selectedCourseId={selectedCourseId}
-                onSelectCourse={loadUnits}
-                onRefresh={() => selectedCourseId && loadUnits(selectedCourseId)}
+                onSelectCourse={(courseId) => {
+                  setSelectedCourseId(courseId);
+                }}
+                onRefresh={loadAllTeacherData}
               />
             )}
 
