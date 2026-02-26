@@ -29,6 +29,9 @@ const getHeartsFromProfile = (profile: UserProfileData | undefined): number => {
   );
 };
 
+const normalizeText = (s: string) =>
+  s.trim().toLowerCase().replace(/[.,?!]/g, "");
+
 /* ================== COMPONENT ================== */
 export const QuizModal: React.FC<QuizModalProps> = ({
   isOpen,
@@ -61,6 +64,9 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   /* ====== ORDENAR ====== */
   const [availableWords, setAvailableWords] = useState<string[]>([]);
   const [orderedWords, setOrderedWords] = useState<string[]>([]);
+
+  /* ====== WRITING (respuesta libre) ====== */
+  const [writingAnswer, setWritingAnswer] = useState("");
 
   const currentQuestion = questions[currentIndex];
   const type = currentQuestion?.questionType?.typeName;
@@ -120,12 +126,10 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     setAvailableWords([]);
     setTranscript("");
     setIsListening(false);
+    setWritingAnswer("");
 
-    if (
-      type === "WRITING" ||
-      type === "ORDERING" ||
-      type === "TRANSLATION_TO_TARGET"
-    ) {
+    // ⛔ OJO: SOLO ORDERING / TRANSLATION usan fichas, NO WRITING
+    if (type === "ORDERING" || type === "TRANSLATION_TO_TARGET") {
       if (optionsSafe.length > 0) {
         const parsedOptions = optionsSafe.map((opt: any) => {
           try {
@@ -146,7 +150,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         setAvailableWords(shuffleArray(words));
       }
     }
-  }, [currentIndex, currentQuestion, type, isOpen]);
+  }, [currentIndex, currentQuestion, type, isOpen, optionsSafe]);
 
   /* ================== CHECK ================== */
   const handleCheckAnswer = async () => {
@@ -155,15 +159,22 @@ export const QuizModal: React.FC<QuizModalProps> = ({
     setIsSyncing(true);
     let correct = false;
 
-    const target = currentQuestion.textTarget
-      .trim()
-      .toLowerCase()
-      .replace(/[.,?!]/g, "");
-    const answer =
-      type === "WRITING" || type === "ORDERING"
-        ? orderedWords.join(" ").trim().toLowerCase()
-        : (selectedOption || "").trim().toLowerCase().replace(/[.,?!]/g, "");
+    const target = normalizeText(currentQuestion.textTarget ?? "");
 
+    let answerRaw = "";
+
+    if (type === "WRITING") {
+      answerRaw = writingAnswer;
+    } else if (type === "ORDERING" || type === "TRANSLATION_TO_TARGET") {
+      answerRaw = orderedWords.join(" ");
+    } else if (type === "SPEAKING") {
+      // si quieres evaluar speaking por texto reconocido:
+      answerRaw = transcript;
+    } else {
+      answerRaw = selectedOption || "";
+    }
+
+    const answer = normalizeText(answerRaw);
     correct = answer === target;
 
     setIsCorrect(correct);
@@ -195,14 +206,13 @@ export const QuizModal: React.FC<QuizModalProps> = ({
 
   /* ================== SALIR (X) ================== */
 
-  // al hacer clic en la X
   const handleRequestExit = () => {
-    // si no respondió nada y está en la primera pregunta, puede salir sin perder progreso
     const hasProgress =
       currentIndex > 0 ||
       isAnswered ||
       selectedOption !== null ||
-      orderedWords.length > 0;
+      orderedWords.length > 0 ||
+      writingAnswer.trim().length > 0;
 
     if (!hasProgress) {
       onClose(false, score, questions.length || 0);
@@ -222,6 +232,16 @@ export const QuizModal: React.FC<QuizModalProps> = ({
   };
 
   if (!isOpen || !currentQuestion) return null;
+
+  // para disabled del botón
+  const isAnswerEmpty =
+    type === "WRITING"
+      ? writingAnswer.trim().length === 0
+      : type === "ORDERING" || type === "TRANSLATION_TO_TARGET"
+      ? orderedWords.length === 0
+      : type === "SPEAKING"
+      ? transcript.trim().length === 0
+      : !selectedOption;
 
   return (
     <div
@@ -248,11 +268,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
             <span style={{ fontWeight: 900, marginRight: 8 }}>
               {localHearts}
             </span>
-            {heartTimer && (
-              <span style={heartTimerText}>
-                ⏱ {heartTimer}
-              </span>
-            )}
+            {heartTimer && <span style={heartTimerText}>⏱ {heartTimer}</span>}
           </div>
 
           <button style={closeBtn} onClick={handleRequestExit}>
@@ -273,7 +289,9 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         <h2 style={questionTitle} className="quiz-title">
           {type === "SPEAKING"
             ? "Escucha y repite la frase"
-            : type === "WRITING" || type === "ORDERING"
+            : type === "WRITING"
+            ? "Escribe la frase correctamente"
+            : type === "ORDERING" || type === "TRANSLATION_TO_TARGET"
             ? "Ordena la frase correctamente"
             : "Selecciona la opción correcta"}
         </h2>
@@ -330,7 +348,29 @@ export const QuizModal: React.FC<QuizModalProps> = ({
               <strong>{transcript || "..."}</strong>
             </div>
           </div>
-        ) : type === "WRITING" || type === "ORDERING" ? (
+        ) : type === "WRITING" ? (
+          /* VISTA DE WRITING (texto libre) */
+          <div style={{ marginTop: 20 }}>
+            <label
+              style={{
+                fontSize: "0.85rem",
+                color: "#777",
+                fontWeight: 700,
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
+              Escribe tu respuesta en inglés:
+            </label>
+            <textarea
+              style={writingTextarea}
+              value={writingAnswer}
+              onChange={(e) => setWritingAnswer(e.target.value)}
+              disabled={isAnswered}
+              rows={3}
+            />
+          </div>
+        ) : type === "ORDERING" || type === "TRANSLATION_TO_TARGET" ? (
           /* VISTA DE ORDENAR */
           <>
             <div style={sentenceBox}>
@@ -452,12 +492,9 @@ export const QuizModal: React.FC<QuizModalProps> = ({
                   ? "#58cc02"
                   : "#ff4b4b"
                 : "#58cc02",
-              opacity:
-                isSyncing || (!selectedOption && orderedWords.length === 0)
-                  ? 0.5
-                  : 1,
+              opacity: isSyncing || isAnswerEmpty ? 0.5 : 1,
             }}
-            disabled={isSyncing || (!selectedOption && orderedWords.length === 0)}
+            disabled={isSyncing || isAnswerEmpty}
             onClick={isAnswered ? handleNext : handleCheckAnswer}
           >
             {isAnswered ? "CONTINUAR" : "COMPROBAR"}
@@ -588,7 +625,7 @@ const overlay: React.CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "stretch",
-  overflow: "hidden", // el scroll será dentro del modal
+  overflow: "hidden",
   fontFamily: "sans-serif",
 };
 
@@ -596,11 +633,11 @@ const container: React.CSSProperties = {
   maxWidth: 600,
   width: "100%",
   margin: "0 auto",
-  padding: "20px 16px 80px", // espacio extra abajo para el botón
+  padding: "20px 16px 80px",
   display: "flex",
   flexDirection: "column",
-  maxHeight: "100vh", // no pasa de la pantalla
-  overflowY: "auto", // hace scroll solo el contenido
+  maxHeight: "100vh",
+  overflowY: "auto",
   boxSizing: "border-box",
 };
 
@@ -710,8 +747,20 @@ const chipSelected: React.CSSProperties = {
   boxShadow: "0 2px 0 #84d8ff",
 };
 
+const writingTextarea: React.CSSProperties = {
+  width: "100%",
+  padding: 12,
+  borderRadius: 12,
+  border: "2px solid #e5e5e5",
+  fontSize: "1rem",
+  fontWeight: 600,
+  resize: "vertical",
+  minHeight: 80,
+  boxSizing: "border-box",
+};
+
 const footer: React.CSSProperties = {
-  position: "sticky", // se “pega” al fondo del modal
+  position: "sticky",
   bottom: 0,
   marginTop: 16,
   paddingTop: 12,
