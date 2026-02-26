@@ -43,7 +43,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     load();
   }, [friend.id]);
 
-  // 🔄 Refrescar el chat cada 1 segundo (tú lo tenías así)
+  // 🔄 Refrescar el chat cada 1 segundo
   useEffect(() => {
     let isMounted = true;
 
@@ -215,11 +215,29 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   };
 
   const styles = `
-    /* ====== Base ====== */
-    .fc-root{
+    /* ====== OVERLAY para poder cerrar tocando fuera ====== */
+    .fc-overlay {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      inset: 0;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
+      background: transparent;
+      z-index: 9998;
+    }
+
+    /* En móvil el overlay hace pantalla completa y oscurece un poco */
+    @media (max-width: 1023px) {
+      .fc-overlay {
+        justify-content: stretch;
+        align-items: stretch;
+        background: rgba(15,23,42,0.15);
+      }
+    }
+
+    /* ====== Base del chat ====== */
+    .fc-root{
+      position: relative;          /* ya no es fixed */
       width: 340px;
       max-height: 70vh;
       background: white;
@@ -229,7 +247,8 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       flex-direction: column;
       overflow: hidden;
       z-index: 9999;
-       height: auto;
+      margin: 0 20px 24px 20px;    /* separarlo de los bordes en desktop */
+      height: auto;
     }
 
     .fc-header{
@@ -270,7 +289,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       padding: 10px 12px;
       overflow-y: auto;
       background: #EFF6FF;
-       min-height: 0;
+      min-height: 0;
     }
 
     .fc-bubble{
@@ -285,19 +304,15 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       overflow-wrap: anywhere;
     }
 
-   .fc-input-area{
-  border-top: 1px solid #E5E5E5;
-  padding: 8px 10px;
-  background: white;
-
-  /* ✅ clave: que nunca desaparezca */
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-
-  /* ✅ safe area (iPhone) */
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
-}
+    .fc-input-area{
+      border-top: 1px solid #E5E5E5;
+      padding: 8px 10px;
+      background: white;
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
 
     .fc-row{
       display: flex;
@@ -384,14 +399,11 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       border-radius: 10px;
     }
 
-    /* ====== Responsive: Mobile/Tablet -> Fullscreen ====== */
+    /* ====== Responsive: Mobile/Tablet -> full screen ====== */
     @media (max-width: 1023px){
       .fc-root{
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: auto;
+        margin: 0;
+        width: 100%;
         max-height: none;
         border-radius: 0;
       }
@@ -410,7 +422,6 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       }
     }
 
-    /* Extra: muy pequeño */
     @media (max-width: 420px){
       .fc-title{ font-size: 13px; }
       .fc-subtitle{ font-size: 10px; }
@@ -418,148 +429,160 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     }
   `;
 
+  // ⬇️ IMPORTANTE: overlay captura click fuera para cerrar en móvil y desktop
   return (
     <>
       <style>{styles}</style>
 
-      <div className="fc-root">
-        {/* header */}
-        <div className="fc-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: "#1CB0F6",
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 800,
-                  fontSize: 14,
-                }}
-              >
-                {friend.fullName.charAt(0).toUpperCase()}
-              </div>
-              <span
-                style={{
-                  position: "absolute",
-                  right: -1,
-                  bottom: -1,
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor: friend.isActive ? "#22c55e" : "#94A3B8",
-                  border: "2px solid white",
-                }}
-              />
-            </div>
-
-            <div>
-              <div className="fc-title">{friend.fullName}</div>
-              <div className="fc-subtitle">
-                {friend.isActive ? "En línea" : "Desconectado"}
-              </div>
-            </div>
-          </div>
-
-          <button onClick={onClose} className="fc-close" aria-label="Cerrar chat">
-            ✕
-          </button>
-        </div>
-
-        {/* mensajes */}
-        <div className="fc-messages">
-          {loading ? (
-            <p style={{ fontSize: 12, color: "#64748B" }}>Cargando mensajes...</p>
-          ) : messages.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#64748B" }}>
-              Comienza la conversación con {friend.fullName.split(" ")[0]} 👋
-            </p>
-          ) : (
-            messages.map((m) => {
-              const isFromFriend = m.senderId === friend.id;
-              const isFromMe = !isFromFriend;
-
-              return (
+      <div className="fc-overlay" onClick={onClose}>
+        <div
+          className="fc-root"
+          onClick={(e) => e.stopPropagation()} // para no cerrar al hacer click dentro
+        >
+          {/* header */}
+          <div className="fc-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ position: "relative" }}>
                 <div
-                  key={m.id}
                   style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: "#1CB0F6",
+                    color: "white",
                     display: "flex",
-                    justifyContent: isFromMe ? "flex-end" : "flex-start",
-                    marginBottom: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    fontSize: 14,
                   }}
                 >
-                  <div
-                    className="fc-bubble"
-                    style={{
-                      backgroundColor: isFromMe ? "#1CB0F6" : "white",
-                      color: isFromMe ? "white" : "#0F172A",
-                      borderTopRightRadius: isFromMe ? 6 : 16,
-                      borderTopLeftRadius: isFromMe ? 16 : 6,
-                    }}
-                  >
-                    {m.content}
-                    {renderAttachment(m)}
-                  </div>
+                  {friend.fullName.charAt(0).toUpperCase()}
                 </div>
-              );
-            })
-          )}
+                <span
+                  style={{
+                    position: "absolute",
+                    right: -1,
+                    bottom: -1,
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    backgroundColor: friend.isActive ? "#22c55e" : "#94A3B8",
+                    border: "2px solid white",
+                  }}
+                />
+              </div>
 
-          <div ref={bottomRef} />
-        </div>
-
-        {/* input */}
-        <div className="fc-input-area">
-          {renderSelectedFile()}
-
-          <div className="fc-row">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="fc-attach"
-              title="Adjuntar archivo"
-            >
-              📎
-            </button>
-
-            <textarea
-              rows={2}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribe un mensaje..."
-              className="fc-textarea"
-            />
+              <div>
+                <div className="fc-title">{friend.fullName}</div>
+                <div className="fc-subtitle">
+                  {friend.isActive ? "En línea" : "Desconectado"}
+                </div>
+              </div>
+            </div>
 
             <button
-              disabled={sending || (!text.trim() && !selectedFile)}
-              onClick={handleSend}
-              className="fc-send"
-              style={{
-                background:
-                  sending || (!text.trim() && !selectedFile)
-                    ? "#BFDBFE"
-                    : "#1CB0F6",
-                cursor:
-                  sending || (!text.trim() && !selectedFile)
-                    ? "default"
-                    : "pointer",
-              }}
+              onClick={onClose}
+              className="fc-close"
+              aria-label="Cerrar chat"
             >
-              Enviar
+              ✕
             </button>
           </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-          />
+          {/* mensajes */}
+          <div className="fc-messages">
+            {loading ? (
+              <p style={{ fontSize: 12, color: "#64748B" }}>
+                Cargando mensajes...
+              </p>
+            ) : messages.length === 0 ? (
+              <p style={{ fontSize: 12, color: "#64748B" }}>
+                Comienza la conversación con {friend.fullName.split(" ")[0]} 👋
+              </p>
+            ) : (
+              messages.map((m) => {
+                const isFromFriend = m.senderId === friend.id;
+                const isFromMe = !isFromFriend;
+
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: isFromMe ? "flex-end" : "flex-start",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div
+                      className="fc-bubble"
+                      style={{
+                        backgroundColor: isFromMe ? "#1CB0F6" : "white",
+                        color: isFromMe ? "white" : "#0F172A",
+                        borderTopRightRadius: isFromMe ? 6 : 16,
+                        borderTopLeftRadius: isFromMe ? 16 : 6,
+                      }}
+                    >
+                      {m.content}
+                      {renderAttachment(m)}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+
+          {/* input */}
+          <div className="fc-input-area">
+            {renderSelectedFile()}
+
+            <div className="fc-row">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="fc-attach"
+                title="Adjuntar archivo"
+              >
+                📎
+              </button>
+
+              <textarea
+                rows={2}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe un mensaje..."
+                className="fc-textarea"
+              />
+
+              <button
+                disabled={sending || (!text.trim() && !selectedFile)}
+                onClick={handleSend}
+                className="fc-send"
+                style={{
+                  background:
+                    sending || (!text.trim() && !selectedFile)
+                      ? "#BFDBFE"
+                      : "#1CB0F6",
+                  cursor:
+                    sending || (!text.trim() && !selectedFile)
+                      ? "default"
+                      : "pointer",
+                }}
+              >
+                Enviar
+              </button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
+          </div>
         </div>
       </div>
     </>
