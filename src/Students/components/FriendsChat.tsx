@@ -77,7 +77,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // ✅ Cerrar con ESC (comodidad en desktop)
+  // ✅ Cerrar con ESC (desktop)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -98,7 +98,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     setSending(true);
 
     try {
-      // 1) mensaje de texto normal
+      // 1) mensaje de texto
       if (trimmed) {
         const optimistic: ChatMessage = {
           id: Date.now(),
@@ -215,7 +215,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   };
 
   const styles = `
-    /* ====== OVERLAY para poder cerrar tocando fuera ====== */
+    /* ====== OVERLAY: cubre toda la pantalla ====== */
     .fc-overlay {
       position: fixed;
       inset: 0;
@@ -226,18 +226,20 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       z-index: 9998;
     }
 
-    /* En móvil el overlay hace pantalla completa y oscurece un poco */
+    /* En móvil: fondo gris y el chat ocupa toda la pantalla */
     @media (max-width: 1023px) {
       .fc-overlay {
-        justify-content: stretch;
-        align-items: stretch;
-        background: rgba(15,23,42,0.15);
+        justify-content: center;
+        align-items: center;
+        background: rgba(15,23,42,0.20);
       }
     }
 
-    /* ====== Base del chat ====== */
+    /* ====== Caja del chat ====== */
     .fc-root{
-      position: relative;          /* ya no es fixed */
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
       width: 340px;
       max-height: 70vh;
       background: white;
@@ -247,8 +249,6 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       flex-direction: column;
       overflow: hidden;
       z-index: 9999;
-      margin: 0 20px 24px 20px;    /* separarlo de los bordes en desktop */
-      height: auto;
     }
 
     .fc-header{
@@ -276,9 +276,9 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       cursor: pointer;
       font-weight: 900;
       color: #94A3B8;
-      font-size: 18px;
-      padding: 2px 8px;
-      border-radius: 10px;
+      font-size: 20px;
+      padding: 4px 10px;
+      border-radius: 999px;
     }
     .fc-close:hover{
       background: rgba(148,163,184,0.15);
@@ -399,11 +399,14 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       border-radius: 10px;
     }
 
-    /* ====== Responsive: Mobile/Tablet -> full screen ====== */
+    /* ====== MÓVIL: pantalla completa ====== */
     @media (max-width: 1023px){
       .fc-root{
-        margin: 0;
-        width: 100%;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
         max-height: none;
         border-radius: 0;
       }
@@ -429,16 +432,14 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     }
   `;
 
-  // ⬇️ IMPORTANTE: overlay captura click fuera para cerrar en móvil y desktop
   return (
     <>
       <style>{styles}</style>
 
+      {/* Overlay: click fuera del chat = cerrar */}
       <div className="fc-overlay" onClick={onClose}>
-        <div
-          className="fc-root"
-          onClick={(e) => e.stopPropagation()} // para no cerrar al hacer click dentro
-        >
+        {/* Chat: stopPropagation para que no se cierre al hacer click dentro */}
+        <div className="fc-root" onClick={(e) => e.stopPropagation()}>
           {/* header */}
           <div className="fc-header">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
