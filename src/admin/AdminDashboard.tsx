@@ -1,6 +1,7 @@
 // src/admin/AdminDashboard.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
 import { AdminSidebarDashboard } from "./AdminSidebarDashboard";
 import {
   generateClassroomCode,
@@ -43,13 +44,10 @@ interface CoursesProps {
 // ==========================================
 // 2. SUB-COMPONENTE: GESTIÓN DE CURSOS
 // ==========================================
-// ==========================================
-// 2. SUB-COMPONENTE: GESTIÓN DE CURSOS
-// ==========================================
 const CoursesSection = ({
   courses,
   allUsers,
-  onSelectCourse, // ya no lo usamos, pero lo dejamos por compatibilidad
+  onSelectCourse,
   onRefresh,
 }: CoursesProps) => {
   const [form, setForm] = useState({
@@ -61,41 +59,19 @@ const CoursesSection = ({
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 👉 Curso que estoy editando (si aplica)
-  const editingCourse = useMemo(
-    () => courses.find((c) => c.id === editingId) || null,
-    [courses, editingId]
-  );
-
-  // ================================================
-  // PROFESORES DISPONIBLES
-  //  - No repetidos en otros cursos
-  //  - PERO si estoy editando, incluir el teacher actual del curso
-  // ================================================
+  // Profesores disponibles: no estén ya asignados como teacher de otro curso
   const usedTeacherIds = new Set(
     courses
       .filter((c) => c.teacher)
       .map((c) => c.teacher.id as string)
   );
 
-  const currentTeacherId = editingCourse?.teacher?.id as string | undefined;
+  const availableTeachers = allUsers.filter(
+    (u) =>
+      (u.role === "TEACHER" || u.role === "ADMIN") && !usedTeacherIds.has(u.id!)
+  );
 
-  const availableTeachers = allUsers.filter((u) => {
-    const isTeacherRole = u.role === "TEACHER" || u.role === "ADMIN";
-    if (!isTeacherRole) return false;
-
-    // Si es el teacher actual del curso en edición, permitirlo
-    if (currentTeacherId && u.id === currentTeacherId) return true;
-
-    // Si ya está usado en otro curso, NO mostrarlo
-    return !usedTeacherIds.has(u.id!);
-  });
-
-  // ================================================
-  // ESTUDIANTES DISPONIBLES
-  //  - No repetidos en otros cursos
-  //  - PERO si estoy editando, incluir los alumnos actuales de ese curso
-  // ================================================
+  // Estudiantes disponibles: no estén en students de ningún curso
   const usedStudentIds = new Set<string>();
   courses.forEach((c) => {
     (c.students || []).forEach((s: any) => {
@@ -103,31 +79,15 @@ const CoursesSection = ({
     });
   });
 
-  const editingCourseStudentIds = new Set<string>(
-    (editingCourse?.students || []).map((s: any) => s.id as string)
+  const availableStudents = allUsers.filter(
+    (u) => u.role === "STUDENT" && !usedStudentIds.has(u.id!)
   );
 
-  const availableStudents = allUsers.filter((u) => {
-    if (u.role !== "STUDENT") return false;
-
-    // Si es alumno del curso que estoy editando, permitirlo
-    if (editingCourseStudentIds.has(u.id!)) return true;
-
-    // Si está matriculado en otro curso, NO mostrarlo
-    return !usedStudentIds.has(u.id!);
-  });
-
-  // ================================================
-  // GUARDAR / CREAR CURSO
-  // ================================================
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
     try {
-      if (editingId) {
-        await updateCourse(editingId, form);
-      } else {
-        await createCourse(form);
-      }
+      if (editingId) await updateCourse(editingId, form);
+      else await createCourse(form);
 
       setForm({
         title: "",
@@ -139,37 +99,7 @@ const CoursesSection = ({
       setEditingId(null);
       onRefresh();
     } catch (e) {
-      console.error(e);
       alert("Error al procesar curso");
-    }
-  };
-
-  // ================================================
-  // ELIMINAR CURSO
-  // ================================================
-  const handleDeleteCourse = async (id: string, title: string) => {
-    const ok = window.confirm(
-      `¿Seguro que deseas eliminar el curso "${title}"? Esta acción no se puede deshacer.`
-    );
-    if (!ok) return;
-
-    try {
-      await deleteCourse(id);
-      // Si estaba editando este curso, limpiamos el formulario
-      if (editingId === id) {
-        setEditingId(null);
-        setForm({
-          title: "",
-          baseLanguage: "ES",
-          targetLanguage: "EN",
-          teachers: [],
-          students: [],
-        });
-      }
-      onRefresh();
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo eliminar el curso");
     }
   };
 
@@ -220,7 +150,7 @@ const CoursesSection = ({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: window.innerWidth < 768 ? "1fr" : "1fr 1fr",
             gap: "15px",
             marginBottom: "15px",
           }}
@@ -237,11 +167,6 @@ const CoursesSection = ({
                   {u.fullName} {form.teachers.includes(u.id!) && "✅"}
                 </div>
               ))}
-              {availableTeachers.length === 0 && (
-                <span style={{ fontSize: 12, color: "#999" }}>
-                  No hay profesores disponibles.
-                </span>
-              )}
             </div>
           </div>
 
@@ -257,11 +182,6 @@ const CoursesSection = ({
                   {u.fullName} {form.students.includes(u.id!) && "✅"}
                 </div>
               ))}
-              {availableStudents.length === 0 && (
-                <span style={{ fontSize: 12, color: "#999" }}>
-                  No hay estudiantes disponibles.
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -286,16 +206,7 @@ const CoursesSection = ({
 
           {editingId && (
             <button
-              onClick={() => {
-                setEditingId(null);
-                setForm({
-                  title: "",
-                  baseLanguage: "ES",
-                  targetLanguage: "EN",
-                  teachers: [],
-                  students: [],
-                });
-              }}
+              onClick={() => setEditingId(null)}
               style={{
                 padding: "12px",
                 borderRadius: "10px",
@@ -334,16 +245,13 @@ const CoursesSection = ({
             </div>
 
             <div style={{ display: "flex", gap: "8px" }}>
-              {/* 🔴 ELIMINAR BOTÓN "UNIDADES" (YA NO SE MUESTRA) */}
-              {/* (si quieres borrarlo completamente, puedes eliminar este botón) */}
-              {/* <button
+              <button
                 onClick={() => onSelectCourse(course.id)}
                 style={btnCourseAction}
               >
                 Unidades
-              </button> */}
+              </button>
 
-              {/* ✏️ EDITAR */}
               <button
                 onClick={() => {
                   setEditingId(course.id);
@@ -362,20 +270,6 @@ const CoursesSection = ({
                 }}
               >
                 Editar
-              </button>
-
-              {/* 🗑 ELIMINAR CURSO */}
-              <button
-                onClick={() =>
-                  handleDeleteCourse(course.id, course.title || "curso")
-                }
-                style={{
-                  ...btnCourseAction,
-                  background: "#FEE2E2",
-                  color: "#B91C1C",
-                }}
-              >
-                Eliminar
               </button>
             </div>
           </div>
@@ -745,6 +639,40 @@ const handleGenCode = async (type: "student" | "teacher") => {
     }
   };
 
+ const [isMobile, setIsMobile] = useState(false);
+ const [isCollapsed, setIsCollapsed] = useState(true);
+
+useEffect(() => {
+
+  const handleResize = () => {
+
+    const mobile = window.innerWidth < 768;
+
+    setIsMobile(mobile);
+
+  };
+
+  handleResize();
+
+  window.addEventListener("resize", handleResize);
+
+  return () => {
+    window.removeEventListener("resize", handleResize);
+  };
+
+}, []);
+
+
+// Ajuste automático sidebar
+useEffect(() => {
+
+  if (isMobile) {
+    setIsCollapsed(true); // En móvil cerrado
+  } else {
+    setIsCollapsed(false); // En desktop abierto
+  }
+
+}, [isMobile]);
   // ------- DESCARGAR PLANTILLA EXCEL -------
   const handleDownloadTemplateExcel = () => {
     const headers = [["fullName", "email", "cedula", "password)"]];
@@ -759,228 +687,330 @@ const handleGenCode = async (type: "student" | "teacher") => {
 
   // ==========================================
   // RENDER PRINCIPAL
-  // ==========================================
-  return (
-    <div style={layoutStyle}>
-      <AnimatePresence>
-        {notification.show && (
-          <motion.div
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 20 }}
-            exit={{ opacity: 0 }}
-            style={{
-              ...toastStyle,
-              backgroundColor:
-                notification.type === "error" ? "#FF4B4B" : "#58CC02",
-            }}
-          >
-            {notification.msg}
-          </motion.div>
-        )}
+return (
+  <div
+    style={{
+      display: "flex",
+      minHeight: "100vh",
+      width: "100%",
+      overflow: "hidden",
+      position: "relative"
+    }}
+  >
+    <AnimatePresence>
+      {notification.show && (
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 20 }}
+          exit={{ opacity: 0 }}
+          style={{
+            ...toastStyle,
+            backgroundColor:
+              notification.type === "error" ? "#FF4B4B" : "#58CC02",
+          }}
+        >
+          {notification.msg}
+        </motion.div>
+      )}
 
-        {editingUser && (
+      {editingUser && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={overlayStyle}
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={overlayStyle}
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            style={modalEditStyle}
           >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              style={modalEditStyle}
+            <h2 style={{ marginBottom: "20px", fontWeight: 900 }}>
+              ✏️ Editar Usuario
+            </h2>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "15px",
+              }}
             >
-              <h2 style={{ marginBottom: "20px", fontWeight: 900 }}>
-                ✏️ Editar Usuario
-              </h2>
-
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "15px" }}
-              >
-                <div style={inputGroup}>
-                  <label style={labelStyle}>NOMBRE</label>
-                  <input
-                    style={inputStyle}
-                    value={editingUser.fullName}
-                    onChange={(e) =>
-                      setEditingUser({
-                        ...editingUser,
-                        fullName: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div style={inputGroup}>
-                  <label style={labelStyle}>EMAIL</label>
-                  <input
-                    style={inputStyle}
-                    value={editingUser.email}
-                    onChange={(e) =>
-                      setEditingUser({
-                        ...editingUser,
-                        email: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div style={inputGroup}>
-                  <label style={labelStyle}>CÉDULA</label>
-                  <input
-                    style={inputStyle}
-                    value={editingUser.cedula}
-                    onChange={(e) =>
-                      setEditingUser({
-                        ...editingUser,
-                        cedula: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  marginTop: "30px",
-                }}
-              >
-                <button onClick={saveFullEdit} style={btnMainStyle}>
-                  Guardar
-                </button>
-
-                <button
-                  onClick={() => setEditingUser(null)}
-                  style={{ ...btnSecondary, width: "100%" }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AdminSidebarDashboard
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-      />
-
-      {/* CONTENIDO PRINCIPAL */}
-      <main style={mainContainerStyle}>
-        {/* USUARIOS */}
-        {activeSection === "roles" && (
-          <div style={cardStyle}>
-            <div style={headerFlexStyle}>
-              <h2 style={titleStyle}>Usuarios</h2>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={fetchUsers} style={btnSecondary}>
-                  {loading ? "..." : "🔄"}
-                </button>
+              <div style={inputGroup}>
+                <label style={labelStyle}>NOMBRE</label>
                 <input
-                  type="text"
-                  placeholder="Buscar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={searchBarStyle}
+                  style={inputStyle}
+                  value={editingUser.fullName}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      fullName: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div style={inputGroup}>
+                <label style={labelStyle}>EMAIL</label>
+                <input
+                  style={inputStyle}
+                  value={editingUser.email}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      email: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div style={inputGroup}>
+                <label style={labelStyle}>CÉDULA</label>
+                <input
+                  style={inputStyle}
+                  value={editingUser.cedula}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      cedula: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
 
-            <div style={tabContainerStyle}>
-              <button
-                onClick={() => setFilterType("STUDENT")}
-                style={tabButtonStyle(filterType === "STUDENT")}
-              >
-                ESTUDIANTES
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                marginTop: "30px",
+              }}
+            >
+              <button onClick={saveFullEdit} style={btnMainStyle}>
+                Guardar
               </button>
 
               <button
-                onClick={() => setFilterType("TEACHER")}
-                style={tabButtonStyle(filterType === "TEACHER")}
+                onClick={() => setEditingUser(null)}
+                style={{ ...btnSecondary, width: "100%" }}
               >
-                PROFESORES
+                Cancelar
               </button>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
 
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>USUARIO</th>
-                  <th style={thStyle}>CÉDULA</th>
-                  <th style={thStyle}>ROL</th>
-                  <th style={thStyle}>ESTADO</th>
-                </tr>
-              </thead>
+    <AdminSidebarDashboard
+     activeSection={activeSection}
+setActiveSection={setActiveSection}
+isMobile={isMobile}
+isCollapsed={isCollapsed}
+setIsCollapsed={setIsCollapsed}
+    />
+      {/* CONTENIDO PRINCIPAL */}
+     <main
+  style={{
+    flex: 1,
+    padding: isMobile ? "70px 15px 20px 15px" : "40px",
+    transition: "all 0.3s",
+    width: "100%",
+    boxSizing: "border-box",
+    display: "flex",
+    justifyContent: "center",
+  }}
+>
+       {/* USUARIOS */}
+{activeSection === "roles" && (
+  <div
+    style={{
+      ...cardStyle,
+      width: "100%",
+      boxSizing: "border-box",
+    }}
+  >
+    {/* HEADER */}
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "16px",
+        marginBottom: "15px",
+      }}
+    >
+      <h2 style={{ ...titleStyle, margin: 0 }}>Usuarios</h2>
 
-              <tbody>
-                {filteredUsers.map((u) => (
-                  <tr key={u.id}>
-                    <td style={tdStyleFirst}>
-                      <div style={{ fontWeight: 800 }}>
-                        {u.fullName || "Sin nombre"}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#AFAFAF" }}>
-                        {u.email}
-                      </div>
-                    </td>
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          flexWrap: "wrap",
+          width: "100%",
+          maxWidth: "400px",
+          justifyContent: "flex-end",
+        }}
+      >
+        <button
+          onClick={fetchUsers}
+          style={{
+            ...btnSecondary,
+            flexShrink: 0,
+          }}
+        >
+          {loading ? "..." : "🔄"}
+        </button>
 
-                    <td style={tdStyle}>{u.cedula || "---"}</td>
+        <input
+          type="text"
+          placeholder="Buscar..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            ...searchBarStyle,
+            flex: "1 1 200px",
+            minWidth: "150px",
+          }}
+        />
+      </div>
+    </div>
 
-                    <td style={tdStyle}>
-                      <select
-                        value={u.role || "STUDENT"}
-                        onChange={(e) =>
-                          handleUserUpdate(u.id!, "role", e.target.value)
-                        }
-                        style={selectRoleStyle}
-                      >
-                        <option value="STUDENT">STUDENT</option>
-                        <option value="TEACHER">TEACHER</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-                    </td>
+    {/* TABS */}
+    <div
+      style={{
+        display: "flex",
+        gap: "10px",
+        flexWrap: "wrap",
+        marginBottom: "15px",
+      }}
+    >
+      <button
+        onClick={() => setFilterType("STUDENT")}
+        style={{
+          ...tabButtonStyle(filterType === "STUDENT"),
+          flex: "1 1 150px",
+        }}
+      >
+        ESTUDIANTES
+      </button>
 
-                    <td style={tdStyleLast}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "10px",
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          style={btnEditMini}
-                        >
-                          ✏️
-                        </button>
+      <button
+        onClick={() => setFilterType("TEACHER")}
+        style={{
+          ...tabButtonStyle(filterType === "TEACHER"),
+          flex: "1 1 150px",
+        }}
+      >
+        PROFESORES
+      </button>
+    </div>
 
-                        <button
-                          onClick={() =>
-                            handleUserUpdate(u.id!, "isActive", !u.isActive)
-                          }
-                          style={{
-                            ...btnStatusStyle,
-                            color: u.isActive ? "#58CC02" : "#FF4B4B",
-                            backgroundColor: u.isActive
-                              ? "#E8FDF0"
-                              : "#FFF0F0",
-                          }}
-                        >
-                          {u.isActive ? "ACTIVO" : "BLOQUEADO"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+    {/* TABLA RESPONSIVE */}
+    <div
+      style={{
+        overflowX: "auto",
+        width: "100%",
+        WebkitOverflowScrolling: "touch",
+        borderRadius: "12px",
+      }}
+    >
+      <table
+        style={{
+          ...tableStyle,
+          minWidth: "700px",
+          width: "100%",
+        }}
+      >
+        <thead>
+          <tr>
+            <th style={thStyle}>USUARIO</th>
+            <th style={thStyle}>CÉDULA</th>
+            <th style={thStyle}>ROL</th>
+            <th style={thStyle}>ESTADO</th>
+          </tr>
+        </thead>
 
+        <tbody>
+          {filteredUsers.map((u) => (
+            <tr key={u.id}>
+              {/* USUARIO */}
+              <td style={tdStyleFirst}>
+                <div style={{ fontWeight: 800 }}>
+                  {u.fullName || "Sin nombre"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#AFAFAF" }}>
+                  {u.email}
+                </div>
+              </td>
+
+              {/* CÉDULA */}
+              <td style={tdStyle}>{u.cedula || "---"}</td>
+
+              {/* ROL */}
+              <td style={tdStyle}>
+                <select
+                  value={u.role || "STUDENT"}
+                  onChange={(e) =>
+                    handleUserUpdate(u.id!, "role", e.target.value)
+                  }
+                  style={{
+                    ...selectRoleStyle,
+                    width: "100%",
+                    minWidth: "120px",
+                  }}
+                >
+                  <option value="STUDENT">STUDENT</option>
+                  <option value="TEACHER">TEACHER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </td>
+
+              {/* ESTADO / ACCIONES */}
+              <td style={tdStyleLast}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    justifyContent: "flex-end",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    onClick={() => setEditingUser(u)}
+                    style={{
+                      ...btnEditMini,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleUserUpdate(u.id!, "isActive", !u.isActive)
+                    }
+                    style={{
+                      ...btnStatusStyle,
+                      color: u.isActive ? "#58CC02" : "#FF4B4B",
+                      backgroundColor: u.isActive
+                        ? "#E8FDF0"
+                        : "#FFF0F0",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {u.isActive ? "ACTIVO" : "BLOQUEADO"}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
         {/* CURSOS */}
         {activeSection === "cursos" && (
           <div style={cardStyle}>
@@ -1305,13 +1335,14 @@ const handleGenCode = async (type: "student" | "teacher") => {
 // ========================= ESTILOS =========================
 const layoutStyle: React.CSSProperties = {
   display: "flex",
+  flexDirection: window.innerWidth < 768 ? "column" : "row",
   backgroundColor: "#F7F9FA",
   minHeight: "100vh",
   fontFamily: '"Nunito", sans-serif',
 };
 const mainContainerStyle: React.CSSProperties = {
-  flex: 1,                         // ocupa todo el espacio restante
-  padding: "20px 32px",            // ajusta padding a lo que te guste
+ width: "100%",
+  padding: "20px",
   boxSizing: "border-box",
 };
 const cardStyle: React.CSSProperties = {
@@ -1418,7 +1449,11 @@ const selectRoleStyle: React.CSSProperties = {
   color: "#777",
   cursor: "pointer",
 };
-const horizontalGrid: React.CSSProperties = { display: "flex", gap: "20px" };
+const horizontalGrid: React.CSSProperties = {
+  display: "flex",
+  flexDirection: window.innerWidth < 900 ? "column" : "row",
+  gap: "20px",
+};
 const modernCodeCard: React.CSSProperties = {
   backgroundColor: "white",
   padding: "25px",
@@ -1455,10 +1490,13 @@ const btnActionSmall: React.CSSProperties = {
   boxShadow: "0 4px 0 #9366E4",
 };
 const rowInputStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  marginBottom: "12px",
-  alignItems: "center",
+padding: "12px",
+  borderRadius: "12px",
+  border: "2px solid #E5E5E5",
+  flex: "1 1 200px",
+  minWidth: "150px",
+  fontWeight: 600,
+  outline: "none",
 };
 const inputStyle: React.CSSProperties = {
   padding: "12px",
