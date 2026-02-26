@@ -77,7 +77,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // ✅ Cerrar con ESC (desktop)
+  // ✅ Cerrar con ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -98,7 +98,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     setSending(true);
 
     try {
-      // 1) mensaje de texto
+      // 1) mensaje de texto normal
       if (trimmed) {
         const optimistic: ChatMessage = {
           id: Date.now(),
@@ -215,7 +215,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   };
 
   const styles = `
-    /* ====== OVERLAY: cubre toda la pantalla ====== */
+    /* ====== OVERLAY: cubre todo y está por ENCIMA de todo ====== */
     .fc-overlay {
       position: fixed;
       inset: 0;
@@ -223,10 +223,10 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       justify-content: flex-end;
       align-items: flex-end;
       background: transparent;
-      z-index: 9998;
+      z-index: 2147483000; /* mega alto */
     }
 
-    /* En móvil: fondo gris y el chat ocupa toda la pantalla */
+    /* En móvil: fondo oscurecido y chat centrado */
     @media (max-width: 1023px) {
       .fc-overlay {
         justify-content: center;
@@ -248,7 +248,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      z-index: 9999;
+      z-index: 2147483001; /* aún más alto que el overlay */
     }
 
     .fc-header{
@@ -275,7 +275,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       background: transparent;
       cursor: pointer;
       font-weight: 900;
-      color: #94A3B8;
+      color: #1f2933;
       font-size: 20px;
       padding: 4px 10px;
       border-radius: 999px;
@@ -436,9 +436,9 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     <>
       <style>{styles}</style>
 
-      {/* Overlay: click fuera del chat = cerrar */}
+      {/* Overlay: clic fuera del chat = cerrar */}
       <div className="fc-overlay" onClick={onClose}>
-        {/* Chat: stopPropagation para que no se cierre al hacer click dentro */}
+        {/* Chat: evitamos que el clic interno cierre el overlay */}
         <div className="fc-root" onClick={(e) => e.stopPropagation()}>
           {/* header */}
           <div className="fc-header">
