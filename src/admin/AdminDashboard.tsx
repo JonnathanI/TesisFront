@@ -43,10 +43,13 @@ interface CoursesProps {
 // ==========================================
 // 2. SUB-COMPONENTE: GESTIÓN DE CURSOS
 // ==========================================
+// ==========================================
+// 2. SUB-COMPONENTE: GESTIÓN DE CURSOS
+// ==========================================
 const CoursesSection = ({
   courses,
   allUsers,
-  onSelectCourse,
+  onSelectCourse, // ya no lo usamos, pero lo dejamos por compatibilidad
   onRefresh,
 }: CoursesProps) => {
   const [form, setForm] = useState({
@@ -58,19 +61,41 @@ const CoursesSection = ({
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Profesores disponibles: no estén ya asignados como teacher de otro curso
+  // 👉 Curso que estoy editando (si aplica)
+  const editingCourse = useMemo(
+    () => courses.find((c) => c.id === editingId) || null,
+    [courses, editingId]
+  );
+
+  // ================================================
+  // PROFESORES DISPONIBLES
+  //  - No repetidos en otros cursos
+  //  - PERO si estoy editando, incluir el teacher actual del curso
+  // ================================================
   const usedTeacherIds = new Set(
     courses
       .filter((c) => c.teacher)
       .map((c) => c.teacher.id as string)
   );
 
-  const availableTeachers = allUsers.filter(
-    (u) =>
-      (u.role === "TEACHER" || u.role === "ADMIN") && !usedTeacherIds.has(u.id!)
-  );
+  const currentTeacherId = editingCourse?.teacher?.id as string | undefined;
 
-  // Estudiantes disponibles: no estén en students de ningún curso
+  const availableTeachers = allUsers.filter((u) => {
+    const isTeacherRole = u.role === "TEACHER" || u.role === "ADMIN";
+    if (!isTeacherRole) return false;
+
+    // Si es el teacher actual del curso en edición, permitirlo
+    if (currentTeacherId && u.id === currentTeacherId) return true;
+
+    // Si ya está usado en otro curso, NO mostrarlo
+    return !usedTeacherIds.has(u.id!);
+  });
+
+  // ================================================
+  // ESTUDIANTES DISPONIBLES
+  //  - No repetidos en otros cursos
+  //  - PERO si estoy editando, incluir los alumnos actuales de ese curso
+  // ================================================
   const usedStudentIds = new Set<string>();
   courses.forEach((c) => {
     (c.students || []).forEach((s: any) => {
@@ -78,15 +103,31 @@ const CoursesSection = ({
     });
   });
 
-  const availableStudents = allUsers.filter(
-    (u) => u.role === "STUDENT" && !usedStudentIds.has(u.id!)
+  const editingCourseStudentIds = new Set<string>(
+    (editingCourse?.students || []).map((s: any) => s.id as string)
   );
 
+  const availableStudents = allUsers.filter((u) => {
+    if (u.role !== "STUDENT") return false;
+
+    // Si es alumno del curso que estoy editando, permitirlo
+    if (editingCourseStudentIds.has(u.id!)) return true;
+
+    // Si está matriculado en otro curso, NO mostrarlo
+    return !usedStudentIds.has(u.id!);
+  });
+
+  // ================================================
+  // GUARDAR / CREAR CURSO
+  // ================================================
   const handleSubmit = async () => {
     if (!form.title.trim()) return alert("Título requerido");
     try {
-      if (editingId) await updateCourse(editingId, form);
-      else await createCourse(form);
+      if (editingId) {
+        await updateCourse(editingId, form);
+      } else {
+        await createCourse(form);
+      }
 
       setForm({
         title: "",
@@ -98,7 +139,37 @@ const CoursesSection = ({
       setEditingId(null);
       onRefresh();
     } catch (e) {
+      console.error(e);
       alert("Error al procesar curso");
+    }
+  };
+
+  // ================================================
+  // ELIMINAR CURSO
+  // ================================================
+  const handleDeleteCourse = async (id: string, title: string) => {
+    const ok = window.confirm(
+      `¿Seguro que deseas eliminar el curso "${title}"? Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    try {
+      await deleteCourse(id);
+      // Si estaba editando este curso, limpiamos el formulario
+      if (editingId === id) {
+        setEditingId(null);
+        setForm({
+          title: "",
+          baseLanguage: "ES",
+          targetLanguage: "EN",
+          teachers: [],
+          students: [],
+        });
+      }
+      onRefresh();
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo eliminar el curso");
     }
   };
 
@@ -166,6 +237,11 @@ const CoursesSection = ({
                   {u.fullName} {form.teachers.includes(u.id!) && "✅"}
                 </div>
               ))}
+              {availableTeachers.length === 0 && (
+                <span style={{ fontSize: 12, color: "#999" }}>
+                  No hay profesores disponibles.
+                </span>
+              )}
             </div>
           </div>
 
@@ -181,6 +257,11 @@ const CoursesSection = ({
                   {u.fullName} {form.students.includes(u.id!) && "✅"}
                 </div>
               ))}
+              {availableStudents.length === 0 && (
+                <span style={{ fontSize: 12, color: "#999" }}>
+                  No hay estudiantes disponibles.
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -205,7 +286,16 @@ const CoursesSection = ({
 
           {editingId && (
             <button
-              onClick={() => setEditingId(null)}
+              onClick={() => {
+                setEditingId(null);
+                setForm({
+                  title: "",
+                  baseLanguage: "ES",
+                  targetLanguage: "EN",
+                  teachers: [],
+                  students: [],
+                });
+              }}
               style={{
                 padding: "12px",
                 borderRadius: "10px",
@@ -244,13 +334,16 @@ const CoursesSection = ({
             </div>
 
             <div style={{ display: "flex", gap: "8px" }}>
-              <button
+              {/* 🔴 ELIMINAR BOTÓN "UNIDADES" (YA NO SE MUESTRA) */}
+              {/* (si quieres borrarlo completamente, puedes eliminar este botón) */}
+              {/* <button
                 onClick={() => onSelectCourse(course.id)}
                 style={btnCourseAction}
               >
                 Unidades
-              </button>
+              </button> */}
 
+              {/* ✏️ EDITAR */}
               <button
                 onClick={() => {
                   setEditingId(course.id);
@@ -269,6 +362,20 @@ const CoursesSection = ({
                 }}
               >
                 Editar
+              </button>
+
+              {/* 🗑 ELIMINAR CURSO */}
+              <button
+                onClick={() =>
+                  handleDeleteCourse(course.id, course.title || "curso")
+                }
+                style={{
+                  ...btnCourseAction,
+                  background: "#FEE2E2",
+                  color: "#B91C1C",
+                }}
+              >
+                Eliminar
               </button>
             </div>
           </div>
