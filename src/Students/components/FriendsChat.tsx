@@ -27,7 +27,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // 🔹 Cargar historial solo una vez al abrir el chat
+  // 🔹 Cargar historial
   useEffect(() => {
     const load = async () => {
       try {
@@ -43,7 +43,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     load();
   }, [friend.id]);
 
-  // 🔄 Refrescar el chat cada 1 segundo
+  // 🔄 Refrescar cada 1s
   useEffect(() => {
     let isMounted = true;
 
@@ -77,7 +77,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // ✅ Cerrar con ESC
+  // Cerrar con ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -98,7 +98,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     setSending(true);
 
     try {
-      // 1) mensaje de texto normal
+      // mensaje de texto
       if (trimmed) {
         const optimistic: ChatMessage = {
           id: Date.now(),
@@ -119,7 +119,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
         });
       }
 
-      // 2) archivo
+      // archivo
       if (selectedFile) {
         const savedFileMessage = await sendChatFile(friend.id, selectedFile, "");
         setMessages((prev) => [...prev, savedFileMessage]);
@@ -215,7 +215,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
   };
 
   const styles = `
-    /* ====== OVERLAY: cubre todo y está por ENCIMA de todo ====== */
+    /* ====== OVERLAY: contenedor general ====== */
     .fc-overlay {
       position: fixed;
       inset: 0;
@@ -223,19 +223,10 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       justify-content: flex-end;
       align-items: flex-end;
       background: transparent;
-      z-index: 2147483000; /* mega alto */
+      z-index: 2147483000;
     }
 
-    /* En móvil: fondo oscurecido y chat centrado */
-    @media (max-width: 1023px) {
-      .fc-overlay {
-        justify-content: center;
-        align-items: center;
-        background: rgba(15,23,42,0.20);
-      }
-    }
-
-    /* ====== Caja del chat ====== */
+    /* ====== Caja del chat (desktop) ====== */
     .fc-root{
       position: fixed;
       bottom: 20px;
@@ -248,7 +239,7 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      z-index: 2147483001; /* aún más alto que el overlay */
+      z-index: 2147483001;
     }
 
     .fc-header{
@@ -399,27 +390,39 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
       border-radius: 10px;
     }
 
-    /* ====== MÓVIL: pantalla completa ====== */
+    /* ====== MÓVIL: pantalla "casi" completa y BAJO el header ====== */
     @media (max-width: 1023px){
+      /* dejamos libre arriba ~70px para el header y sus menús */
+      .fc-overlay{
+        top: 70px;
+        align-items: flex-start;
+        justify-content: center;
+        background: rgba(15,23,42,0.10);
+      }
+
       .fc-root{
-        top: 0;
+        top: 70px;
         left: 0;
         right: 0;
         bottom: 0;
         width: auto;
         max-height: none;
-        border-radius: 0;
+        border-radius: 18px 18px 0 0;
       }
+
       .fc-messages{
         padding: 12px;
       }
+
       .fc-bubble{
         max-width: 88%;
         font-size: 13px;
       }
+
       .fc-textarea{
         font-size: 14px;
       }
+
       .fc-send{
         padding: 10px 14px;
       }
@@ -436,10 +439,10 @@ export const FriendsChat: React.FC<FriendsChatProps> = ({
     <>
       <style>{styles}</style>
 
-      {/* Overlay: clic fuera del chat = cerrar */}
-      <div className="fc-overlay" onClick={onClose}>
-        {/* Chat: evitamos que el clic interno cierre el overlay */}
-        <div className="fc-root" onClick={(e) => e.stopPropagation()}>
+      {/* Overlay: futuro si quieres cerrar tocando fuera,
+          por ahora solo usamos para posicionar el chat */}
+      <div className="fc-overlay">
+        <div className="fc-root">
           {/* header */}
           <div className="fc-header">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
