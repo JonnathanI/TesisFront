@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
+// 👇 Base URL de tu backend
+const API_BASE_URL =
+  (process.env.REACT_APP_API_URL as string) ||
+  "https://englishpeak.duckdns.org/api";
+
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -28,7 +33,7 @@ export default function ResetPassword() {
     }
 
     try {
-      const res = await fetch("http://localhost:8081/api/auth/password/reset", {
+      const res = await fetch(`${API_BASE_URL}/auth/password/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -156,8 +161,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     transition: "border 0.2s",
     backgroundColor: "#f7f7f7",
   },
-  // Nota: Para que el borde cambie a amarillo al hacer focus, 
-  // podrías usar una clase CSS, pero aquí lo mantenemos simple.
   button: {
     backgroundColor: "#ffc800",
     color: "#3c3c3c",
@@ -169,7 +172,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     textTransform: "uppercase",
     cursor: "pointer",
     marginTop: "10px",
-    boxShadow: "0px 4px 0px #e5a500", // Efecto 3D del botón de Duolingo
+    boxShadow: "0px 4px 0px #e5a500",
   },
   errorText: {
     color: "#ff4b4b",
