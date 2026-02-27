@@ -2,9 +2,7 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
 // 👇 Base URL de tu backend
-const API_BASE_URL =
-  (process.env.REACT_APP_API_URL as string) ||
-  "https://englishpeak.duckdns.org/api";
+const API_BASE_URL = "https://englishpeak.duckdns.org/api";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
