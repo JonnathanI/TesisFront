@@ -509,7 +509,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
   const eyeColors = ["#000000", "#634e34", "#2e536f", "#3d6e70", "#7d5d8c", "#9b111e", "#ffc800", "#999999"];
 
   const styles = `
-    .ae-overlay{
+   .ae-overlay{
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.85);
@@ -517,15 +517,15 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      padding: 14px;
+      padding: 16px;
+      overflow-y: auto;        /* ✅ Si el modal es muy alto, se puede scrollear */
     }
-
     .ae-modal{
       background: #1A202C;
       border-radius: 24px;
-      width: 95%;
-      max-width: 900px;
-      height: min(90vh, 820px);
+      width: 100%;
+      max-width: 960px;
+      max-height: 90vh;        /* ✅ No pasa de la altura de la pantalla */
       display: flex;
       gap: 18px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.5);
@@ -587,7 +587,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     .ae-scroll{
       flex: 1;
-      overflow-y: auto;
+      overflow-y: auto;       /* ✅ Zona scrollable para las opciones */
       padding-right: 6px;
       min-height: 0;
     }
@@ -624,10 +624,16 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     /* ✅ Mobile/Tablet: una columna (preview arriba) */
     @media (max-width: 900px){
-      .ae-modal{
+    .ae-overlay{
+        padding: 0;
+        align-items: stretch;
+        justify-content: stretch;
+      }
+       .ae-modal{
         width: 100%;
-        height: 100dvh;
         max-width: none;
+        height: auto;
+        min-height: 100dvh;    /* Ocupa toda la altura visible */
         border-radius: 0;
         flex-direction: column;
         gap: 12px;
@@ -652,10 +658,20 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       }
     }
 
-    /* Extra small */
+     /* 📱 Extra pequeños (teléfonos chicos) */
     @media (max-width: 420px){
-      .ae-preview{ height: 210px; }
-      .ae-tabbtn{ padding: 10px 10px; font-size: 13px; }
+      .ae-preview{
+        height: 200px;
+      }
+
+      .ae-tabbtn{
+        padding: 8px 8px;
+        font-size: 12px;
+      }
+
+      .ae-title{
+        font-size: 1.1rem;
+      }
     }
   `;
 
