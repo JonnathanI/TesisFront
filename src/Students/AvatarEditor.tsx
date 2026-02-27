@@ -14,6 +14,9 @@ export interface AvatarAttributes {
   eyes: "default" | "happy" | "wink" | "angry" | "surprised" | "sleepy";
   mouth: "smile" | "frown" | "open" | "smirk";
   accessory: "none" | "hat" | "bowtie" | "glasses";
+
+  /** 🔥 Nuevo: id del aspecto especial aplicado */
+  specialSkin?: string | null;
 }
 
 export const DEFAULT_AVATAR: AvatarAttributes = {
@@ -24,7 +27,91 @@ export const DEFAULT_AVATAR: AvatarAttributes = {
   eyes: "default",
   mouth: "smile",
   accessory: "none",
+  specialSkin: null,
 };
+
+/* ===========================
+   1.1. SKINS ESPECIALES
+   =========================== */
+
+interface SpecialSkin {
+  id: string;
+  name: string;
+  price: number;
+  preview: string; // emoji/mini ícono
+  overrides: Partial<AvatarAttributes>;
+}
+
+// 🎭 Aspectos temáticos con precio en diamantes
+export const SPECIAL_SKINS: SpecialSkin[] = [
+  {
+    id: "christmas",
+    name: "Navidad",
+    price: 50,
+    preview: "🎄",
+    overrides: {
+      skinTone: "#FCE9D9",
+      shirtColor: "#D62828",
+      accessory: "hat",
+      eyes: "happy",
+    },
+  },
+  {
+    id: "santa",
+    name: "Santa Claus",
+    price: 90,
+    preview: "🎅",
+    overrides: {
+      shirtColor: "#C1121F",
+      accessory: "hat",
+      mouth: "smile",
+    },
+  },
+  {
+    id: "newyear",
+    name: "Año Nuevo",
+    price: 70,
+    preview: "🎆",
+    overrides: {
+      shirtColor: "#FFD700",
+      accessory: "bowtie",
+      eyes: "surprised",
+    },
+  },
+  {
+    id: "valentine",
+    name: "San Valentín",
+    price: 40,
+    preview: "❤️",
+    overrides: {
+      shirtColor: "#FF4B4B",
+      eyes: "happy",
+      mouth: "smirk",
+    },
+  },
+  {
+    id: "birthday",
+    name: "Cumpleaños",
+    price: 60,
+    preview: "🎂",
+    overrides: {
+      accessory: "hat",
+      shirtColor: "#9C6FD6",
+      eyes: "happy",
+    },
+  },
+  {
+    id: "halloween",
+    name: "Halloween",
+    price: 80,
+    preview: "🎃",
+    overrides: {
+      shirtColor: "#FF8C00",
+      eyes: "angry",
+      mouth: "smirk",
+    },
+  },
+];
 
 /* ===========================
    2. PREVIEW DE OJOS
@@ -151,8 +238,17 @@ export const AnimatedAvatarRenderer: React.FC<AvatarRendererProps> = ({
   avatar,
   size = 200,
 }) => {
+  // 👉 Aplicar overrides del skin especial si está seleccionado
+  let renderAvatar: AvatarAttributes = avatar;
+  if (avatar.specialSkin) {
+    const skinPack = SPECIAL_SKINS.find((s) => s.id === avatar.specialSkin);
+    if (skinPack) {
+      renderAvatar = { ...avatar, ...skinPack.overrides };
+    }
+  }
+
   const { skinTone, shirtColor, eyeColor, bodyType, eyes, mouth, accessory } =
-    avatar;
+    renderAvatar;
 
   const bodyBaseY = 145;
   const bodyHeight = 105;
@@ -482,7 +578,14 @@ export const AnimatedAvatarRenderer: React.FC<AvatarRendererProps> = ({
    4. EDITOR DE AVATAR (MODAL)
    =========================== */
 
-type AvatarTab = "skin" | "eyes" | "mouth" | "body" | "shirt" | "extra";
+type AvatarTab =
+  | "skin"
+  | "eyes"
+  | "mouth"
+  | "body"
+  | "shirt"
+  | "extra"
+  | "seasonal";
 
 interface AvatarEditorProps {
   initialAvatar?: AvatarAttributes;
@@ -504,34 +607,57 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     setCurrentAvatar((prev) => ({ ...prev, [key]: value }));
   };
 
-  const skinTones = ["#FFDBAC", "#F1C27D", "#E0AC69", "#C68642", "#8D5524", "#5D4037"];
-  const shirtColors = ["#9C6FD6", "#58CC02", "#1CB0F6", "#FF4B4B", "#FFC800", "#FFFFFF", "#333333"];
-  const eyeColors = ["#000000", "#634e34", "#2e536f", "#3d6e70", "#7d5d8c", "#9b111e", "#ffc800", "#999999"];
+  const skinTones = [
+    "#FFDBAC",
+    "#F1C27D",
+    "#E0AC69",
+    "#C68642",
+    "#8D5524",
+    "#5D4037",
+  ];
+  const shirtColors = [
+    "#9C6FD6",
+    "#58CC02",
+    "#1CB0F6",
+    "#FF4B4B",
+    "#FFC800",
+    "#FFFFFF",
+    "#333333",
+  ];
+  const eyeColors = [
+    "#000000",
+    "#634e34",
+    "#2e536f",
+    "#3d6e70",
+    "#7d5d8c",
+    "#9b111e",
+    "#ffc800",
+    "#999999",
+  ];
 
   const styles = `
-       .ae-overlay{
+    .ae-overlay{
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.85);
       display: flex;
       justify-content: center;
-      align-items: flex-start;   /* ⬅ antes estaba center */
+      align-items: center;
       z-index: 9999;
-      padding: 16px 0;           /* ⬅ padding vertical */
-      overflow-y: auto;          /* ⬅ permite scroll en toda la pantalla */
-    }scro
-        .ae-modal{
+      padding: 14px;
+    }
+
+    .ae-modal{
       background: #1A202C;
       border-radius: 24px;
-      width: 100%;
-      max-width: 960px;
-      /* max-height: 90vh;  ⬅ QUÍTALO */
+      width: 95%;
+      max-width: 900px;
+      height: min(90vh, 820px);
       display: flex;
       gap: 18px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.5);
       overflow: hidden;
       min-width: 0;
-      margin: 24px auto;         /* ⬅ para que no se pegue al borde superior */
     }
 
     .ae-preview{
@@ -588,7 +714,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     .ae-scroll{
       flex: 1;
-      overflow-y: auto;       /* ✅ Zona scrollable para las opciones */
+      overflow-y: auto;
       padding-right: 6px;
       min-height: 0;
     }
@@ -625,16 +751,10 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     /* ✅ Mobile/Tablet: una columna (preview arriba) */
     @media (max-width: 900px){
-    .ae-overlay{
-        padding: 0;
-        align-items: stretch;
-        justify-content: stretch;
-      }
-       .ae-modal{
+      .ae-modal{
         width: 100%;
+        height: 100dvh;
         max-width: none;
-        height: auto;
-        min-height: 100dvh;    /* Ocupa toda la altura visible */
         border-radius: 0;
         flex-direction: column;
         gap: 12px;
@@ -659,20 +779,10 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       }
     }
 
-     /* 📱 Extra pequeños (teléfonos chicos) */
+    /* Extra small */
     @media (max-width: 420px){
-      .ae-preview{
-        height: 200px;
-      }
-
-      .ae-tabbtn{
-        padding: 8px 8px;
-        font-size: 12px;
-      }
-
-      .ae-title{
-        font-size: 1.1rem;
-      }
+      .ae-preview{ height: 210px; }
+      .ae-tabbtn{ padding: 10px 10px; font-size: 13px; }
     }
   `;
 
@@ -737,7 +847,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       >
         {/* PREVIEW */}
         <div className="ae-preview">
-          {/* En móvil se ajusta por CSS */}
           <AnimatedAvatarRenderer avatar={currentAvatar} />
         </div>
 
@@ -753,12 +862,15 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             <TabBtn id="body" label="Cuerpo" />
             <TabBtn id="shirt" label="Ropa" />
             <TabBtn id="extra" label="Extras" />
+            <TabBtn id="seasonal" label="Temporadas" />
           </div>
 
           <div className="ae-scroll">
             {/* OJOS */}
             {activeTab === "eyes" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 16 }}
+              >
                 <div>
                   <h4
                     style={{
@@ -798,7 +910,8 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(110px, 1fr))",
                       gap: 12,
                     }}
                   >
@@ -1029,13 +1142,51 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                 </OptionBox>
               </div>
             )}
+
+            {/* TEMPORADAS / SKINS ESPECIALES */}
+            {activeTab === "seasonal" && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {SPECIAL_SKINS.map((skin) => (
+                  <OptionBox
+                    key={skin.id}
+                    onClick={() => updateAttr("specialSkin", skin.id)}
+                    isSelected={currentAvatar.specialSkin === skin.id}
+                  >
+                    <div style={{ fontSize: "2.5rem" }}>{skin.preview}</div>
+                    <span style={{ fontSize: "0.9rem", color: "#fff" }}>
+                      {skin.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "#1cb0f6",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      💎 {skin.price}
+                    </span>
+                  </OptionBox>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="ae-actions">
             <button className="ae-btn ae-btn-cancel" onClick={onCancel}>
               Cancelar
             </button>
-            <button className="ae-btn ae-btn-save" onClick={() => onSave(currentAvatar)}>
+            <button
+              className="ae-btn ae-btn-save"
+              onClick={() => onSave(currentAvatar)}
+            >
               Guardar Cambios
             </button>
           </div>
