@@ -217,30 +217,34 @@ const StudentDashboard = () => {
   };
 
   // 💎 Compra de aspectos de avatar (skins de temporada)
-  const handleAvatarSkinPurchase = async (skinId: string, cost: number) => {
-    if (!userProfile) return;
+const handleAvatarSkinPurchase = async (
+  skinId: string,
+  cost: number
+): Promise<boolean> => {
+  if (!userProfile) return false;
 
-    if (userProfile.lingots < cost) {
-      alert("No tienes suficientes gemas para este aspecto.");
-      return;
-    }
+  if (userProfile.lingots < cost) {
+    alert("No tienes suficientes gemas para este aspecto.");
+    return false;
+  }
 
-    try {
-      // IMPORTANTE: ajusta el identificador según como lo espera tu backend
-      // Por ejemplo: "SKIN_christmas", "SKIN_valentine", etc.
-      await buyShopItem(`SKIN_${skinId.toUpperCase()}`);
+  try {
+    // IMPORTANTE: ajusta el identificador si tu backend usa otro nombre
+    await buyShopItem(`SKIN_${skinId.toUpperCase()}`);
 
-      const freshProfile = await loadData(true);
-      const unlockedSkins = ((freshProfile as any).unlockedSkins ||
-        []) as string[];
-      setOwnedSkins(unlockedSkins);
+    const freshProfile = await loadData(true);
+    const unlockedSkins = ((freshProfile as any).unlockedSkins ||
+      []) as string[];
+    setOwnedSkins(unlockedSkins);
 
-      alert("¡Aspecto adquirido/equipado!");
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || "Error al comprar el aspecto.");
-    }
-  };
+    alert("¡Aspecto adquirido/equipado!");
+    return true;
+  } catch (error: any) {
+    console.error(error);
+    alert(error.message || "Error al comprar el aspecto.");
+    return false;
+  }
+};
 
   // ✅ Guardar avatar desde el editor
   const handleAvatarSave = (newAvatar: AvatarAttributes) => {
@@ -820,36 +824,7 @@ const StudentDashboard = () => {
               />
             )}
 
-            {section === "profile" && (
-              <>
-                <ProfileSection />
-                {userProfile && (
-                  <div
-                    style={{
-                      marginTop: 16,
-                      display: "flex",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <button
-                      onClick={() => setShowAvatarEditor(true)}
-                      style={{
-                        padding: "10px 18px",
-                        borderRadius: 18,
-                        border: "none",
-                        backgroundColor: "#1CB0F6",
-                        color: "white",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                        boxShadow: "0 4px 0 #1899D6",
-                      }}
-                    >
-                      🎨 Editar avatar
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+           {section === "profile" && <ProfileSection />}
 
             {section === "badges" && (
               <>
@@ -894,6 +869,7 @@ const StudentDashboard = () => {
       </div>
 
       {/* 🎨 MODAL DEL AVATAR EDITOR */}
+           {/* 🎨 MODAL DEL AVATAR EDITOR */}
       {showAvatarEditor && userProfile && (
         <AvatarEditor
           initialAvatar={avatar}

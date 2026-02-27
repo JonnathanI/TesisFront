@@ -3,14 +3,23 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaFire, FaBolt, FaCrown, FaUser, FaPen, FaMedal } from "react-icons/fa";
 
-import { getUserProfile, updateUserAvatar } from "../api/auth.service";
+import {
+  getUserProfile,
+  updateUserAvatar,
+  buyShopItem,
+} from "../api/auth.service";
+
 import AvatarEditor, {
   AnimatedAvatarRenderer,
   AvatarAttributes,
   DEFAULT_AVATAR,
 } from "./AvatarEditor";
 
-import PetEditor, { PetRenderer, PetAttributes, DEFAULT_PET } from "./PetEditor";
+import PetEditor, {
+  PetRenderer,
+  PetAttributes,
+  DEFAULT_PET,
+} from "./PetEditor";
 
 import { UserProfileData } from "../api/auth.types";
 
@@ -40,6 +49,9 @@ export default function UserProfile() {
   const [showAvatarEditor, setShowAvatarEditor] = useState(false);
   const [showPetEditor, setShowPetEditor] = useState(false);
 
+  // ✅ skins que el usuario ya tiene
+  const [ownedSkins, setOwnedSkins] = useState<string[]>([]);
+
   // 👉 helper para guardar avatar+mascota juntos
   const persistAvatar = async (
     avatarToSave: AvatarAttributes,
@@ -57,11 +69,51 @@ export default function UserProfile() {
     }
   };
 
+  // 💎 compra/equipado de skins desde el perfil
+// dentro de UserProfile.tsx (o StudentDashboard, si lo usas ahí también)
+const handleAvatarSkinPurchase = async (
+  skinId: string,
+  cost: number
+): Promise<boolean> => {
+  if (!profile) return false;
+
+  if (profile.lingots < cost) {
+    alert("No tienes suficientes diamantes para este aspecto.");
+    return false;
+  }
+
+  try {
+    // 🔴 ANTES (da error de Ítem desconocido)
+    // await buyShopItem(`SKIN_${skinId.toUpperCase()}`);
+
+    // ✅ AHORA: mandamos el id TAL CUAL lo definiste en SEASONAL_SKINS
+    await buyShopItem(skinId);
+
+    // Recargar perfil para actualizar lingots y skins desbloqueados
+    const fresh = await getUserProfile();
+    setProfile(fresh);
+
+    const unlocked = ((fresh as any).unlockedSkins || []) as string[];
+    setOwnedSkins(unlocked);
+
+    alert("¡Aspecto adquirido/equipado!");
+    return true;
+  } catch (error: any) {
+    console.error(error);
+    alert(error.message || "Error al comprar el aspecto.");
+    return false;
+  }
+};
+
   useEffect(() => {
     const loadData = async () => {
       try {
         const data = await getUserProfile();
         setProfile(data);
+
+        // ✅ leer skins desbloqueados del backend, si existen
+        const unlocked = ((data as any).unlockedSkins || []) as string[];
+        setOwnedSkins(unlocked);
 
         let avatarFromServer: AvatarAttributes | null = null;
         let petFromServer: PetAttributes | null = null;
@@ -357,7 +409,11 @@ export default function UserProfile() {
   });
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="up-root">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="up-root"
+    >
       <style>{styles}</style>
 
       <div className="up-wrap">
@@ -366,16 +422,33 @@ export default function UserProfile() {
           <div className="up-card">
             {/* Racha y lingots */}
             <div className="up-top-right">
-              <div style={{ color: "#ff9600", display: "flex", gap: 6, alignItems: "center" }}>
+              <div
+                style={{
+                  color: "#ff9600",
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                }}
+              >
                 <FireIcon /> {profile.currentStreak}
               </div>
-              <div style={{ color: "#1cb0f6", display: "flex", gap: 6, alignItems: "center" }}>
+              <div
+                style={{
+                  color: "#1cb0f6",
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                }}
+              >
                 💎 {profile.lingots}
               </div>
             </div>
 
             {/* Botón editar avatar */}
-            <button className="up-edit-btn" onClick={() => setShowAvatarEditor(true)}>
+            <button
+              className="up-edit-btn"
+              onClick={() => setShowAvatarEditor(true)}
+            >
               <PenIcon />
             </button>
 
@@ -389,8 +462,15 @@ export default function UserProfile() {
                 )}
 
                 {/* Sub-burbuja mascota */}
-                <div className="up-pet-bubble" onClick={() => setShowPetEditor(true)}>
-                  {pet ? <PetRenderer pet={pet} size={60} /> : <span style={{ fontSize: "2rem" }}>🦉</span>}
+                <div
+                  className="up-pet-bubble"
+                  onClick={() => setShowPetEditor(true)}
+                >
+                  {pet ? (
+                    <PetRenderer pet={pet} size={60} />
+                  ) : (
+                    <span style={{ fontSize: "2rem" }}>🦉</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -402,8 +482,9 @@ export default function UserProfile() {
               <p className="up-joined">Se unió en {joinedDate}</p>
 
               <div className="up-pet-tip">
-                <strong>Mascota:</strong> Tu compañero de estudio. Personaliza su estilo en la tienda de mascota:
-                puedes ponerlo feliz, con sueño o enojado.
+                <strong>Mascota:</strong> Tu compañero de estudio. Personaliza
+                su estilo en la tienda de mascota: puedes ponerlo feliz, con
+                sueño o enojado.
               </div>
             </div>
           </div>
@@ -426,7 +507,11 @@ export default function UserProfile() {
               value={`Nivel ${currentLevel}`}
               label={profile.league}
             />
-            <StatBox icon={<MedalIcon color="#00ffc2" />} value="0" label="Top 3" />
+            <StatBox
+              icon={<MedalIcon color="#00ffc2" />}
+              value="0"
+              label="Top 3"
+            />
           </div>
 
           {/* LOGROS */}
@@ -437,7 +522,13 @@ export default function UserProfile() {
               color="#ff9600"
               title="En el blanco"
               desc="Racha de 7 días"
-              level={profile.currentStreak >= 7 ? 3 : profile.currentStreak >= 1 ? 1 : 0}
+              level={
+                profile.currentStreak >= 7
+                  ? 3
+                  : profile.currentStreak >= 1
+                  ? 1
+                  : 0
+              }
               maxLevel={3}
             />
             <AchievementItem
@@ -445,7 +536,9 @@ export default function UserProfile() {
               color="#58cc02"
               title="Intelectual"
               desc="Gana 500 XP"
-              level={profile.totalXp >= 500 ? 3 : profile.totalXp >= 100 ? 1 : 0}
+              level={
+                profile.totalXp >= 500 ? 3 : profile.totalXp >= 100 ? 1 : 0
+              }
               maxLevel={3}
             />
           </div>
@@ -463,6 +556,10 @@ export default function UserProfile() {
               await persistAvatar(newAvatar, pet ?? DEFAULT_PET);
             }}
             onCancel={() => setShowAvatarEditor(false)}
+            // 👇 ahora este editor también ve tus lingots y skins
+            userLingots={profile.lingots}
+            ownedSkins={ownedSkins}
+            onPurchase={handleAvatarSkinPurchase}
           />
         )}
       </AnimatePresence>

@@ -1,4 +1,4 @@
-// src/Components/AvatarEditor.tsx
+// src/Students/AvatarEditor.tsx
 import React, { useState } from "react";
 import { motion, Variants } from "framer-motion";
 
@@ -14,8 +14,6 @@ export interface AvatarAttributes {
   eyes: "default" | "happy" | "wink" | "angry" | "surprised" | "sleepy";
   mouth: "smile" | "frown" | "open" | "smirk";
   accessory: "none" | "hat" | "bowtie" | "glasses";
-  /** ID de skin especial equipado, si hay */
-  specialSkin?: string | null;
 }
 
 export const DEFAULT_AVATAR: AvatarAttributes = {
@@ -26,77 +24,7 @@ export const DEFAULT_AVATAR: AvatarAttributes = {
   eyes: "default",
   mouth: "smile",
   accessory: "none",
-  specialSkin: null,
 };
-
-/* ===========================
-   1.1 SKINS ESPECIALES / TEMPORADAS
-   =========================== */
-
-interface SpecialSkin {
-  id: string;
-  name: string;
-  price: number;
-  preview: string;
-  overrides: Partial<AvatarAttributes>;
-}
-
-const SPECIAL_SKINS: SpecialSkin[] = [
-  {
-    id: "christmas",
-    name: "Navidad",
-    price: 50,
-    preview: "🎄",
-    overrides: {
-      shirtColor: "#D62828",
-      accessory: "hat",
-      eyes: "happy",
-    },
-  },
-  {
-    id: "valentine",
-    name: "San Valentín",
-    price: 40,
-    preview: "❤️",
-    overrides: {
-      shirtColor: "#FF4B4B",
-      eyes: "happy",
-      mouth: "smirk",
-    },
-  },
-  {
-    id: "newyear",
-    name: "Año Nuevo",
-    price: 70,
-    preview: "🎆",
-    overrides: {
-      shirtColor: "#FFD700",
-      accessory: "bowtie",
-      eyes: "surprised",
-    },
-  },
-  {
-    id: "birthday",
-    name: "Cumpleaños",
-    price: 60,
-    preview: "🎂",
-    overrides: {
-      accessory: "hat",
-      eyes: "happy",
-    },
-  },
-  {
-    id: "halloween",
-    name: "Halloween",
-    price: 80,
-    preview: "🎃",
-    overrides: {
-      shirtColor: "#FF8C00",
-      eyes: "angry",
-      mouth: "smirk",
-    },
-  },
-];
 
 /* ===========================
    2. PREVIEW DE OJOS
@@ -551,7 +479,7 @@ export const AnimatedAvatarRenderer: React.FC<AvatarRendererProps> = ({
 };
 
 /* ===========================
-   4. EDITOR DE AVATAR (MODAL)
+   4. SKINS DE TEMPORADA
    =========================== */
 
 type AvatarTab =
@@ -561,17 +489,116 @@ type AvatarTab =
   | "body"
   | "shirt"
   | "extra"
-  | "seasonal";
+  | "skins";
+
+interface SeasonalSkin {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  category: "navidad" | "san_valentin" | "cumple" | "halloween" | "nuevo_anio";
+  emoji: string;
+  overrides: Partial<AvatarAttributes>;
+}
+
+const SEASONAL_SKINS: SeasonalSkin[] = [
+  {
+    id: "XMAS_ELF",
+    name: "Navidad Duende",
+    description: "Sombrero navideño y suéter rojo festivo.",
+    cost: 150,
+    category: "navidad",
+    emoji: "🎄",
+    overrides: {
+      shirtColor: "#EF4444",
+      eyes: "happy",
+      mouth: "smile",
+      accessory: "hat",
+    },
+  },
+  {
+    id: "XMAS_SWEATER",
+    name: "Jersey de Nieve",
+    description: "Ropa azul hielo para la época navideña.",
+    cost: 120,
+    category: "navidad",
+    emoji: "❄️",
+    overrides: {
+      shirtColor: "#1D4ED8",
+      eyes: "sleepy",
+      mouth: "smirk",
+    },
+  },
+  {
+    id: "VALENTINE_LOVE",
+    name: "Amor y Amistad",
+    description: "Colores rosados y mirada tierna.",
+    cost: 130,
+    category: "san_valentin",
+    emoji: "💘",
+    overrides: {
+      shirtColor: "#EC4899",
+      eyeColor: "#EC4899",
+      eyes: "happy",
+      mouth: "smile",
+    },
+  },
+  {
+    id: "BIRTHDAY_PARTY",
+    name: "Cumpleaños",
+    description: "Fiesta de cumpleaños con corbatín.",
+    cost: 140,
+    category: "cumple",
+    emoji: "🎂",
+    overrides: {
+      accessory: "bowtie",
+      eyes: "surprised",
+      mouth: "open",
+      shirtColor: "#F97316",
+    },
+  },
+  {
+    id: "NEWYEAR_FIREWORKS",
+    name: "Año Nuevo",
+    description: "Look brillante para recibir el año.",
+    cost: 160,
+    category: "nuevo_anio",
+    emoji: "🎆",
+    overrides: {
+      shirtColor: "#FACC15",
+      eyes: "surprised",
+      mouth: "smile",
+    },
+  },
+  {
+    id: "HALLOWEEN_SPOOKY",
+    name: "Halloween",
+    description: "Mirada misteriosa con colores oscuros.",
+    cost: 150,
+    category: "halloween",
+    emoji: "🎃",
+    overrides: {
+      shirtColor: "#111827",
+      eyeColor: "#F97316",
+      eyes: "angry",
+      mouth: "smirk",
+    },
+  },
+];
+
+/* ===========================
+   5. EDITOR DE AVATAR (MODAL)
+   =========================== */
 
 interface AvatarEditorProps {
   initialAvatar?: AvatarAttributes;
   onSave: (avatar: AvatarAttributes) => void;
   onCancel: () => void;
 
-  // 💎 NUEVO: cosas relacionadas con gemas y skins
-  userLingots: number; // profile.lingots
-  ownedSkins: string[]; // ej: ["christmas","valentine"]
-  onPurchase: (skinId: string, cost: number) => void;
+  // 💎 OPCIONALES → así no rompe el padre actual
+  userLingots?: number;
+  ownedSkins?: string[];
+  onPurchase?: (skinId: string, cost: number) => Promise<boolean> | boolean;
 }
 
 const AvatarEditor: React.FC<AvatarEditorProps> = ({
@@ -586,7 +613,11 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     initialAvatar || DEFAULT_AVATAR
   );
   const [activeTab, setActiveTab] = useState<AvatarTab>("eyes");
-  const [skinError, setSkinError] = useState("");
+  const [selectedSkinId, setSelectedSkinId] = useState<string | null>(null);
+
+  // Valores seguros aunque el padre no los envíe
+  const effectiveLingots = userLingots ?? 0;
+  const effectiveOwnedSkins = ownedSkins ?? [];
 
   const updateAttr = (key: keyof AvatarAttributes, value: any) => {
     setCurrentAvatar((prev) => ({ ...prev, [key]: value }));
@@ -619,41 +650,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     "#ffc800",
     "#999999",
   ];
-
-  /* ========= LÓGICA SKINS ESPECIALES ========= */
-
-  const handleEquipSkin = (skin: SpecialSkin) => {
-    if (!ownedSkins.includes(skin.id)) return;
-
-    setCurrentAvatar((prev) => ({
-      ...prev,
-      ...skin.overrides,
-      specialSkin: skin.id,
-    }));
-  };
-
-  const handleBuySkin = (skin: SpecialSkin) => {
-    const isOwned = ownedSkins.includes(skin.id);
-
-    if (isOwned) {
-      handleEquipSkin(skin);
-      return;
-    }
-
-    if (userLingots < skin.price) {
-      setSkinError("No tienes suficientes diamantes 💎");
-      return;
-    }
-
-    setSkinError("");
-    // 🔥 avisar al padre para que descuente gemas y guarde compra
-    onPurchase(skin.id, skin.price);
-
-    // equiparlo visualmente
-    handleEquipSkin(skin);
-  };
-
-  /* ========= ESTILOS ========= */
 
   const styles = `
     .ae-overlay{
@@ -703,7 +699,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     .ae-title{
       color: white;
-      margin: 0 0 8px 0;
+      margin: 0 0 14px 0;
     }
 
     .ae-tabs{
@@ -769,7 +765,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       box-shadow: 0 4px 0 #46a302;
     }
 
-    /* ✅ Mobile/Tablet: una columna (preview arriba) */
     @media (max-width: 900px){
       .ae-modal{
         width: 100%;
@@ -799,7 +794,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
       }
     }
 
-    /* Extra small */
     @media (max-width: 420px){
       .ae-preview{ height: 210px; }
       .ae-tabbtn{ padding: 10px 10px; font-size: 13px; }
@@ -856,6 +850,53 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     />
   );
 
+  const handleSkinAction = async (skin: SeasonalSkin) => {
+    const isOwned = effectiveOwnedSkins.includes(skin.id);
+    const isActive = selectedSkinId === skin.id;
+
+    // Ya está equipado → nada
+    if (isActive) return;
+
+    // Si ya lo tiene → solo equipar
+    if (isOwned) {
+      setCurrentAvatar((prev) => ({ ...prev, ...skin.overrides }));
+      setSelectedSkinId(skin.id);
+      return;
+    }
+
+    // No lo tiene y no hay función de compra conectada
+    if (!onPurchase) {
+      alert(
+        "La compra de aspectos aún no está conectada. Solo el desarrollador debe configurar onPurchase."
+      );
+      return;
+    }
+
+    if (effectiveLingots < skin.cost) {
+      alert("No tienes suficientes diamantes.");
+      return;
+    }
+
+    try {
+      // Respetamos el booleano que devuelva el padre
+      const purchaseResult = await Promise.resolve(
+        onPurchase(skin.id, skin.cost)
+      );
+
+      if (!purchaseResult) {
+        // el backend / padre decidió que la compra no se complete
+        return;
+      }
+
+      // Si todo fue bien, equipamos el aspecto en el editor
+      setCurrentAvatar((prev) => ({ ...prev, ...skin.overrides }));
+      setSelectedSkinId(skin.id);
+    } catch (e) {
+      console.error("Error comprando skin:", e);
+      alert("No se pudo completar la compra del aspecto.");
+    }
+  };
+
   return (
     <div className="ae-overlay">
       <style>{styles}</style>
@@ -874,22 +915,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
         <div className="ae-controls">
           <h2 className="ae-title">Edita tu Avatar</h2>
 
-          {/* 💎 Info de gemas */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 10,
-              color: "#A0AEC0",
-              fontWeight: 800,
-              fontSize: "0.9rem",
-            }}
-          >
-            <span>💎 Gemas:</span>
-            <span style={{ color: "#1CB0F6" }}>{userLingots}</span>
-          </div>
-
           {/* pestañas */}
           <div className="ae-tabs">
             <TabBtn id="skin" label="Piel" />
@@ -898,18 +923,14 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             <TabBtn id="body" label="Cuerpo" />
             <TabBtn id="shirt" label="Ropa" />
             <TabBtn id="extra" label="Extras" />
-            <TabBtn id="seasonal" label="Temporadas" />
+            <TabBtn id="skins" label="Aspectos" />
           </div>
 
           <div className="ae-scroll">
             {/* OJOS */}
             {activeTab === "eyes" && (
               <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
+                style={{ display: "flex", flexDirection: "column", gap: 16 }}
               >
                 <div>
                   <h4
@@ -923,9 +944,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     Color de ojos
                   </h4>
 
-                  <div
-                    style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-                  >
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                     {eyeColors.map((c) => (
                       <ColorCircle
                         key={c}
@@ -1007,14 +1026,10 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             {/* PIEL */}
             {activeTab === "skin" && (
               <div>
-                <h4
-                  style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}
-                >
+                <h4 style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}>
                   Tono de piel
                 </h4>
-                <div
-                  style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-                >
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {skinTones.map((c) => (
                     <ColorCircle
                       key={c}
@@ -1030,14 +1045,10 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             {/* ROPA */}
             {activeTab === "shirt" && (
               <div>
-                <h4
-                  style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}
-                >
+                <h4 style={{ color: "#A0AEC0", marginBottom: "0.8rem" }}>
                   Color de ropa
                 </h4>
-                <div
-                  style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
-                >
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {shirtColors.map((c) => (
                     <ColorCircle
                       key={c}
@@ -1055,8 +1066,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(120px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -1107,8 +1117,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(140px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -1149,8 +1158,7 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(140px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
                   gap: 12,
                 }}
               >
@@ -1196,96 +1204,157 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               </div>
             )}
 
-            {/* TEMPORADAS */}
-            {activeTab === "seasonal" && (
+            {/* ASPECTOS DE TEMPORADA */}
+            {activeTab === "skins" && (
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(150px, 1fr))",
-                  gap: 12,
-                }}
+                style={{ display: "flex", flexDirection: "column", gap: 16 }}
               >
-                {SPECIAL_SKINS.map((skin) => {
-                  const isOwned = ownedSkins.includes(skin.id);
-                  const isEquipped = currentAvatar.specialSkin === skin.id;
-                  const canAfford = userLingots >= skin.price;
-
-                  return (
-                    <OptionBox
-                      key={skin.id}
-                      isSelected={isEquipped}
-                      onClick={undefined}
-                    >
-                      <div style={{ fontSize: "2.5rem" }}>
-                        {skin.preview}
-                      </div>
-
-                      <span
-                        style={{
-                          fontSize: "0.95rem",
-                          color: "#fff",
-                        }}
-                      >
-                        {skin.name}
-                      </span>
-
-                      <span
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "#1cb0f6",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
-                      >
-                        💎 {skin.price}
-                      </span>
-
-                      <button
-                        type="button"
-                        disabled={!isOwned && !canAfford}
-                        onClick={() => handleBuySkin(skin)}
-                        style={{
-                          marginTop: 6,
-                          padding: "6px 10px",
-                          borderRadius: 12,
-                          border: "none",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          cursor:
-                            !isOwned && !canAfford
-                              ? "not-allowed"
-                              : "pointer",
-                          backgroundColor: isOwned ? "#48BB78" : "#1CB0F6",
-                          opacity: !isOwned && !canAfford ? 0.6 : 1,
-                          color: "white",
-                          width: "100%",
-                        }}
-                      >
-                        {isOwned
-                          ? isEquipped
-                            ? "Equipado"
-                            : "Equipar"
-                          : canAfford
-                          ? "Comprar"
-                          : "Insuficiente"}
-                      </button>
-                    </OptionBox>
-                  );
-                })}
-
-                {skinError && (
-                  <p
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <h4
                     style={{
-                      gridColumn: "1 / -1",
-                      color: "#FEB2B2",
-                      fontSize: "0.8rem",
+                      color: "#A0AEC0",
+                      margin: 0,
+                      fontSize: "0.9rem",
+                      textTransform: "uppercase",
                     }}
                   >
-                    {skinError}
-                  </p>
-                )}
+                    Aspectos de temporada
+                  </h4>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontWeight: 800,
+                      color: "#1CB0F6",
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    <span>💎</span>
+                    <span>{effectiveLingots}</span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(160px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {SEASONAL_SKINS.map((skin) => {
+                    const isOwned = effectiveOwnedSkins.includes(skin.id);
+                    const isActive = selectedSkinId === skin.id;
+                    const canAfford =
+                      effectiveLingots >= skin.cost && !!onPurchase;
+
+                    return (
+                      <motion.div
+                        key={skin.id}
+                        whileTap={{ scale: 0.97 }}
+                        style={{
+                          padding: "0.9rem",
+                          borderRadius: "0.9rem",
+                          background: "#2D3748",
+                          border: isActive
+                            ? "2px solid #58CC02"
+                            : isOwned
+                            ? "2px solid #1CB0F6"
+                            : "2px solid #4A5568",
+                          color: "white",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "2rem",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {skin.emoji}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: 800,
+                                fontSize: "0.95rem",
+                                marginBottom: 2,
+                              }}
+                            >
+                              {skin.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "#CBD5E0",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={skin.description}
+                            >
+                              {skin.description}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleSkinAction(skin)}
+                          disabled={!isOwned && (!onPurchase || !canAfford)}
+                          style={{
+                            marginTop: 4,
+                            padding: "8px 10px",
+                            borderRadius: 999,
+                            border: "none",
+                            cursor:
+                              !isOwned && (!onPurchase || !canAfford)
+                                ? "not-allowed"
+                                : "pointer",
+                            fontWeight: 800,
+                            fontSize: "0.8rem",
+                            backgroundColor: isActive
+                              ? "#58CC02"
+                              : isOwned
+                              ? "#1CB0F6"
+                              : "#4A5568",
+                            color: "white",
+                            opacity:
+                              !isOwned && (!onPurchase || !canAfford) ? 0.5 : 1,
+                          }}
+                        >
+                          {isActive
+                            ? "Equipado"
+                            : isOwned
+                            ? "Equipar"
+                            : !onPurchase
+                            ? "Compra no configurada"
+                            : canAfford
+                            ? `Comprar ${skin.cost} 💎`
+                            : "Sin diamantes"}
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
