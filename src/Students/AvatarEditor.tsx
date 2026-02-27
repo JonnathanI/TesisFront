@@ -15,7 +15,7 @@ export interface AvatarAttributes {
   mouth: "smile" | "frown" | "open" | "smirk";
   accessory: "none" | "hat" | "bowtie" | "glasses";
 
-  /** 🔥 Nuevo: id del aspecto especial aplicado */
+  /** id del aspecto especial (solo para marcarlo) */
   specialSkin?: string | null;
 }
 
@@ -226,7 +226,7 @@ const EyeExpressionPreview: React.FC<EyeExpressionPreviewProps> = ({
 );
 
 /* ===========================
-   3. RENDER AVATAR (solo persona)
+   3. RENDER AVATAR
    =========================== */
 
 interface AvatarRendererProps {
@@ -238,17 +238,10 @@ export const AnimatedAvatarRenderer: React.FC<AvatarRendererProps> = ({
   avatar,
   size = 200,
 }) => {
-  // 👉 Aplicar overrides del skin especial si está seleccionado
-  let renderAvatar: AvatarAttributes = avatar;
-  if (avatar.specialSkin) {
-    const skinPack = SPECIAL_SKINS.find((s) => s.id === avatar.specialSkin);
-    if (skinPack) {
-      renderAvatar = { ...avatar, ...skinPack.overrides };
-    }
-  }
-
+  // IMPORTANTE: el skin especial ya se aplica en el editor,
+  // aquí solo usamos los valores del avatar.
   const { skinTone, shirtColor, eyeColor, bodyType, eyes, mouth, accessory } =
-    renderAvatar;
+    avatar;
 
   const bodyBaseY = 145;
   const bodyHeight = 105;
@@ -591,17 +584,37 @@ interface AvatarEditorProps {
   initialAvatar?: AvatarAttributes;
   onSave: (avatar: AvatarAttributes) => void;
   onCancel: () => void;
+
+  /** diamantes iniciales del usuario */
+  initialDiamonds?: number;
+
+  /** skins que ya tiene comprados */
+  initialOwnedSkins?: string[];
+
+  /** callback opcional cuando compra un skin */
+  onPurchaseSkin?: (
+    skinId: string,
+    price: number,
+    newDiamonds: number
+  ) => void;
 }
 
 const AvatarEditor: React.FC<AvatarEditorProps> = ({
   initialAvatar,
   onSave,
   onCancel,
+  initialDiamonds = 0,
+  initialOwnedSkins = [],
+  onPurchaseSkin,
 }) => {
   const [currentAvatar, setCurrentAvatar] = useState<AvatarAttributes>(
     initialAvatar || DEFAULT_AVATAR
   );
   const [activeTab, setActiveTab] = useState<AvatarTab>("eyes");
+
+  const [diamonds, setDiamonds] = useState<number>(initialDiamonds);
+  const [ownedSkins, setOwnedSkins] = useState<string[]>(initialOwnedSkins);
+  const [skinError, setSkinError] = useState<string>("");
 
   const updateAttr = (key: keyof AvatarAttributes, value: any) => {
     setCurrentAvatar((prev) => ({ ...prev, [key]: value }));
@@ -683,7 +696,23 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     .ae-title{
       color: white;
-      margin: 0 0 14px 0;
+      margin: 0 0 6px 0;
+    }
+
+    .ae-subtitle{
+      color: #A0AEC0;
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+    }
+
+    .ae-diamonds{
+      color: #F6E05E;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
     }
 
     .ae-tabs{
@@ -795,15 +824,23 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     </button>
   );
 
-  const OptionBox = ({ children, onClick, isSelected }: any) => (
+  const OptionBox = ({
+    children,
+    onClick,
+    isSelected,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    isSelected?: boolean;
+  }) => (
     <motion.div
-      whileTap={{ scale: 0.95 }}
+      whileTap={onClick ? { scale: 0.95 } : undefined}
       onClick={onClick}
       style={{
         padding: "0.8rem",
         borderRadius: "0.8rem",
         background: "#2d3748",
-        cursor: "pointer",
+        cursor: onClick ? "pointer" : "default",
         border: isSelected ? "2px solid #1cb0f6" : "2px solid #4a5568",
         textAlign: "center",
         color: "white",
@@ -836,6 +873,43 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
     />
   );
 
+  /* ==============
+     HANDLERS SKINS
+     ==============*/
+
+  const handleBuySkin = (skin: SpecialSkin) => {
+    if (ownedSkins.includes(skin.id)) return;
+
+    if (diamonds < skin.price) {
+      setSkinError("No tienes suficientes diamantes para este aspecto.");
+      return;
+    }
+
+    const newDiamonds = diamonds - skin.price;
+    setDiamonds(newDiamonds);
+    setOwnedSkins((prev) => [...prev, skin.id]);
+    setSkinError("");
+
+    if (onPurchaseSkin) {
+      onPurchaseSkin(skin.id, skin.price, newDiamonds);
+    }
+
+    // Después de comprar, equipamos directo
+    handleEquipSkin(skin);
+  };
+
+  const handleEquipSkin = (skin: SpecialSkin) => {
+    if (!ownedSkins.includes(skin.id)) return;
+
+    // Aplica overrides sobre el avatar actual,
+    // pero luego se puede seguir editando normalmente.
+    setCurrentAvatar((prev) => ({
+      ...prev,
+      ...skin.overrides,
+      specialSkin: skin.id,
+    }));
+  };
+
   return (
     <div className="ae-overlay">
       <style>{styles}</style>
@@ -853,6 +927,14 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
         {/* CONTROLES */}
         <div className="ae-controls">
           <h2 className="ae-title">Edita tu Avatar</h2>
+          <div className="ae-diamonds">
+            <span>💎 Diamantes:</span>
+            <span>{diamonds}</span>
+          </div>
+          <p className="ae-subtitle">
+            Personaliza tu personaje o compra aspectos especiales de
+            festividades.
+          </p>
 
           {/* pestañas */}
           <div className="ae-tabs">
@@ -1148,33 +1230,80 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                   gap: 12,
                 }}
               >
-                {SPECIAL_SKINS.map((skin) => (
-                  <OptionBox
-                    key={skin.id}
-                    onClick={() => updateAttr("specialSkin", skin.id)}
-                    isSelected={currentAvatar.specialSkin === skin.id}
-                  >
-                    <div style={{ fontSize: "2.5rem" }}>{skin.preview}</div>
-                    <span style={{ fontSize: "0.9rem", color: "#fff" }}>
-                      {skin.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "#1cb0f6",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
+                {SPECIAL_SKINS.map((skin) => {
+                  const isOwned = ownedSkins.includes(skin.id);
+                  const isEquipped = currentAvatar.specialSkin === skin.id;
+
+                  return (
+                    <OptionBox
+                      key={skin.id}
+                      isSelected={isEquipped}
+                      onClick={
+                        isOwned
+                          ? () => handleEquipSkin(skin)
+                          : () => handleBuySkin(skin)
+                      }
                     >
-                      💎 {skin.price}
-                    </span>
-                  </OptionBox>
-                ))}
+                      <div style={{ fontSize: "2.5rem" }}>{skin.preview}</div>
+                      <span style={{ fontSize: "0.95rem", color: "#fff" }}>
+                        {skin.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "#1cb0f6",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        💎 {skin.price}
+                      </span>
+
+                      <button
+                        style={{
+                          marginTop: 6,
+                          padding: "6px 10px",
+                          borderRadius: 12,
+                          border: "none",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          backgroundColor: isOwned ? "#48BB78" : "#1CB0F6",
+                          color: "white",
+                          width: "100%",
+                        }}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isOwned) {
+                            handleEquipSkin(skin);
+                          } else {
+                            handleBuySkin(skin);
+                          }
+                        }}
+                      >
+                        {isOwned ? (isEquipped ? "Equipado" : "Equipar") : "Comprar"}
+                      </button>
+                    </OptionBox>
+                  );
+                })}
+                {skinError && (
+                  <p
+                    style={{
+                      gridColumn: "1 / -1",
+                      color: "#FEB2B2",
+                      fontSize: "0.8rem",
+                      marginTop: 4,
+                    }}
+                  >
+                    {skinError}
+                  </p>
+                )}
               </div>
             )}
           </div>
