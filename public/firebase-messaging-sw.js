@@ -4,8 +4,7 @@
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
-// (las dobles importScripts que tenías eran repetidas, las dejamos solo una vez)
-
+// Init Firebase en el SW (mismo proyecto que en tu front)
 firebase.initializeApp({
   apiKey: "AIzaSyBeJr6Cyz0MXgOXcLS847tmdfSbTO3z6ok",
   authDomain: "europeek-ee4ae.firebaseapp.com",
@@ -17,34 +16,31 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// 😎 Recibe notificaciones cuando la web está cerrada o minimizada
+// 🔔 Notificaciones cuando la web está CERRADA o en segundo plano
 messaging.onBackgroundMessage((payload) => {
-  console.log("💬 Notificación recibida en segundo plano (BG):", payload);
+  console.log("💬 [SW] Notificación BG recibida:", payload);
 
   const notif = payload.notification || {};
   const data = payload.data || {};
 
-  // 1) Título: notification.title → data.title → data.type → fallback
+  // Título
   const title =
     notif.title ||
     data.title ||
     (data.type === "MESSAGE_RECEIVED"
       ? "Nuevo mensaje"
       : data.type === "TASK_ASSIGNED"
-      ? "Nueva tarea"
+      ? "Nueva tarea asignada"
       : "Notificación");
 
-  // 2) Cuerpo: notification.body → data.body → data.message → vacío
-  const body =
-    notif.body ||
-    data.body ||
-    data.message ||
-    "";
+  // Cuerpo
+  const body = notif.body || data.body || data.message || "";
 
   const options = {
     body,
-    icon: "/logo192.png",
-    data, // acá va type, relatedId, userId, etc.
+    icon: "/favicon.ico",   // mucho más seguro que /logo192.png
+    badge: "/favicon.ico",
+    data,                   // aquí viaja type, relatedId, etc.
   };
 
   self.registration.showNotification(title, options);
@@ -56,12 +52,9 @@ self.addEventListener("notificationclick", (event) => {
 
   const data = event.notification.data || {};
   const type = data.type;
-  const relatedId = data.relatedId;
-
   let url = "/";
 
   if (type === "MESSAGE_RECEIVED") {
-    // 🔔 Mensaje → lo llevamos al dashboard del estudiante (luego puedes afinar esto)
     url = "/student/dashboard";
   } else if (type === "TASK_ASSIGNED") {
     url = "/student/dashboard?tab=groups";
