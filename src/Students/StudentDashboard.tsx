@@ -17,11 +17,12 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { EvaluationsSection } from "./sections/EvaluationsSection";
 
-// ⬇️ NUEVO IMPORT
+// ⬇️ NOTIFICACIONES
 import { NotificationsBell } from "./components/NotificationsBell";
 import { requestNotificationPermissionAndToken } from "../firebase";
 import { registerFcmToken } from "../api/auth.service";
 
+// ⬇️ API
 import {
   getUserProfile,
   getCourses,
@@ -42,6 +43,12 @@ import {
   UserProfileData,
 } from "../api/auth.types";
 
+// ⬇️ AVATAR EDITOR NUEVO
+import AvatarEditor, {
+  AvatarAttributes,
+  DEFAULT_AVATAR,
+} from "../Students/AvatarEditor";
+
 const StudentDashboard = () => {
   const navigate = useNavigate();
 
@@ -52,6 +59,11 @@ const StudentDashboard = () => {
   const [friends, setFriends] = useState<StudentData[]>([]);
   const [units, setUnits] = useState<UnitWithLessons[]>([]);
   const [heartTimer, setHeartTimer] = useState<string>("");
+
+  // 💎 Avatar & skins
+  const [avatar, setAvatar] = useState<AvatarAttributes>(DEFAULT_AVATAR);
+  const [ownedSkins, setOwnedSkins] = useState<string[]>([]);
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
 
   // --- ESTADOS DE CONTROL ---
   const [isLoading, setIsLoading] = useState(true);
@@ -100,13 +112,29 @@ const StudentDashboard = () => {
         setUserProfile(profile);
         setHeartTimer(profile.nextHeartRegenTime ?? "");
 
+        // 💎 cargar skins desbloqueados (ajusta el nombre del campo según tu backend)
+        const unlockedSkins = ((profile as any).unlockedSkins ||
+          []) as string[];
+        setOwnedSkins(unlockedSkins);
+
+        // 💎 avatar guardado en backend (ajusta el nombre del campo si es distinto)
+        const avatarRaw = (profile as any).avatarData;
+        if (avatarRaw) {
+          try {
+            const parsed =
+              typeof avatarRaw === "string" ? JSON.parse(avatarRaw) : avatarRaw;
+            setAvatar({ ...DEFAULT_AVATAR, ...parsed });
+          } catch (e) {
+            console.warn("No se pudo parsear avatarData:", e);
+          }
+        }
+
         const topUsers = await getGlobalLeaderboard();
         setLeaderboard(topUsers);
 
         const friendsData = await getFriendsList();
         setFriends(friendsData);
 
-        // 🔹 Unidades SOLO de los cursos donde este alumno está inscrito
         const myUnits = await getMyUnits();
         console.log("📘 Unidades del alumno (my-units):", myUnits);
         setUnits(myUnits);
@@ -130,7 +158,7 @@ const StudentDashboard = () => {
     loadData();
   }, [loadData]);
 
-    // 🔥 Registrar token FCM en el backend (solo una vez al entrar)
+  // 🔥 Registrar token FCM en el backend (solo una vez al entrar)
   useEffect(() => {
     const setupFcm = async () => {
       try {
@@ -170,19 +198,61 @@ const StudentDashboard = () => {
     }
   };
 
+  // 🛒 Compras normales de la tienda (vidas, streak, etc.)
   const handlePurchase = async (type: string, cost: number) => {
-    if (userProfile && userProfile.lingots >= cost) {
-      try {
-        await buyShopItem(type);
-        const freshProfile = await getUserProfile();
-        setUserProfile(freshProfile);
-        alert("¡Compra exitosa!");
-      } catch (error: any) {
-        alert(error.message);
-      }
-    } else {
+    if (!userProfile || userProfile.lingots < cost) {
       alert("No tienes suficientes lingotes.");
+      return;
     }
+
+    try {
+      await buyShopItem(type);
+      // refrescamos todo el perfil (incluye diamantes, avatar, skins, etc.)
+      await loadData(true);
+      alert("¡Compra exitosa!");
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Error al procesar la compra.");
+    }
+  };
+
+  // 💎 Compra de aspectos de avatar (skins de temporada)
+  const handleAvatarSkinPurchase = async (skinId: string, cost: number) => {
+    if (!userProfile) return;
+
+    if (userProfile.lingots < cost) {
+      alert("No tienes suficientes gemas para este aspecto.");
+      return;
+    }
+
+    try {
+      // IMPORTANTE: ajusta el identificador según como lo espera tu backend
+      // Por ejemplo: "SKIN_christmas", "SKIN_valentine", etc.
+      await buyShopItem(`SKIN_${skinId.toUpperCase()}`);
+
+      const freshProfile = await loadData(true);
+      const unlockedSkins = ((freshProfile as any).unlockedSkins ||
+        []) as string[];
+      setOwnedSkins(unlockedSkins);
+
+      alert("¡Aspecto adquirido/equipado!");
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Error al comprar el aspecto.");
+    }
+  };
+
+  // ✅ Guardar avatar desde el editor
+  const handleAvatarSave = (newAvatar: AvatarAttributes) => {
+    setAvatar(newAvatar);
+    setShowAvatarEditor(false);
+
+    // 🔴 IMPORTANTE:
+    // Aquí solo se actualiza en memoria.
+    // Si ya tienes un endpoint para guardar el avatar, puedes llamarlo aquí:
+    //
+    // await updateAvatarOnServer(newAvatar);
+    // await loadData(true);
   };
 
   const handleLogout = () => {
@@ -227,7 +297,7 @@ const StudentDashboard = () => {
     };
   }, [isSidebarOpen, isRightPanelOpen]);
 
-  // 🔥 Panel derecho reutilizable (evita duplicar)
+  // 🔥 Panel derecho reutilizable
   const RightPanel = useMemo(() => {
     if (!userProfile) return null;
 
@@ -750,7 +820,36 @@ const StudentDashboard = () => {
               />
             )}
 
-            {section === "profile" && <ProfileSection />}
+            {section === "profile" && (
+              <>
+                <ProfileSection />
+                {userProfile && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowAvatarEditor(true)}
+                      style={{
+                        padding: "10px 18px",
+                        borderRadius: 18,
+                        border: "none",
+                        backgroundColor: "#1CB0F6",
+                        color: "white",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: "0 4px 0 #1899D6",
+                      }}
+                    >
+                      🎨 Editar avatar
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
 
             {section === "badges" && (
               <>
@@ -793,6 +892,18 @@ const StudentDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* 🎨 MODAL DEL AVATAR EDITOR */}
+      {showAvatarEditor && userProfile && (
+        <AvatarEditor
+          initialAvatar={avatar}
+          onSave={handleAvatarSave}
+          onCancel={() => setShowAvatarEditor(false)}
+          userLingots={userProfile.lingots}
+          ownedSkins={ownedSkins}
+          onPurchase={handleAvatarSkinPurchase}
+        />
+      )}
     </div>
   );
 };
