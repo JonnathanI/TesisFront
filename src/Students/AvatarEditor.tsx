@@ -509,28 +509,29 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
   const eyeColors = ["#000000", "#634e34", "#2e536f", "#3d6e70", "#7d5d8c", "#9b111e", "#ffc800", "#999999"];
 
   const styles = `
-   .ae-overlay{
+       .ae-overlay{
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.85);
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;   /* ⬅ antes estaba center */
       z-index: 9999;
-      padding: 16px;
-      overflow-y: auto;        /* ✅ Si el modal es muy alto, se puede scrollear */
-    }
-    .ae-modal{
+      padding: 16px 0;           /* ⬅ padding vertical */
+      overflow-y: auto;          /* ⬅ permite scroll en toda la pantalla */
+    }scro
+        .ae-modal{
       background: #1A202C;
       border-radius: 24px;
       width: 100%;
       max-width: 960px;
-      max-height: 90vh;        /* ✅ No pasa de la altura de la pantalla */
+      /* max-height: 90vh;  ⬅ QUÍTALO */
       display: flex;
       gap: 18px;
       box-shadow: 0 20px 50px rgba(0,0,0,0.5);
       overflow: hidden;
       min-width: 0;
+      margin: 24px auto;         /* ⬅ para que no se pegue al borde superior */
     }
 
     .ae-preview{
