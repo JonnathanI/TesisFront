@@ -38,8 +38,8 @@ messaging.onBackgroundMessage((payload) => {
 
   const options = {
     body,
-    icon: "/favicon.ico",   // mucho más seguro que /logo192.png
-    badge: "/favicon.ico",
+    icon: "/euro-02.png",   // mucho más seguro que /logo192.png
+    badge: "/euro-02.png",
     data,                   // aquí viaja type, relatedId, etc.
   };
 

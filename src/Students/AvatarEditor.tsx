@@ -923,7 +923,6 @@ const AvatarEditor: React.FC<AvatarEditorProps> = ({
             <TabBtn id="body" label="Cuerpo" />
             <TabBtn id="shirt" label="Ropa" />
             <TabBtn id="extra" label="Extras" />
-            <TabBtn id="skins" label="Aspectos" />
           </div>
 
           <div className="ae-scroll">
