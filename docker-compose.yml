@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # OJO: sin /api al final, porque tu código le agrega /api
+        REACT_APP_API_URL: "https://englishpeak.duckdns.org"
+    container_name: tesis-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
