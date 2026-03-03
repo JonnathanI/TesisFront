@@ -59,7 +59,7 @@ export const Login: React.FC = () => {
       document.head.appendChild(link);
     }
     document.body.style.margin = "0";
-    document.body.style.backgroundColor = COLOR_BG_LIGHT;
+    document.body.style.backgroundColor = "transparent";
     document.body.style.color = COLOR_TEXT_DARK;
     document.body.style.fontFamily = "'Poppins', system-ui, sans-serif";
   }, []);
@@ -117,18 +117,24 @@ export const Login: React.FC = () => {
   };
 
   const css = `
-    .login-page{
-      min-height: 100dvh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      padding: 24px;
-      box-sizing: border-box;
-    }
+.login-page{
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  box-sizing: border-box;
+
+  background: url("/images/login-bg.jpg") no-repeat center center;
+  background-size: cover;
+}
 
     .login-logo{
       position: absolute;
+      z-index: 1;
       left: 40px;
       top: 30px;
       font-size: 32px;
@@ -142,6 +148,8 @@ export const Login: React.FC = () => {
     }
 
     .login-card{
+    position: relative;
+    z-index: 1;
       background: ${COLOR_CARD_BG};
       border-radius: 25px;
       padding: 64px 48px;
@@ -286,6 +294,11 @@ export const Login: React.FC = () => {
       .login-input{ padding: 16px 16px; font-size: 1rem; border-radius: 18px; }
       .login-btn{ padding: 16px; font-size: 1.1rem; }
     }
+      @media (max-width: 768px){
+  .login-page{
+    background-position: top center;
+  }
+}
 
     /* ✅ Mobile */
     @media (max-width: 480px){
