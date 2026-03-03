@@ -11,157 +11,223 @@ export default function HomeIngles() {
     <>
       <style>{`
         :root {
-          --color-bg-light: #E5E6E6; 
-          --color-primary-blue: #278DCE; 
-          --color-secondary-yellow: #FFD700; 
-          --color-card-bg: rgba(255, 255, 255, 0.9); 
-          --color-text-dark: #4A4A4A; 
-        }
+  --color-bg-light: #E5E6E6; 
+  --color-primary-blue: #278DCE; 
+  --color-secondary-yellow: #FFD700; 
+  --color-card-bg: rgba(255, 255, 255, 0.9); 
+  --color-text-dark: #4A4A4A; 
+}
 
-        html, body, #root {
-          margin: 0;
-          height: 100%;
-          font-family: 'Poppins', sans-serif;
-          overflow-x: hidden;
-        }
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  font-family: 'Poppins', sans-serif;
+  overflow-x: hidden;
+}
 
-        body {
-          background-color: var(--color-bg-light);
-          color: var(--color-text-dark); 
-        }
+body {
+  background-color: var(--color-bg-light);
+  color: var(--color-text-dark); 
+}
 
-        .home-container {
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-          position: relative;
-          z-index: 1;
-        }
+/* CONTENEDOR */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
 
-        .bird-background {
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          height: 140vh;
-          opacity: 0.5;
-          z-index: 0;
-          pointer-events: none;
-        }
+/* 🔥 FONDO RESPONSIVE */
+.bird-background {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;   /* 🔥 CLAVE */
+  object-position: center;
+  opacity: 0.25;
+  z-index: 0;
+  pointer-events: none;
+}
 
-        /* HEADER CORREGIDO */
-        .home-header {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 15px 40px; /* Padding simétrico */
-          background: rgba(255, 255, 255, 0.95);
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-          z-index: 10;
-          box-sizing: border-box; /* Importante para que el padding no desborde el ancho */
-        }
+/* HEADER */
+.home-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 40px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  z-index: 10;
+  box-sizing: border-box;
+}
 
-        .logo-text {
-          font-size: 32px;
-          font-weight: 900;
-          color: var(--color-primary-blue);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          text-shadow: 2px 2px 0px var(--color-secondary-yellow);
-          cursor: pointer;
-        }
+.logo-text {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--color-primary-blue);
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0px var(--color-secondary-yellow);
+  cursor: pointer;
+}
 
-        /* BOTÓN CORREGIDO */
-        .btn-login-header {
-          padding: 12px 25px;
-          font-size: 16px;
-          font-weight: 700;
-          border-radius: 50px;
-          cursor: pointer;
-          border: 2px solid var(--color-primary-blue);
-          background: white;
-          color: var(--color-primary-blue);
-          transition: all 0.3s ease;
-          white-space: nowrap; /* Evita que el texto se amontone */
-          margin-left: 0; /* Se eliminó el margen negativo que lo ocultaba */
-        }
+.btn-login-header {
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 2px solid var(--color-primary-blue);
+  background: white;
+  color: var(--color-primary-blue);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
 
-        .btn-login-header:hover {
-          background: var(--color-primary-blue);
-          color: white;
-          transform: scale(1.05);
-        }
+.btn-login-header:hover {
+  background: var(--color-primary-blue);
+  color: white;
+  transform: scale(1.05);
+}
 
-        .bird-icon-title {
-          height: 100px;
-          margin-left: 15px;
-          margin-bottom: 10px;
-          animation: floatBird 3s ease-in-out infinite;
-        }
+/* HERO */
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 160px 20px 40px 20px;
+  z-index: 2;
+}
 
-        @keyframes floatBird {
-          0% { transform: translateY(0); }
-          50% { transform: translateY(-15px) rotate(5deg); }
-          100% { transform: translateY(0); }
-        }
+.hero h1 {
+  font-size: 64px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: var(--color-primary-blue);
+  line-height: 1.1;
+}
 
-        .hero {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 150px 20px 0 20px;
-          z-index: 2;
-        }
+.hero h1 span {
+  color: var(--color-secondary-yellow);
+}
 
-        .hero h1 {
-          font-size: 64px;
-          font-weight: 900;
-          text-transform: uppercase;
-          color: var(--color-primary-blue);
-        }
+.hero p {
+  font-size: 20px;
+  margin-bottom: 40px;
+  max-width: 700px;
+}
 
-        .hero h1 span {
-          color: var(--color-secondary-yellow);
-        }
+/* PÁJARO TÍTULO */
+.bird-icon-title {
+  height: 90px;
+  margin-left: 15px;
+  animation: floatBird 3s ease-in-out infinite;
+}
 
-        .hero p {
-          font-size: 20px;
-          margin-bottom: 40px;
-          max-width: 700px;
-        }
+@keyframes floatBird {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-12px) rotate(4deg); }
+  100% { transform: translateY(0); }
+}
 
-        .cards {
-          display: flex;
-          justify-content: center;
-          gap: 30px;
-          margin: 60px 0;
-          z-index: 2;
-        }
+/* CARDS */
+.cards {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;  /* 🔥 IMPORTANTE */
+  gap: 30px;
+  margin: 40px 20px 80px 20px;
+  z-index: 2;
+}
 
-        .card {
-          background: var(--color-card-bg);
-          border-radius: 25px;
-          width: 280px;
-          padding: 30px 20px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
+.card {
+  background: var(--color-card-bg);
+  border-radius: 25px;
+  width: 280px;
+  padding: 30px 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+}
 
-        .card h3 {
-          color: var(--color-primary-blue);
-        }
+.card:hover {
+  transform: translateY(-8px);
+}
 
-        @media (max-width: 900px) {
-          .hero h1 { font-size: 45px; }
-          .cards { flex-direction: column; align-items: center; }
-          .logo-text { font-size: 24px; }
-          .home-header { padding: 15px 20px; }
-        }
+.card h3 {
+  color: var(--color-primary-blue);
+}
+
+/* ===================== */
+/* TABLET */
+/* ===================== */
+@media (max-width: 900px) {
+
+  .hero h1 { font-size: 42px; }
+
+  .hero p { font-size: 18px; }
+
+  .logo-text { font-size: 24px; }
+
+  .home-header { padding: 15px 20px; }
+
+  .bird-icon-title { height: 70px; }
+
+}
+
+/* ===================== */
+/* MOBILE */
+/* ===================== */
+@media (max-width: 480px) {
+
+  .home-header {
+    padding: 12px 15px;
+  }
+
+  .logo-text {
+    font-size: 20px;
+  }
+
+  .btn-login-header {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .hero {
+    padding: 120px 15px 30px 15px;
+  }
+
+  .hero h1 {
+    font-size: 28px;
+  }
+
+  .hero p {
+    font-size: 15px;
+  }
+
+  .bird-icon-title {
+    height: 55px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 350px;
+  }
+
+  .bird-background {
+    opacity: 0.15;
+    object-fit: cover;
+  }
+
+}
       `}</style>
 
       <div className="home-container">
