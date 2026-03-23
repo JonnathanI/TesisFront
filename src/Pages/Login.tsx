@@ -82,7 +82,8 @@ export const Login: React.FC = () => {
       setTimeout(() => {
         if (data.role === "ADMIN") navigate("/admin/dashboard");
         else if (data.role === "TEACHER") navigate("/teacher/dashboard");
-        else navigate("/student/dashboard");
+        else window.location.href =
+              "https://tesisfront-26h1.onrender.com/student/dashboard";
       }, 800);
     } catch (err: any) {
       setError(err?.message || "Credenciales inválidas.");
