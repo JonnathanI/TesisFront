@@ -1,0 +1,28 @@
+{
+  "short_name": "DuoDocente",
+  "name": "Duolingo Clone - Panel Docente",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#58cc02",
+  "background_color": "#ffffff"
+}

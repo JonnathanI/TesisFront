@@ -1,0 +1,20 @@
+{
+  "files": {
+    "main.css": "/static/css/main.c15d6006.css",
+    "main.js": "/static/js/main.5a6cc3ce.js",
+    "static/js/453.1d4e1f31.chunk.js": "/static/js/453.1d4e1f31.chunk.js",
+    "static/media/PrimeraLeccion.png": "/static/media/PrimeraLeccion.007f8a79cff93dcbc7f4.png",
+    "static/media/top7.png": "/static/media/top7.7affcdbdcfb2eec0bec9.png",
+    "static/media/legend.png": "/static/media/legend.40ce19b31515a2a5a0ca.png",
+    "static/media/top1.png": "/static/media/top1.986f4d82aa540a8a301c.png",
+    "static/media/LeccionPerfecta.png": "/static/media/LeccionPerfecta.52807df31ea6b9d45d88.png",
+    "index.html": "/index.html",
+    "main.c15d6006.css.map": "/static/css/main.c15d6006.css.map",
+    "main.5a6cc3ce.js.map": "/static/js/main.5a6cc3ce.js.map",
+    "453.1d4e1f31.chunk.js.map": "/static/js/453.1d4e1f31.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.c15d6006.css",
+    "static/js/main.5a6cc3ce.js"
+  ]
+}
